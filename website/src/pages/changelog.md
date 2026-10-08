@@ -11,46 +11,50 @@ All notable changes to skillshare are documented here. For the full commit histo
 
 ## [0.25.3] - 2026-10-08
 
-
-* release 0.25.3 ([a25215d](https://github.com/runkids/skillshare/commit/a25215dfdcbef2bb6cbcb13e889dca70bad93359))
-
-
 ### New Features
 
-* **extras:** choose which files each target syncs, and edit targets in place ([b699e1c](https://github.com/runkids/skillshare/commit/b699e1cfceec4ce9985e0c7136518296084d75eb))
-* **extras:** choose which files each target syncs, and edit targets in place ([a9ae534](https://github.com/runkids/skillshare/commit/a9ae5349a2d3556b62277f1e0bfbd9166d164895)), closes [#435](https://github.com/runkids/skillshare/issues/435)
-* install config entries from the dashboard, prune deleted skills, calmer Sync and Skills pages ([0edbadc](https://github.com/runkids/skillshare/commit/0edbadca04e9f811bb63eb37873fa6ceb409835a))
-* **install:** install config entries from the dashboard and name repos by owner ([e3af627](https://github.com/runkids/skillshare/commit/e3af6274fc613560b7ae40eaea99b899f4d80ce1))
-* **sync:** explain include filters that select no skill ([8d40e06](https://github.com/runkids/skillshare/commit/8d40e0697533ce6273d01818bd6d49bd5d0fdfdb))
-* **sync:** explain include filters that select no skill ([5d5b0f3](https://github.com/runkids/skillshare/commit/5d5b0f3efb66f2c9c9af7ce902111c470638417c))
-* **ui:** install missing entries, prune deleted skills, and calmer sync and skills pages ([535de2f](https://github.com/runkids/skillshare/commit/535de2fcedcc52d1da9dbc2c5ae369bd5bb44807))
-* **ui:** keep Sync in reach on the Sync page ([1b1c8da](https://github.com/runkids/skillshare/commit/1b1c8da5b425cdf2f5af43d3958ce7e19a41bb7c))
+#### Extras
 
+- **Choose which files each target syncs** — a folder extra used to send every file to every target. Each target can now set `include` and `exclude` patterns in `.gitignore` syntax, matched on the path inside the source. In `merge` mode the next sync removes links to files that stop matching; `copy` mode keeps files it copied before. Filters are refused for `symlink` mode and single-file extras, and `sync` warns when an `include` pattern matches no file. A negated include such as `!draft.md` is not reported as unmatched. Refs: #435.
+  ```bash
+  skillshare extras init docs --target ~/.claude/docs --include index.md --include learning.md
+  skillshare extras docs --target ~/.cursor/docs --add-exclude "draft*"
+  ```
+  - On an extra with more than one target, the filter flags need `--target`, like `--mode`.
+  - Filters written by hand in the config are validated before sync, so a malformed pattern such as `[` stops the sync instead of pruning every link.
+  - Switching a filtered target to `symlink`, from the dashboard or the `extras list` mode picker, is refused.
+- **Edit targets and extras in the dashboard** — **Edit target** changes a target's folder, file name, mode, flatten setting and filters with a live preview. **Edit extra** renames an extra or points it at another source folder. A moved target or source drops the links left at the old place and syncs right away; links into a source folder that was already moved or deleted are relinked too. The config is saved before old links are removed, so a failed save leaves the targets working.
+
+#### Install
+
+- **Install config entries from the dashboard** — what `skillshare install` with no arguments restores is now offered in the dashboard: the **Updates** tab and the install dialog show **Install all** when the config lists entries that are not installed. In project mode they install into the project's `.skillshare/skills`. The install summary counts tracked repos and their skills apart from standalone skills.
+- **Prune skills deleted upstream** — after a check, skills removed from their source repo are listed with **Prune** and **Prune all** on the **Updates** tab, which move them to the trash for 7 days. Prune appears only after a check in the current session.
+- **New tracked repos are named `_<owner>-<repo>`** — `alice/skills` and `bob/skills` install as `_alice-skills` and `_bob-skills` instead of colliding. Existing installs keep their names, and repeating `install --track` for a repo cloned earlier under its old name reuses that checkout instead of cloning a second copy.
+  ```bash
+  skillshare install github.com/alice/skills --track   # → _alice-skills
+  ```
+
+#### Sync
+
+- **Include filters that select no skill are explained** — the CLI says the filter adds nothing to that target. The dashboard's Sync page, sync dialogs and Git Sync (after a pull) show one notice per project, or per global target, saying the target gets no skills, with **Edit filter** linking to where the filter is set. No notice is shown while a followed source link cannot be read, since the skill list is incomplete then.
+- **Calmer Sync page** — targets that get the same changes share one card listing the skills by folder, and the summary and the **Sync** button stay in view while the list scrolls. **Discard all** moves skills that no target has received yet to the trash, after a confirmation. A tracked repo is offered only when none of its skills has been synced, and skills already live through a `symlink`-mode target are left out.
+- **Skills page** — the toolbar and group headings stay in view while scrolling, **New skill** and **Link folder** are in the **Install** menu, filters are remembered in the browser, and **Update repo** is in the repo menu.
 
 ### Bug Fixes
 
-* **extras:** keep a target in config when it cannot be inspected ([e5dcaa5](https://github.com/runkids/skillshare/commit/e5dcaa5f64cce5bf7b3331a82ace6e40f5a7a46d)), closes [#491](https://github.com/runkids/skillshare/issues/491)
-* **extras:** keep filter changes from being dropped or saved invalid ([c182c42](https://github.com/runkids/skillshare/commit/c182c42d1a0994080fdf6aad279c1701772d81dd)), closes [#435](https://github.com/runkids/skillshare/issues/435)
-* **extras:** only treat an actual link as linking to the source ([0127a15](https://github.com/runkids/skillshare/commit/0127a150db131fbc2d642ada2160582fd45a688b)), closes [#491](https://github.com/runkids/skillshare/issues/491)
-* **extras:** prune a symlink target only when it links to the source ([1bf4c32](https://github.com/runkids/skillshare/commit/1bf4c326cb60d11d8d611593400e6f63a2e2a664))
-* **extras:** prune a symlink target only when it links to the source ([36113be](https://github.com/runkids/skillshare/commit/36113be45e28eb4f8767715da88b944ea17cd348)), closes [#491](https://github.com/runkids/skillshare/issues/491)
-* **extras:** recognize junctions as links to the extra's source ([44e8bd5](https://github.com/runkids/skillshare/commit/44e8bd5927ca0dd367d3fcc02a98a383e5e5e414)), closes [#491](https://github.com/runkids/skillshare/issues/491)
-* **extras:** relink symlinks to a missing source and accept negated includes ([7740ee8](https://github.com/runkids/skillshare/commit/7740ee8798c30fcec102953ba46ac8621db6e8f8)), closes [#435](https://github.com/runkids/skillshare/issues/435)
-* **extras:** validate hand-written filters and keep links when a save fails ([72ce921](https://github.com/runkids/skillshare/commit/72ce921eeb70e8bc2e7bfc1a3ee9f48a10545d84)), closes [#435](https://github.com/runkids/skillshare/issues/435)
-* **git:** report unmatched include filters from the sync after a pull ([bd7e67f](https://github.com/runkids/skillshare/commit/bd7e67fffd3737d64cdcf2da2d373c055ae132e8))
-* **install:** reuse a tracked checkout cloned under the old basename name ([906669d](https://github.com/runkids/skillshare/commit/906669df753a8d359347264422577f2cf4becc24))
-* **server:** install config entries into the project source in project mode ([a686ee9](https://github.com/runkids/skillshare/commit/a686ee910ff2cc768745ea810aae43d82e4c7cad))
-* **sync:** link each target's unmatched filter and ignore blank includes ([47be510](https://github.com/runkids/skillshare/commit/47be5105f53109d94c4f1c5f25db5ab06c5eea51))
-* **sync:** skip unmatched include notices when the source is incomplete ([81e0824](https://github.com/runkids/skillshare/commit/81e0824396010d4c364057d242486ea3ecdb22d0))
-* **ui:** keep a context submenu open after switching back to it quickly ([c979bf0](https://github.com/runkids/skillshare/commit/c979bf0701796f2023031b6460c1acee25dc3da4))
-* **ui:** keep Discard all away from skills live in a symlink-mode target ([b09a068](https://github.com/runkids/skillshare/commit/b09a068410d735b57a78b867046a2f783dfd22f9))
-* **ui:** key update check statuses by relative path ([735c0fe](https://github.com/runkids/skillshare/commit/735c0fe876cc108c499bcfa1f3fb97313e7a6d93))
-* **ui:** leave collapsed groups out of the Skills list paging ([66750ac](https://github.com/runkids/skillshare/commit/66750ac4e5c08b1f942518d8a728400d612c61df))
-* **ui:** offer a tracked repo to Discard all only when all of it is new ([f56049d](https://github.com/runkids/skillshare/commit/f56049d3d3f7f9a6b869407de6b6e3517e23501e))
-* **ui:** refresh the sync matrix after installing config entries ([e84075d](https://github.com/runkids/skillshare/commit/e84075dcec94837dfd0bc1e6a4ca28fc8c61f38a))
-* **ui:** require a fresh check before offering prune ([2188be7](https://github.com/runkids/skillshare/commit/2188be740e22644ea4d5b26aa4d5a648ff9852af))
-* **ui:** show a skill and an agent with the same name as two sync rows ([e36c38a](https://github.com/runkids/skillshare/commit/e36c38abfce96b9a08a71874c86fc1896e595293))
-* **ui:** show unmatched filter notices in every sync dialog ([819ea63](https://github.com/runkids/skillshare/commit/819ea634f598670cacdaa951d853fc209f862f55))
+#### Extras
+
+- **`--remove-target --prune` keeps a symlink target that does not link to the source** — the CLI removed a `symlink`-mode target wherever it pointed, so a link repointed at your own folder could be lost. Like the dashboard, it now removes only a link to the extra's source, and warns and leaves anything else. Refs: #491.
+  - Windows junctions created when Developer Mode is off are recognized as links to the source, so they are removed instead of left behind.
+  - A real folder reached through a symlinked parent of the source is kept instead of failing with "not a symlink".
+  - When the target cannot be inspected, for example because of a permission error, the target stays in the config and the error is reported, so you can retry.
+
+#### Dashboard
+
+- **A skill and an agent with the same name show as two sync rows** — `reviewer` and `reviewer.md` were merged into one row while the header counted two changes.
+- **Update check statuses are kept per folder** — `a/foo` and `b/foo` shared one status, so a result for one was shown for the other.
+- **Collapsed groups no longer use up Skills list paging** — their items took places on the 100-item page, hiding later groups behind **Show more**.
+- **Context submenus stay open** — moving from one submenu to another and back quickly closed the first one a moment after it opened.
 
 ## [0.25.2] - 2026-10-07
 
