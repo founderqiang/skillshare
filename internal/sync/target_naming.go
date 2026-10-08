@@ -167,8 +167,9 @@ func (r *TargetSkillResolution) LegacyNames(mode, targetPath string, manifest *M
 	if r == nil {
 		return legacy
 	}
+	taken := r.ValidTargetNames()
 	for _, skill := range r.Skills {
-		if name, _, err := findLegacyTargetEntry(mode, targetPath, skill, manifest); err == nil && name != "" {
+		if name, _, err := findLegacyTargetEntry(mode, targetPath, skill, taken, manifest); err == nil && name != "" {
 			legacy[name] = skill
 		}
 	}

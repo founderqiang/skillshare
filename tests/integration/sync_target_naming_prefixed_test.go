@@ -217,3 +217,34 @@ func TestTarget_SetPrefixedNamingNeedsCopyMode(t *testing.T) {
 	sb.RunCLI("sync").AssertSuccess(t)
 	assertEntries(t, sb, targetPath, "emil-design-prototype", "mattpocock-skills-prototype", "my-skill")
 }
+
+func TestSync_TargetNaming_OldManifestDoesNotTakeAnotherSkillsEntry(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	sb.CreateSkill("dev", map[string]string{"SKILL.md": "---\nname: dev\n---\n# top"})
+	// "aaa/dev" syncs before "dev", so its lookup runs before dev records its naming.
+	sb.CreateNestedSkill("aaa/dev", map[string]string{"SKILL.md": "---\nname: dev\n---\n# nested"})
+	targetPath := sb.CreateTarget("claude")
+	writeNamingConfig(sb, targetPath, "flat", "copy")
+	sb.RunCLI("sync").AssertSuccess(t)
+
+	// Under an old manifest, "dev" is also aaa/dev's standard name; it
+	// still belongs to the top-level skill that syncs to it.
+	manifest := readSyncManifest(t, sb, targetPath)
+	manifest.Naming = nil
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sb.WriteFile(filepath.Join(targetPath, ssync.ManifestFile), string(data))
+
+	result := sb.RunCLI("sync")
+	result.AssertSuccess(t)
+	result.AssertOutputNotContains(t, "kept legacy")
+	if got := sb.ReadFile(filepath.Join(targetPath, "dev", "SKILL.md")); !strings.Contains(got, "# top") {
+		t.Fatalf("dev was overwritten:\n%s", got)
+	}
+	if got := sb.ReadFile(filepath.Join(targetPath, "aaa__dev", "SKILL.md")); !strings.Contains(got, "# nested") {
+		t.Fatalf("aaa__dev has the wrong content:\n%s", got)
+	}
+}

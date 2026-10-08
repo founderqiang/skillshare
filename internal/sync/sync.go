@@ -609,9 +609,10 @@ func SyncTargetMergeWithSkills(name string, target config.TargetConfig, allSkill
 		return nil, fmt.Errorf("failed to read manifest: %w", err)
 	}
 
+	taken := resolution.ValidTargetNames()
 	for _, resolved := range resolution.Skills {
 		skill := resolved.Skill
-		activeName, err := selectActiveTargetNameForSync("merge", sc.Path, resolved, manifest, dryRun)
+		activeName, err := selectActiveTargetNameForSync("merge", sc.Path, resolved, taken, manifest, dryRun)
 		if err != nil {
 			return nil, err
 		}

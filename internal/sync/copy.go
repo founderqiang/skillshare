@@ -101,9 +101,10 @@ func SyncTargetCopyWithSkillsOptions(name string, target config.TargetConfig, al
 		manifest.Naming = make(map[string]string)
 	}
 
+	taken := resolution.ValidTargetNames()
 	for i, resolved := range resolution.Skills {
 		skill := resolved.Skill
-		activeName, err := selectActiveTargetNameForSync("copy", sc.Path, resolved, manifest, dryRun)
+		activeName, err := selectActiveTargetNameForSync("copy", sc.Path, resolved, taken, manifest, dryRun)
 		if err != nil {
 			return nil, err
 		}
