@@ -192,6 +192,25 @@ func TestHandlePatchConfig_SavesModeAndLogLimit(t *testing.T) {
 	}
 }
 
+func TestHandlePatchConfig_ModeKeepsInheritedPrefixedNamingValid(t *testing.T) {
+	s, _ := newTestServerWithTargets(t, map[string]string{"claude": filepath.Join(t.TempDir(), "skills")})
+	patch := func(url, body string) int {
+		rr := httptest.NewRecorder()
+		s.handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPatch, url, strings.NewReader(body)))
+		return rr.Code
+	}
+
+	if code := patch("/api/config", `{"mode":"copy"}`); code != http.StatusOK {
+		t.Fatalf("set copy: got %d", code)
+	}
+	if code := patch("/api/targets/claude", `{"target_naming":"prefixed"}`); code != http.StatusOK {
+		t.Fatalf("set prefixed on a target inheriting copy: got %d", code)
+	}
+	if code := patch("/api/config", `{"mode":"merge"}`); code != http.StatusBadRequest {
+		t.Fatalf("global merge under an inheriting prefixed target: got %d, want 400", code)
+	}
+}
+
 func TestHandlePutConfig_InvalidHooks_400(t *testing.T) {
 	s, sourceDir := newTestServer(t)
 	body := `{"raw":"source: ` + sourceDir + `\nmode: merge\ntargets: {}\nhooks:\n  entries:\n    guard:\n      bindings:\n        nosuchagent:\n          events: {}\n"}`
