@@ -108,7 +108,7 @@ type SkillsFolderConflict struct {
 }
 
 // SkillsFolderConflicts returns the shared skills folders whose targets'
-// filters, mode or target naming differ, sorted by path. defaultMode is the
+// filters, mode or (outside symlink mode) target naming differ, sorted by path. defaultMode is the
 // global mode a target without its own inherits. Targets with identical
 // settings agree on the folder's contents and are not a conflict. universal
 // is kept when it is in the group, otherwise the alphabetically first target.

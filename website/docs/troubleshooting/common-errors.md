@@ -123,7 +123,7 @@ skillshare restore <target>
 
 ### `sync` keeps showing the same changes {#sync-keeps-showing-the-same-changes}
 
-**Cause:** Two targets sync skills into the same folder with different `include` or `exclude` filters, `mode`, or `target_naming`. Each sync adds what one target wants and removes what the other filters out, so the folder never settles. `sync` names them:
+**Cause:** Two targets sync skills into the same folder with different `include` or `exclude` filters, `mode`, or `target_naming` (naming only matters outside `symlink` mode, which links the whole folder). Each sync adds what one target wants and removes what the other filters out, so the folder never settles. `sync` names them:
 
 ```
 ! codex and universal sync skills to ~/.agents/skills with different settings, so each sync undoes the other
