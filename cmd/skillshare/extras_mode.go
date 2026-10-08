@@ -117,7 +117,7 @@ func cmdExtrasMode(args []string) error {
 					targetPath = extra.Targets[0].Path
 				default:
 					// flatten-only changes apply to all targets when --target is omitted
-					if flattenSet && syncMode == "" {
+					if flattenSet && syncMode == "" && !filters.hasUpdates() {
 						return applyFlattenAll(extras, name, flattenVal, saveFn, configPath, start)
 					}
 					return fmt.Errorf("extra %q has %d targets — use --target to specify which one", name, len(extra.Targets))

@@ -90,3 +90,14 @@ func TestSyncExtras_WarnsUnmatchedInclude(t *testing.T) {
 	result.AssertSuccess(t)
 	result.AssertAnyOutputContains(t, `include "index.mdd" matches no file`)
 }
+
+func TestExtras_FlattenWithFilterNeedsTargetOnMultiTargetExtra(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	setupDocsExtra(t, sb, "\n      - path: "+filepath.Join(sb.Home, ".cursor", "docs"))
+
+	result := sb.RunCLI("extras", "docs", "--flatten", "--add-exclude", "draft*", "-g")
+
+	result.AssertFailure(t)
+	result.AssertAnyOutputContains(t, "--target")
+}
