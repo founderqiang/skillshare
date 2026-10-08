@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, Tag } from 'lucide-react';
@@ -32,6 +32,16 @@ export default function HubView({ title, draftId, url, actions }: Props) {
   const [filter, setFilter] = useState('');
   const [tag, setTag] = useState('');
   const [installing, setInstalling] = useState<string | null>(null);
+  // The bar draws its bottom line once it pins to the top.
+  const [stuck, setStuck] = useState(false);
+  const sentinel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([e]) => setStuck(!e.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   const draft = useQuery({
     queryKey: queryKeys.hub.draft(draftId ?? ''),
@@ -81,8 +91,10 @@ export default function HubView({ title, draftId, url, actions }: Props) {
   return (
     <div className="flex min-w-0 flex-col gap-3">
       {/* The filter has to stay reachable: a hosted hub runs to hundreds of rows.
-          The band runs wider than the content so the list's offset shadow scrolls under it too. */}
-      <div className="sticky top-0 z-10 -mx-2 flex flex-col gap-3 bg-bg px-2">
+          The bar's padding gives it room once pinned; -my-3 keeps the resting layout tight,
+          and the marker sits at the bar's top edge so `stuck` flips as it pins. */}
+      <div ref={sentinel} aria-hidden className="-mt-3 h-0" />
+      <div className={`ss-stickbar -my-3 flex flex-col gap-3 ${stuck ? 'stuck' : ''}`}>
         <div className="ss-sec !mb-0 !items-center">
           <h2>{title}</h2>
           {results && <span className="ss-cnt">{results.length}</span>}

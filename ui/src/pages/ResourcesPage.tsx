@@ -862,7 +862,8 @@ export default function ResourcesPage({ kind }: { kind: Kind }) {
             </div>
           )}
 
-          <div ref={sentinel} aria-hidden className="-mt-2 h-0" />
+          {/* Pulled up so the controls sit 16px under the tabs; the marker stays one flex gap above the bar, as before. */}
+          <div ref={sentinel} aria-hidden className="-mt-[52px] h-0" />
           {/* Every control sizes to its label: fixed widths truncated the longer values
               ("xcode-claude", "Disabled") and pushed the row past the container. */}
           <div ref={bar} className={`ss-stickbar ${stuck ? 'stuck' : ''}`}>
@@ -990,7 +991,7 @@ export default function ResourcesPage({ kind }: { kind: Kind }) {
           </div>
           </div>
 
-          <div className="-mt-3" style={{ '--stick': `${barHeight}px` } as React.CSSProperties}>
+          <div className="-mt-6" style={{ '--stick': `${barHeight}px` } as React.CSSProperties}>
             {content}
             {total > 0 && (
               <div className="flex items-center justify-between mt-3">
