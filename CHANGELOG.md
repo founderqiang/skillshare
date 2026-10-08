@@ -1,5 +1,48 @@
 # Changelog
 
+## [0.25.3](https://github.com/runkids/skillshare/compare/v0.25.2...v0.25.3) (2026-10-08)
+
+
+* release 0.25.3 ([a25215d](https://github.com/runkids/skillshare/commit/a25215dfdcbef2bb6cbcb13e889dca70bad93359))
+
+
+### New Features
+
+* **extras:** choose which files each target syncs, and edit targets in place ([b699e1c](https://github.com/runkids/skillshare/commit/b699e1cfceec4ce9985e0c7136518296084d75eb))
+* **extras:** choose which files each target syncs, and edit targets in place ([a9ae534](https://github.com/runkids/skillshare/commit/a9ae5349a2d3556b62277f1e0bfbd9166d164895)), closes [#435](https://github.com/runkids/skillshare/issues/435)
+* install config entries from the dashboard, prune deleted skills, calmer Sync and Skills pages ([0edbadc](https://github.com/runkids/skillshare/commit/0edbadca04e9f811bb63eb37873fa6ceb409835a))
+* **install:** install config entries from the dashboard and name repos by owner ([e3af627](https://github.com/runkids/skillshare/commit/e3af6274fc613560b7ae40eaea99b899f4d80ce1))
+* **sync:** explain include filters that select no skill ([8d40e06](https://github.com/runkids/skillshare/commit/8d40e0697533ce6273d01818bd6d49bd5d0fdfdb))
+* **sync:** explain include filters that select no skill ([5d5b0f3](https://github.com/runkids/skillshare/commit/5d5b0f3efb66f2c9c9af7ce902111c470638417c))
+* **ui:** install missing entries, prune deleted skills, and calmer sync and skills pages ([535de2f](https://github.com/runkids/skillshare/commit/535de2fcedcc52d1da9dbc2c5ae369bd5bb44807))
+* **ui:** keep Sync in reach on the Sync page ([1b1c8da](https://github.com/runkids/skillshare/commit/1b1c8da5b425cdf2f5af43d3958ce7e19a41bb7c))
+
+
+### Bug Fixes
+
+* **extras:** keep a target in config when it cannot be inspected ([e5dcaa5](https://github.com/runkids/skillshare/commit/e5dcaa5f64cce5bf7b3331a82ace6e40f5a7a46d)), closes [#491](https://github.com/runkids/skillshare/issues/491)
+* **extras:** keep filter changes from being dropped or saved invalid ([c182c42](https://github.com/runkids/skillshare/commit/c182c42d1a0994080fdf6aad279c1701772d81dd)), closes [#435](https://github.com/runkids/skillshare/issues/435)
+* **extras:** only treat an actual link as linking to the source ([0127a15](https://github.com/runkids/skillshare/commit/0127a150db131fbc2d642ada2160582fd45a688b)), closes [#491](https://github.com/runkids/skillshare/issues/491)
+* **extras:** prune a symlink target only when it links to the source ([1bf4c32](https://github.com/runkids/skillshare/commit/1bf4c326cb60d11d8d611593400e6f63a2e2a664))
+* **extras:** prune a symlink target only when it links to the source ([36113be](https://github.com/runkids/skillshare/commit/36113be45e28eb4f8767715da88b944ea17cd348)), closes [#491](https://github.com/runkids/skillshare/issues/491)
+* **extras:** recognize junctions as links to the extra's source ([44e8bd5](https://github.com/runkids/skillshare/commit/44e8bd5927ca0dd367d3fcc02a98a383e5e5e414)), closes [#491](https://github.com/runkids/skillshare/issues/491)
+* **extras:** relink symlinks to a missing source and accept negated includes ([7740ee8](https://github.com/runkids/skillshare/commit/7740ee8798c30fcec102953ba46ac8621db6e8f8)), closes [#435](https://github.com/runkids/skillshare/issues/435)
+* **extras:** validate hand-written filters and keep links when a save fails ([72ce921](https://github.com/runkids/skillshare/commit/72ce921eeb70e8bc2e7bfc1a3ee9f48a10545d84)), closes [#435](https://github.com/runkids/skillshare/issues/435)
+* **git:** report unmatched include filters from the sync after a pull ([bd7e67f](https://github.com/runkids/skillshare/commit/bd7e67fffd3737d64cdcf2da2d373c055ae132e8))
+* **install:** reuse a tracked checkout cloned under the old basename name ([906669d](https://github.com/runkids/skillshare/commit/906669df753a8d359347264422577f2cf4becc24))
+* **server:** install config entries into the project source in project mode ([a686ee9](https://github.com/runkids/skillshare/commit/a686ee910ff2cc768745ea810aae43d82e4c7cad))
+* **sync:** link each target's unmatched filter and ignore blank includes ([47be510](https://github.com/runkids/skillshare/commit/47be5105f53109d94c4f1c5f25db5ab06c5eea51))
+* **sync:** skip unmatched include notices when the source is incomplete ([81e0824](https://github.com/runkids/skillshare/commit/81e0824396010d4c364057d242486ea3ecdb22d0))
+* **ui:** keep a context submenu open after switching back to it quickly ([c979bf0](https://github.com/runkids/skillshare/commit/c979bf0701796f2023031b6460c1acee25dc3da4))
+* **ui:** keep Discard all away from skills live in a symlink-mode target ([b09a068](https://github.com/runkids/skillshare/commit/b09a068410d735b57a78b867046a2f783dfd22f9))
+* **ui:** key update check statuses by relative path ([735c0fe](https://github.com/runkids/skillshare/commit/735c0fe876cc108c499bcfa1f3fb97313e7a6d93))
+* **ui:** leave collapsed groups out of the Skills list paging ([66750ac](https://github.com/runkids/skillshare/commit/66750ac4e5c08b1f942518d8a728400d612c61df))
+* **ui:** offer a tracked repo to Discard all only when all of it is new ([f56049d](https://github.com/runkids/skillshare/commit/f56049d3d3f7f9a6b869407de6b6e3517e23501e))
+* **ui:** refresh the sync matrix after installing config entries ([e84075d](https://github.com/runkids/skillshare/commit/e84075dcec94837dfd0bc1e6a4ca28fc8c61f38a))
+* **ui:** require a fresh check before offering prune ([2188be7](https://github.com/runkids/skillshare/commit/2188be740e22644ea4d5b26aa4d5a648ff9852af))
+* **ui:** show a skill and an agent with the same name as two sync rows ([e36c38a](https://github.com/runkids/skillshare/commit/e36c38abfce96b9a08a71874c86fc1896e595293))
+* **ui:** show unmatched filter notices in every sync dialog ([819ea63](https://github.com/runkids/skillshare/commit/819ea634f598670cacdaa951d853fc209f862f55))
+
 ## [0.25.2] - 2026-10-07
 
 ### Bug Fixes
