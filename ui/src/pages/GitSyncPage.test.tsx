@@ -50,6 +50,15 @@ describe('updates from another computer', () => {
     ],
   };
 
+  it('explains an include filter that selects no skill after the pull syncs', async () => {
+    vi.mocked(api.gitStatus).mockResolvedValue({ ...status, hasRemote: true, isDirty: false, files: [], ahead: 1, behind: 1 });
+    vi.mocked(api.pull).mockResolvedValue({ success: true, upToDate: false, commits: [], stats: { filesChanged: 1, insertions: 1, deletions: 0 }, syncResults: [],
+      unmatched: [{ target: 'claude', patterns: ['*review*'], all: true }] });
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: 'Pull and merge' }));
+    expect(await screen.findByRole('link', { name: 'Edit filter' })).toHaveAttribute('href', '/targets/claude');
+  });
+
   it('compares conflicts and requires a choice for every file before applying', async () => {
     vi.mocked(api.gitStatus).mockResolvedValue({ ...status, hasRemote: true, isDirty: false, files: [], ahead: 1, behind: 1 });
     vi.mocked(api.pull).mockRejectedValueOnce(new ApiError(409, 'conflict', { code: 'pull_conflict', params: conflicts }));

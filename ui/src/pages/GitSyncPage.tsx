@@ -14,6 +14,7 @@ import { PageSkeleton } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
 import { parseStatusLine } from '../components/git/gitView';
 import PullConflictDialog from '../components/git/PullConflictDialog';
+import UnmatchedNotices from '../components/sync/UnmatchedNotices';
 import type { GitPullConflict, GitPullResolution } from '../api/types/git';
 import { useAppContext } from '../context/AppContext';
 import { useT, plural } from '../i18n';
@@ -275,6 +276,7 @@ export default function GitSyncPage() {
           </div>
         )}
         {pulled?.warnings?.map((w) => <div key={w} className="ss-note warn"><AlertTriangle size={16} /><span className="flex-1 break-words">{w}</span></div>)}
+        <UnmatchedNotices items={pulled?.unmatched} />
       </div>
 
       {!status.isRepo ? (
