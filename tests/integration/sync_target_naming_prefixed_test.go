@@ -248,3 +248,20 @@ func TestSync_TargetNaming_OldManifestDoesNotTakeAnotherSkillsEntry(t *testing.T
 		t.Fatalf("aaa__dev has the wrong content:\n%s", got)
 	}
 }
+
+func TestSync_TargetNamingPrefixed_ProjectMode(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	projectRoot := sb.SetupProjectDir("claude")
+	sb.CreateProjectSkill(projectRoot, "_emil-design/prototype", map[string]string{"SKILL.md": "---\nname: prototype\n---\n# Emil"})
+	sb.CreateProjectSkill(projectRoot, "_mattpocock-skills/prototype", map[string]string{"SKILL.md": "---\nname: prototype\n---\n# Matt"})
+	sb.WriteProjectConfig(projectRoot, `target_naming: prefixed
+targets:
+  - name: claude
+    skills:
+      mode: copy
+`)
+
+	sb.RunCLIInDir(projectRoot, "sync", "-p").AssertSuccess(t)
+	assertEntries(t, sb, filepath.Join(projectRoot, ".claude", "skills"), "emil-design-prototype", "mattpocock-skills-prototype")
+}
