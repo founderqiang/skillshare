@@ -24,7 +24,7 @@ import ProjectInstructions from '../components/instructions/ProjectInstructions'
 import SharedInstructions from '../components/instructions/SharedInstructions';
 import { isAgentsExtra } from '../components/instructions/instructionsView';
 import { useAvailableTargetsQuery, useOverviewQuery } from '../hooks/useSharedQueries';
-import { EditExtraDialog, EditTargetDialog, FILE_MODES, MODES, joinFile } from '../components/extras/ExtraEditDialogs';
+import { EditExtraDialog, EditTargetDialog, FILE_MODES, MODES, applyDraftChange, joinFile } from '../components/extras/ExtraEditDialogs';
 import { invalidate } from '../lib/queryEvents';
 
 /** A file name typed where a path would be wrong. */
@@ -112,7 +112,7 @@ function FileDraftFields({ draft, onChange, fileName, known, disabled }: {
       <Select
         className="w-[104px] shrink-0"
         value={draft.mode}
-        onChange={(v) => onChange({ ...draft, mode: v })}
+        onChange={(v) => onChange(applyDraftChange(draft, { mode: v }))}
         options={FILE_MODES.map((m) => ({ value: m, label: m, description: t(`extras.fileModeDescription.${m}`) }))}
         disabled={disabled}
       />
@@ -145,15 +145,14 @@ function DraftFields({ draft, onChange, extensions, known, disabled }: {
       <Select
         className="w-[170px] shrink-0"
         value={draft.extension}
-        // An extension converts each file, so it always writes copies
-        onChange={(v) => onChange({ ...draft, extension: v, ...(v ? { mode: 'copy' } : {}) })}
+        onChange={(v) => onChange(applyDraftChange(draft, { extension: v }))}
         options={[{ value: '', label: t('extras.noExtension') }, ...extensions.map((e) => ({ value: e, label: e }))]}
         disabled={disabled || extensions.length === 0}
       />
       <Select
         className="w-[104px] shrink-0"
         value={locked ? 'copy' : draft.mode}
-        onChange={(v) => onChange({ ...draft, mode: v, ...(v === 'symlink' ? { flatten: false } : {}) })}
+        onChange={(v) => onChange(applyDraftChange(draft, { mode: v }))}
         options={MODES.map((m) => ({ value: m, label: m, description: t(`extras.modeDescription.${m}`) }))}
         disabled={disabled || locked}
       />
