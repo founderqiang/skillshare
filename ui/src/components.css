@@ -638,7 +638,7 @@ button:disabled { cursor: not-allowed; }
 .ss-inp input::placeholder, .ss-inp textarea::placeholder { color: var(--ink-3); }
 .ss-inp.area textarea { resize: vertical; min-height: 64px; line-height: 1.55; }
 .ss-seg>*, .ss-tabs>*, .ss-pager>*, .ss-menu>a, .ss-more { cursor: pointer; }
-.ss-seg>*:not(.on):hover, .ss-tabs>*:not(.on):hover { color: var(--ink); }
+.ss-seg>*:not(.on):not(:disabled):hover, .ss-tabs>*:not(.on):hover { color: var(--ink); }
 .ss-menu>:is(a,button) { width: 100%; text-align: left; }
 .ss-menu>:is(a,button):not(.dng):hover { background: var(--sel); color: var(--sel-ink); }
 :root[data-theme="playful"] .ss-menu>:is(a,button):not(.dng):hover { background: var(--pa); }

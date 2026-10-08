@@ -4,7 +4,7 @@ interface Option<T extends string> {
   value: T;
   label: ReactNode;
   count?: number;
-  /** Tooltip; also the accessible name of an icon-only option. */
+  /** Tooltip; an icon-only option (its icon is aria-hidden) is also named by it. */
   title?: string;
   disabled?: boolean;
 }
@@ -37,7 +37,6 @@ export default function SegmentedControl<T extends string>({ value, onChange, op
             style={color ? { color } : undefined}
             aria-pressed={on}
             title={opt.title}
-            aria-label={typeof opt.label === 'string' ? undefined : opt.title}
           >
             {opt.label}
             {opt.count != null && <span className="ss-cnt">{opt.count}</span>}

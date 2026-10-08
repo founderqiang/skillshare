@@ -166,8 +166,16 @@ function TargetEditor({ target, targets }: { target: Target; targets: Target[] }
   const local = agent ? target.agentLocalCount ?? 0 : target.localCount;
   // prefixed rewrites name: inside each copy, so it cannot outlive copy mode.
   const prefixedOff = draft.mode !== 'copy';
-  const setSkillsMode = (m: string) =>
-    setDraft({ ...draft, mode: m, ...(m !== 'copy' && draft.naming === 'prefixed' && { naming: saved.naming === 'prefixed' ? 'flat' : saved.naming }) });
+  const setSkillsMode = (m: string) => {
+    let naming = draft.naming;
+    if (m !== 'copy' && naming === 'prefixed') naming = saved.naming === 'prefixed' ? 'flat' : saved.naming;
+    setDraft({ ...draft, mode: m, naming });
+  };
+  const namingOptions = [
+    { value: 'flat', label: 'flat' },
+    { value: 'standard', label: 'standard' },
+    { value: 'prefixed', label: 'prefixed', disabled: prefixedOff, title: prefixedOff ? t('targetDetail.prefixedNeedsCopyTitle') : undefined },
+  ];
 
   const tabCount = (k: (typeof tabs)[number]) =>
     k === 'skill' && !skillsOn ? null : (k === 'mcp' ? mcp.data && serverCount(mcp.data, client)
@@ -328,7 +336,7 @@ function TargetEditor({ target, targets }: { target: Target; targets: Target[] }
                     </span>
                     <span className="text-[13px] text-ink-2">{t(draft.naming === 'standard' ? 'targetDetail.namingStandard' : draft.naming === 'prefixed' ? 'targetDetail.namingPrefixed' : 'targetDetail.namingFlat')}</span>
                   </div>
-                  <SegmentedControl value={draft.naming} onChange={(naming) => setDraft({ ...draft, naming })} options={[{ value: 'flat', label: 'flat' }, { value: 'standard', label: 'standard' }, { value: 'prefixed', label: 'prefixed', disabled: prefixedOff, title: prefixedOff ? t('targetDetail.prefixedNeedsCopyTitle') : undefined }]} />
+                  <SegmentedControl value={draft.naming} onChange={(naming) => setDraft({ ...draft, naming })} options={namingOptions} />
                 </div>
                 {prefixedOff && (
                   <span className="flex items-center gap-1.5 text-[13px] text-ink-3"><Info size={14} className="shrink-0" />{t('targetDetail.prefixedNeedsCopy')}</span>
