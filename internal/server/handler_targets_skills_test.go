@@ -44,6 +44,7 @@ type skillsTargetItem struct {
 	SkillsEnabled    bool     `json:"skillsEnabled"`
 	SkillsReadFrom   []string `json:"skillsReadFrom"`
 	SkillsAlsoReadBy []string `json:"skillsAlsoReadBy"`
+	SkillsSharedWith []string `json:"skillsSharedWith"`
 	LinkedCount      int      `json:"linkedCount"`
 }
 
@@ -96,6 +97,19 @@ func TestSkillsOffPreview_SharedFolder(t *testing.T) {
 	json.Unmarshal(rr.Body.Bytes(), &resp)
 	if resp["sharedWith"] != "universal" {
 		t.Errorf("preview = %s", rr.Body.String())
+	}
+}
+
+func TestListTargets_NamesTargetsSharingASkillsFolder(t *testing.T) {
+	shared := filepath.Join(t.TempDir(), "agents", "skills")
+	s, _ := newTestServerWithTargets(t, map[string]string{"universal": shared, "codex": shared, "claude": filepath.Join(t.TempDir(), "claude", "skills")})
+
+	items := listSkillsTargets(t, s)
+	if !slices.Equal(items["universal"].SkillsSharedWith, []string{"codex"}) || !slices.Equal(items["codex"].SkillsSharedWith, []string{"universal"}) {
+		t.Errorf("universal = %+v, codex = %+v", items["universal"], items["codex"])
+	}
+	if len(items["claude"].SkillsSharedWith) != 0 {
+		t.Errorf("claude = %+v, want no sharing", items["claude"])
 	}
 }
 
