@@ -14,7 +14,7 @@ import { useToast } from '../components/Toast';
 import { hookLabel, hookMessage, rootName } from '../components/hooks/hooksView';
 import MCPNotices from '../components/mcp/MCPNotices';
 import { describeMessage, mcpClient, targetLabel } from '../components/mcp/mcpView';
-import { changeSets, countChanges, countEdited, discardable, tally, extraGroups, groupByFolder, groupInSync, HOOKS_CHANGED, hooksGroups, MCP_CHANGED, mcpGroups, otherWarnings, resourceGroups, runSync, type ChangeGroup, type Part, type RowIcon, type SyncFailure } from '../components/sync/syncView';
+import { changeSets, countChanges, countEdited, discardable, receivesSkill, tally, extraGroups, groupByFolder, groupInSync, HOOKS_CHANGED, hooksGroups, MCP_CHANGED, mcpGroups, otherWarnings, resourceGroups, runSync, type ChangeGroup, type Part, type RowIcon, type SyncFailure } from '../components/sync/syncView';
 import SyncResult from '../components/sync/SyncResult';
 import SyncError from '../components/sync/SyncError';
 import SkillsOffDialog from '../components/targets/SkillsOffDialog';
@@ -128,7 +128,7 @@ export default function SyncPage() {
   const skills = useSkillsQuery({ enabled: addsSkills });
   const matrix = useSyncMatrix(addsSkills);
   const skillList = skills.data?.resources ?? [];
-  const toDiscard = !addsSkills || !matrix.matrix.length ? [] : discardable(resources.groups, skillList, (name) => matrix.getSkillTargets(name).filter((e) => e.status === 'synced').map((e) => e.target));
+  const toDiscard = !addsSkills || !matrix.matrix.length ? [] : discardable(resources.groups, skillList, (name) => matrix.getSkillTargets(name).filter(receivesSkill).map((e) => e.target));
   // Show a skill by its source path; flattened target names (_repo__skills__x) are hard to read.
   const relPaths = new Map(skillList.map((s) => [s.flatName, s.relPath]));
   const display = (r: ChangeGroup['rows'][number]) => (r.part === 'skill' ? formatTrackedRepoName(relPaths.get(r.name) ?? r.name.replace(/__/g, '/')) : r.name);

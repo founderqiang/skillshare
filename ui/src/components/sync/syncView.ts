@@ -1,4 +1,4 @@
-import { api, type DiffTarget, type ExtraDiffResult, type Skill, type SyncResponse, type Target } from '../../api/client';
+import { api, type DiffTarget, type ExtraDiffResult, type Skill, type SyncMatrixEntry, type SyncResponse, type Target } from '../../api/client';
 import { hooksApi, type HookPlan } from '../../api/hooks';
 import { mcpApi, type MCPPlan } from '../../api/mcp';
 import { formatAgentDisplayName } from '../../lib/resourceNames';
@@ -184,6 +184,12 @@ export function tally(rows: ChangeRow[]): Partial<Record<RowIcon, number>> {
   }
   return n;
 }
+
+/**
+ * Whether a target gets a skill: by its filters, or always when it links the whole source folder.
+ * The matrix marks symlink-mode targets `na` since filters don't apply, yet every source skill is live there.
+ */
+export const receivesSkill = (e: SyncMatrixEntry) => e.status === 'synced' || e.reasonCode === 'sync_matrix.symlink_filters_not_applicable';
 
 /**
  * The skills Discard all moves to trash: never synced anywhere yet, so new in every target that should get them.

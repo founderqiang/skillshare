@@ -94,6 +94,27 @@ describe('Sync page last sync', () => {
     expect(dialog).not.toHaveTextContent('old');
   });
 
+  it('does not offer Discard all for a skill a symlink-mode target already exposes', async () => {
+    const skill = (flatName: string) => ({ name: flatName, kind: 'skill', flatName, relPath: flatName, sourcePath: '', isInRepo: true });
+    vi.mocked(api.listTargets).mockResolvedValue({ targets: [target('codex')], sourceSkillCount: 1 });
+    vi.mocked(api.diff).mockResolvedValue({
+      diffs: [{ target: 'codex', items: [{ skill: 'fresh', action: 'link', reason: 'new' }] }],
+      ignored_count: 0, ignored_skills: [], ignore_root: '', ignore_repos: [],
+    } as never);
+    vi.mocked(api.listSkills).mockResolvedValue({ resources: [skill('fresh')] } as never);
+    // claude links the whole source folder, so fresh is already live there.
+    vi.mocked(api.getSyncMatrix).mockResolvedValue({ entries: [
+      { skill: 'fresh', target: 'codex', status: 'synced', reason: '' },
+      { skill: 'fresh', target: 'claude', status: 'na', reason: 'symlink mode — filters not applicable', reasonCode: 'sync_matrix.symlink_filters_not_applicable' },
+    ] } as never);
+    renderPage();
+
+    expect(await screen.findByText(/Sync 1 change/)).toBeInTheDocument();
+    await waitFor(() => expect(api.getSyncMatrix).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole('button', { name: 'Discard all' })).toBeNull();
+  });
+
   it('counts the failed targets when an older entry has no names', async () => {
     vi.mocked(api.listLog).mockResolvedValue({ entries: [{ ts: '2026-09-30T00:00:00Z', cmd: 'sync', status: 'partial', args: { targets_total: 3, targets_failed: 1 } }] } as never);
     renderPage();
