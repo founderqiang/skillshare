@@ -508,15 +508,8 @@ func (s *Server) handleExtrasCreate(w http.ResponseWriter, r *http.Request) {
 	// Build ExtraConfig
 	extra := config.ExtraConfig{Name: body.Name, Source: body.Source, File: body.File}
 	for _, t := range body.Targets {
-		et := config.ExtraTargetConfig{Path: t.Path, Flatten: t.Flatten, As: t.As}
-		if t.Mode != "" {
-			et.Mode = t.Mode
-		}
-		if t.Extension != "" {
-			// A transform extension only makes sense with copy mode.
-			et.Extension = t.Extension
-			et.Mode = "copy"
-		}
+		et := config.ExtraTargetConfig{Path: t.Path, Mode: t.Mode, Flatten: t.Flatten, Extension: t.Extension, As: t.As}
+		et.Normalize()
 		extra.Targets = append(extra.Targets, et)
 	}
 	if err := config.ValidateExtraConfig(extra); err != nil {
@@ -839,14 +832,13 @@ func (s *Server) handleExtrasMode(w http.ResponseWriter, r *http.Request) {
 
 				// An extension transform implies copy mode. Reject only a mode
 				// explicitly requested in this call that conflicts; otherwise
-				// force copy, overriding any prior mode on the target.
-				if newExtension != "" {
-					if body.Mode != "" && body.Mode != "copy" {
-						writeError(w, http.StatusBadRequest, "extension requires copy mode, but mode "+body.Mode+" was set on the target")
-						return
-					}
-					newMode = "copy"
+				// force copy, overriding any prior mode on the target. Filters
+				// are not dropped here: symlink with filters fails validation.
+				if newExtension != "" && body.Mode != "" && body.Mode != "copy" {
+					writeError(w, http.StatusBadRequest, "extension requires copy mode, but mode "+body.Mode+" was set on the target")
+					return
 				}
+				newMode = config.ExtraTargetConfig{Mode: newMode, Extension: newExtension}.EffectiveMode()
 
 				// Validate the combination
 				if err := config.ValidateExtraFlatten(newFlatten, newMode); err != nil {

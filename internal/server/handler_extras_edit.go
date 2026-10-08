@@ -100,14 +100,7 @@ func (s *Server) handleExtrasEditTarget(w http.ResponseWriter, r *http.Request) 
 
 	in := body.Target
 	next := config.ExtraTargetConfig{Path: in.Path, Mode: in.Mode, Flatten: in.Flatten, Extension: in.Extension, As: in.As, Include: in.Include, Exclude: in.Exclude}
-	if next.Extension != "" {
-		// A transform extension only makes sense with copy mode.
-		next.Mode = "copy"
-	}
-	if next.Mode == "symlink" {
-		// One link to the whole folder cannot leave files out.
-		next.Include, next.Exclude = nil, nil
-	}
+	next.Normalize()
 	newPath := filepath.Clean(resolveExtrasTargetPath(s.projectRoot, next.Path))
 	if !s.IsProjectMode() {
 		next.Path = newPath

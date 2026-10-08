@@ -44,6 +44,24 @@ func ManagedExtraMode(mode string) bool {
 	return mode == "import" || mode == "prepend" || mode == "append"
 }
 
+// EffectiveMode returns the target's mode after its extension: a transform
+// extension only makes sense with copy mode.
+func (t ExtraTargetConfig) EffectiveMode() string {
+	if t.Extension != "" {
+		return "copy"
+	}
+	return t.Mode
+}
+
+// Normalize applies EffectiveMode and drops include and exclude from a
+// symlink target: one link to the whole folder cannot leave files out.
+func (t *ExtraTargetConfig) Normalize() {
+	t.Mode = t.EffectiveMode()
+	if t.Mode == "symlink" {
+		t.Include, t.Exclude = nil, nil
+	}
+}
+
 // ValidateExtraMode checks that mode is a valid sync mode.
 // Empty string is allowed (defaults to "merge" at runtime).
 func ValidateExtraMode(mode string) error {
