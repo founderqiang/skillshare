@@ -897,8 +897,7 @@ func PruneOrphanLinksWithSkills(opts PruneOptions) (*PruneResult, error) {
 			result.Removed = append(result.Removed, name)
 			// Track manifest changes for cleanup
 			if _, inManifest := manifest.Managed[name]; inManifest {
-				delete(manifest.Managed, name)
-				delete(manifest.Naming, name)
+				manifest.Remove(name)
 				manifestChanged = true
 			}
 		}

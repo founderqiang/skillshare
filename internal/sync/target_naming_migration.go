@@ -56,14 +56,12 @@ func selectActiveTargetNameForSync(mode, targetPath string, skill ResolvedTarget
 // when the skill already has its current name, or the old name is one another
 // skill syncs to (taken), there is nothing to migrate.
 func findLegacyTargetEntry(mode, targetPath string, skill ResolvedTargetSkill, taken map[string]bool, manifest *Manifest) (string, string, error) {
-	desiredPath := filepath.Join(targetPath, skill.TargetName)
-	if info, err := os.Lstat(desiredPath); err == nil && isManagedTargetEntry(mode, desiredPath, info, skill, manifest, namedTarget{name: skill.TargetName}) {
-		return "", "", nil
-	}
+	prev := ""
 	for _, c := range targetNameCandidates(skill.Skill) {
-		if c.name == "" || c.name == skill.TargetName || taken[c.name] {
+		if c.name == "" || c.name == prev || c.name == skill.TargetName || taken[c.name] {
 			continue
 		}
+		prev = c.name
 		legacyPath := filepath.Join(targetPath, c.name)
 		info, err := os.Lstat(legacyPath)
 		if os.IsNotExist(err) {
@@ -72,9 +70,14 @@ func findLegacyTargetEntry(mode, targetPath string, skill ResolvedTargetSkill, t
 		if err != nil {
 			return "", "", fmt.Errorf("failed to inspect legacy target entry %s: %w", c.name, err)
 		}
-		if isManagedTargetEntry(mode, legacyPath, info, skill, manifest, c) {
-			return c.name, c.naming, nil
+		if !isManagedTargetEntry(mode, legacyPath, info, skill, manifest, c) {
+			continue
 		}
+		desiredPath := filepath.Join(targetPath, skill.TargetName)
+		if info, err := os.Lstat(desiredPath); err == nil && isManagedTargetEntry(mode, desiredPath, info, skill, manifest, namedTarget{name: skill.TargetName}) {
+			return "", "", nil
+		}
+		return c.name, c.naming, nil
 	}
 	return "", "", nil
 }

@@ -586,7 +586,10 @@ func collectTargetDiff(name string, target config.TargetConfig, source, mode str
 		return r
 	}
 
-	manifest, _ := sync.ReadManifest(sc.Path)
+	var manifest *sync.Manifest // only copy-mode legacy lookups read it
+	if mode == "copy" {
+		manifest, _ = sync.ReadManifest(sc.Path)
+	}
 	legacyNames := resolution.LegacyNames(mode, sc.Path, manifest)
 	if mode == "copy" {
 		collectCopyDiff(&r, name, sc.Path, resolution.Skills, sourceSkills, legacyNames, manifest, ignorePatterns, dp)
