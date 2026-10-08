@@ -666,7 +666,10 @@ export default function ResourcesPage({ kind }: { kind: Kind }) {
   /* -- Content -- */
 
   const treeItemTotal = treeRows.filter((r) => r.type === 'item').length;
-  const total = view === 'tree' ? treeItemTotal : filtered.length;
+  // List view hides a collapsed group's rows, so they neither page nor count as shown.
+  const listGroups = view !== 'list' ? [] : group === 'source' ? groups : group === 'folder' ? folderGroups : [];
+  const groupHidden = (g: { key: string }) => collapsed.has(groupKey(group === 'folder' ? folderKey(g.key) : g.key));
+  const total = view === 'tree' ? treeItemTotal : filtered.length - listGroups.filter(groupHidden).reduce((n, g) => n + g.items.length, 0);
   const shown = Math.min(limit, total);
   let content: React.ReactNode;
 
@@ -790,9 +793,9 @@ export default function ResourcesPage({ kind }: { kind: Kind }) {
     let body: React.ReactNode;
     const rows = (key: string, list: Skill[]) => (collapsed.has(groupKey(key)) ? [] : list.map((s) => itemRow(s)));
     if (group === 'source') {
-      body = limitGroups(groups, limit).map((g) => [groupHead(g, false), ...rows(g.key, g.items)]);
+      body = limitGroups(groups, limit, groupHidden).map((g) => [groupHead(g, false), ...rows(g.key, g.items)]);
     } else if (group === 'folder') {
-      body = limitGroups(folderGroups, limit).map((g) => [folderHead(g, false), ...rows(folderKey(g.key), g.items)]);
+      body = limitGroups(folderGroups, limit, groupHidden).map((g) => [folderHead(g, false), ...rows(folderKey(g.key), g.items)]);
     } else {
       body = <>{groups.filter((g) => g.link && g.items.length === 0).map((g) => groupHead(g, false))}{filtered.slice(0, limit).map((s) => itemRow(s))}</>;
     }
