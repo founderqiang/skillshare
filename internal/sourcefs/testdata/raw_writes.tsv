@@ -456,6 +456,7 @@ internal/sync/sync.go	ensureRealTargetDir	os.MkdirAll	targetPath	target
 internal/sync/sync.go	ensureRealTargetDir	os.Remove	targetPath	target
 internal/sync/sync.go	mergeDirectories	os.MkdirAll	dstPath	source-unmigrated
 internal/sync/target_naming_migration.go	selectActiveTargetNameForSync	os.Rename	legacyPath, desiredPath	target
+internal/sync/target_naming_migration.go	selectActiveTargetNameForSync	os.Rename	desiredPath, legacyPath	target
 internal/testutil/git_helpers.go	SeedRemoteBranch	os.MkdirAll	filepath.Dir(full)	test-helper
 internal/testutil/git_helpers.go	SeedRemoteBranch	os.WriteFile	full	test-helper
 internal/testutil/testutil.go	(*Sandbox).CreateNestedSkill	os.MkdirAll	skillDir	test-helper
@@ -513,6 +514,8 @@ internal/uidist/uidist.go	extractTarGz	os.MkdirAll	filepath.Dir(target)	config
 internal/uidist/uidist.go	extractTarGz	os.MkdirAll	target	config
 internal/uidist/uidist.go	extractTarGz	os.OpenFile	target	config
 internal/utils/frontmatter_write.go	SetFrontmatterList	os.WriteFile	filePath	source-unmigrated
+internal/utils/frontmatter_write.go	SetFrontmatterValue	os.WriteFile	filePath	target
+internal/utils/frontmatter_write.go	SetFrontmatterValue	os.WriteFile	filePath	target
 internal/utils/frontmatter_write.go	ToggleFrontmatterFlag	os.WriteFile	filePath	source-unmigrated
 internal/utils/frontmatter_write.go	ToggleFrontmatterFlag	os.WriteFile	filePath	source-unmigrated
 internal/utils/link_windows.go	CreateJunction	os.Mkdir	linkPath	source-unmigrated
