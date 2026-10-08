@@ -44,9 +44,23 @@ func TestSyncSkillTarget_ReportsUnmatchedIncludeWithTargetName(t *testing.T) {
 
 		r := SyncSkillTarget(SkillTarget{Name: "claude", Target: target, Mode: mode}, skills, SkillRunOptions{Source: sourceDir})
 
-		want := `claude: include pattern "missing" matches no skill in the source`
-		if r.Err != nil || !slices.Contains(r.Warnings, want) {
-			t.Fatalf("%s: warnings = %q, want %q", mode, r.Warnings, want)
+		want := `claude: include filter "missing" matches no skill in the source, so it adds nothing to this target`
+		if r.Err != nil || !slices.Contains(r.UnmatchedWarnings(), want) {
+			t.Fatalf("%s: warnings = %q, want %q", mode, r.UnmatchedWarnings(), want)
+		}
+	}
+}
+
+// A partial source may hold the skills the filter names, so it is not called unmatched.
+func TestSyncSkillTarget_IncompleteSourceReportsNoUnmatchedInclude(t *testing.T) {
+	sourceDir, skills := skillRunSource(t)
+	for _, mode := range []string{"merge", "copy"} {
+		target := config.TargetConfig{Skills: &config.ResourceTargetConfig{Path: t.TempDir(), Include: []string{"missing"}}}
+
+		r := SyncSkillTarget(SkillTarget{Name: "claude", Target: target, Mode: mode}, skills, SkillRunOptions{Source: sourceDir, SourceIncomplete: true})
+
+		if r.Err != nil || len(r.UnmatchedIncludes) != 0 {
+			t.Fatalf("%s: unmatched = %+v, want none", mode, r.UnmatchedIncludes)
 		}
 	}
 }

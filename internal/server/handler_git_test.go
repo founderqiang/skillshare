@@ -703,6 +703,33 @@ func TestHandlePull_EmptyRemoteReturnsCode(t *testing.T) {
 	}
 }
 
+func TestHandlePull_ReportsUnmatchedIncludeFromItsSync(t *testing.T) {
+	s, src := newTestServer(t)
+	addSkill(t, src, "alpha")
+	s.cfg.Targets["claude"] = config.TargetConfig{Skills: &config.ResourceTargetConfig{Path: filepath.Join(t.TempDir(), "claude-skills"), Include: []string{"missing"}}}
+	if err := s.cfg.Save(); err != nil {
+		t.Fatal(err)
+	}
+	initServerGitRepo(t, src)
+	testutil.RunGit(t, src, "add", "-A")
+	testutil.RunGit(t, src, "commit", "-m", "alpha")
+	remote := filepath.Join(t.TempDir(), "remote.git")
+	testutil.RunGit(t, "", "init", "--bare", remote)
+	testutil.RunGit(t, src, "remote", "add", "origin", remote)
+	testutil.RunGit(t, src, "push", "-u", "origin", "HEAD")
+
+	rr := postPull(s, `{"alwaysSync":true}`)
+	var resp struct {
+		Unmatched []unmatchedInclude `json:"unmatched"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if rr.Code != http.StatusOK || len(resp.Unmatched) != 1 || resp.Unmatched[0].Target != "claude" {
+		t.Fatalf("expected the unmatched include for claude, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
 func TestHandlePull_ReportsExtrasSyncWarnings(t *testing.T) {
 	s, _, remote, _ := setupExtrasScopePull(t)
 	pushRemoteFile(t, remote, "other/readme.md", "# other\n")

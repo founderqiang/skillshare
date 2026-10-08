@@ -3,11 +3,12 @@ import { AlertCircle, CircleCheck, RefreshCw, TriangleAlert } from 'lucide-react
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
-import { api } from '../api/client';
+import { api, type UnmatchedInclude } from '../api/client';
 import Button from './Button';
 import DialogShell from './DialogShell';
 import Spinner from './Spinner';
 import SyncResultList, { SyncUpToDate } from './SyncResultList';
+import UnmatchedNotices from './sync/UnmatchedNotices';
 import { countChanges, resourceGroups, type Part } from './sync/syncView';
 import { useT } from '../i18n';
 import { useDiffQuery, useSyncedTargetsQuery } from '../hooks/useSharedQueries';
@@ -34,12 +35,14 @@ export default function SyncPreviewModal({ open, onClose, kind }: SyncPreviewMod
   const [syncing, setSyncing] = useState(false);
   const [synced, setSynced] = useState(false);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [unmatched, setUnmatched] = useState<UnmatchedInclude[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // Fresh numbers on every open; the cached diff may predate an install or uninstall.
   useEffect(() => {
     setError(null);
     setWarnings([]);
+    setUnmatched([]);
     setSynced(false);
     if (open) void diff.refetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -51,6 +54,7 @@ export default function SyncPreviewModal({ open, onClose, kind }: SyncPreviewMod
     try {
       const res = await api.sync({ dryRun: false, kind });
       setWarnings(res.warnings ?? []);
+      setUnmatched(res.unmatched ?? []);
       setSynced(true);
       void invalidate(queryClient, 'synced');
     } catch (e: unknown) {
@@ -92,6 +96,7 @@ export default function SyncPreviewModal({ open, onClose, kind }: SyncPreviewMod
           <>
             <div className="ss-note inf"><CircleCheck size={16} /><span className="flex-1">{t('syncPreview.completed')}</span></div>
             {warnings.map((w) => <div key={w} className="ss-note warn"><TriangleAlert size={16} /><span className="flex-1">{w}</span></div>)}
+            <UnmatchedNotices items={unmatched} />
           </>
         ) : loading ? (
           <div className="ss-list"><div className="ss-r gap-2 text-[13px] text-ink-2"><Spinner size="sm" />{t('sync.checking')}</div></div>

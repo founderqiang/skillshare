@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, ArrowDownToLine, Bot, ChevronDown, ChevronRight, CircleCheck, CircleMinus, EyeOff, Folder, FolderPlus, Gauge, Globe, Import, Minus, Plug, Plus, Puzzle, RefreshCw, TriangleAlert, Webhook } from 'lucide-react';
@@ -16,6 +16,7 @@ import MCPNotices from '../components/mcp/MCPNotices';
 import { describeMessage, mcpClient, targetLabel } from '../components/mcp/mcpView';
 import { changeSets, countChanges, countEdited, discardable, receivesSkill, tally, extraGroups, groupByFolder, groupInSync, HOOKS_CHANGED, hooksGroups, MCP_CHANGED, mcpGroups, otherWarnings, resourceGroups, runSync, type ChangeGroup, type Part, type RowIcon, type SyncFailure } from '../components/sync/syncView';
 import SyncResult from '../components/sync/SyncResult';
+import UnmatchedNotices from '../components/sync/UnmatchedNotices';
 import SyncError from '../components/sync/SyncError';
 import SkillsOffDialog from '../components/targets/SkillsOffDialog';
 import SegmentedControl from '../components/SegmentedControl';
@@ -83,6 +84,16 @@ export default function SyncPage() {
 
   const [off, setOff] = useState<Set<Part>>(new Set());
   const [force, setForce] = useState(false);
+  // The bar draws its bottom line once the line above it scrolls away.
+  const [stuck, setStuck] = useState(false);
+  const sentinel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([e]) => setStuck(!e.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [collecting, setCollecting] = useState(false);
   const [running, setRunning] = useState(false);
@@ -268,36 +279,26 @@ export default function SyncPage() {
 
   return (
     <div className="animate-fade-in">
-      <PageHeader title={t('sync.title')} subtitle={t('sync.subtitle')} />
-      <div className="ss-stickbar !py-3.5 mb-3">
-          <div className="flex flex-wrap items-center gap-[18px]">
-            <span className="text-[13px] text-ink-3">{t('sync.include')}</span>
-            {PARTS.map((p) => (
-              <Checkbox key={p} size="sm" label={PART_LABEL[p]} checked={parts.has(p)} disabled={running} onChange={() => setOff((s) => toggle(s, p) as Set<Part>)} />
-            ))}
-            <span className="flex items-center gap-2" title={t('sync.forceHint')}>
-              <button type="button" role="switch" aria-checked={force} aria-labelledby="sync-force" aria-describedby="sync-force-hint" className={`ss-sw ${force ? 'on' : ''} disabled:opacity-50`} disabled={running} onClick={() => setForce(!force)}>
-                <i />
-              </button>
-              <span id="sync-force" className="text-[13px] font-semibold">Force</span>
-              <span id="sync-force-hint" className="sr-only">{t('sync.forceHint')}</span>
-            </span>
-            <span className="flex-1" />
-            <span className="flex items-center gap-2" data-tour="sync-actions">
-              {toDiscard.length > 0 && (
-                <Button variant="secondary" disabled={running} onClick={() => setDiscarding(true)}>
-                  {t('sync.discard')}
-                </Button>
-              )}
-              <Button variant="primary" onClick={sync} loading={running} disabled={loading || parts.size === 0}>
-                {!running && <RefreshCw size={16} />}
-                {count > 0 ? t(plural('sync.run', count), { count }) : t('sync.run.none')}
-              </Button>
-            </span>
-          </div>
-      </div>
       <div className="grid grid-cols-[minmax(0,1fr)_280px] items-start gap-8">
         <div className="flex min-w-0 flex-col gap-4">
+          <PageHeader className="!mb-0" title={t('sync.title')} subtitle={t('sync.subtitle')} />
+          {/* Roomy padding for when it sticks; the negative margin keeps the gaps tight before that. */}
+          <div ref={sentinel} className="-mb-[17px] h-px" />
+          <div className={`ss-stickbar !py-4 -my-[14px] ${stuck ? 'stuck' : ''}`}>
+              <div className="flex flex-wrap items-center gap-[18px]">
+                <span className="text-[13px] text-ink-3">{t('sync.include')}</span>
+                {PARTS.map((p) => (
+                  <Checkbox key={p} size="sm" label={PART_LABEL[p]} checked={parts.has(p)} disabled={running} onChange={() => setOff((s) => toggle(s, p) as Set<Part>)} />
+                ))}
+                <span className="flex items-center gap-2" title={t('sync.forceHint')}>
+                  <button type="button" role="switch" aria-checked={force} aria-labelledby="sync-force" aria-describedby="sync-force-hint" className={`ss-sw ${force ? 'on' : ''} disabled:opacity-50`} disabled={running} onClick={() => setForce(!force)}>
+                    <i />
+                  </button>
+                  <span id="sync-force" className="text-[13px] font-semibold">Force</span>
+                  <span id="sync-force-hint" className="sr-only">{t('sync.forceHint')}</span>
+                </span>
+              </div>
+          </div>
           {edited > 0 && (
             <div className={`ss-note ${force ? 'warn' : 'inf'}`}>
               {force ? <TriangleAlert size={16} /> : <CircleMinus size={16} />}
@@ -324,6 +325,7 @@ export default function SyncPage() {
           {parts.has('hooks') && hooks.data?.previewError && <div className="ss-note bad"><AlertCircle size={16} /><SyncError error={hooks.data.previewError} /></div>}
           {parts.has('mcp') && mcp.data?.previewError && <div className="ss-note bad"><AlertCircle size={16} /><SyncError error={mcp.data.previewError} /></div>}
           <SyncResult failures={failures} warnings={otherWarnings(outcome)} synced={syncedTargets} force={force} onForce={() => setForce(true)} />
+          <UnmatchedNotices items={outcome?.unmatched} />
           {!!outcome?.path_overlap && (
             <div className="ss-note warn !items-center">
               <TriangleAlert size={16} />
@@ -503,7 +505,21 @@ export default function SyncPage() {
 
         </div>
 
-        <aside className="sticky top-[84px] flex flex-col">
+        {/* Sync sits on the card so it stays in reach while the changes scroll. */}
+        {/* Stuck at -21px so the buttons (centered 47px down) line up with the stuck bar's row (26px). */}
+        <aside className="sticky top-[-21px] flex flex-col gap-3">
+          {/* Sized so the card's top lines up with the Include row's, with the buttons resting just above it. */}
+          <div className="flex h-[64px] items-end justify-end gap-2" data-tour="sync-actions">
+            {toDiscard.length > 0 && (
+              <Button variant="secondary" disabled={running} onClick={() => setDiscarding(true)}>
+                {t('sync.discard')}
+              </Button>
+            )}
+            <Button variant="primary" onClick={sync} loading={running} disabled={loading || parts.size === 0}>
+              {!running && <RefreshCw size={16} />}
+              {count > 0 ? t(plural('sync.run', count), { count }) : t('sync.run.none')}
+            </Button>
+          </div>
           <div className="ss-box flex flex-col gap-3.5">
             <div className="flex items-center justify-between">
               <h3 className="text-[15px] font-semibold">{t('sync.last.title')}</h3>

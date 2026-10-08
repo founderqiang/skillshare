@@ -71,11 +71,25 @@ export interface SyncTargetFailure {
 export interface SyncResponse extends IgnoreSources {
   results: SyncResult[];
   warnings?: string[];
+  /** Targets whose include filter selects no skill */
+  unmatched?: UnmatchedInclude[];
   failed?: SyncTargetFailure[];
   folder_conflicts?: FolderConflict[];
   /** Targets whose skills path overlaps another's in a way folder_conflicts doesn't explain. */
   path_overlap?: number;
   context_cost?: ContextCost;
+}
+
+/** A target whose include filter selects no skill. */
+export interface UnmatchedInclude {
+  target: string;
+  /** The project folder of a project target (`project@tool`) */
+  root?: string;
+  patterns: string[];
+  /** Source path names the patterns likely meant */
+  suggestions?: string[];
+  /** No include pattern selects anything, so the target gets no skills */
+  all: boolean;
 }
 
 /** A skills folder two or more targets sync into with different settings, so each sync undoes the other. */

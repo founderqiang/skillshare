@@ -81,7 +81,7 @@ func TestResolveTargetSkillsForTarget_ReportsUnmatchedInclude(t *testing.T) {
 	skill.FlatName = utils.PathToFlatName(skill.RelPath)
 	skills := []DiscoveredSkill{skill}
 
-	const want = `include pattern "dev" matches no skill in the source ` +
+	const want = `include filter "dev" matches no skill in the source, so it adds nothing to this target ` +
 		`(filters use the source path name; did you mean "frontend__dev"?)`
 
 	for _, naming := range []string{"flat", "standard"} {

@@ -698,7 +698,8 @@ func TestHandleSync_UnmatchedIncludeIsReported(t *testing.T) {
 	s, src := newTestServer(t)
 	addSkill(t, src, "alpha")
 	s.cfg.Targets["claude"] = config.TargetConfig{
-		Skills: &config.ResourceTargetConfig{Path: filepath.Join(t.TempDir(), "claude-skills"), Include: []string{"missing"}},
+		// The blank include is ignored, so "missing" is the only pattern and selects nothing.
+		Skills: &config.ResourceTargetConfig{Path: filepath.Join(t.TempDir(), "claude-skills"), Include: []string{"missing", ""}},
 	}
 	if err := s.cfg.Save(); err != nil {
 		t.Fatal(err)
@@ -712,14 +713,18 @@ func TestHandleSync_UnmatchedIncludeIsReported(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 	var resp struct {
-		Warnings []string `json:"warnings"`
+		Warnings  []string           `json:"warnings"`
+		Unmatched []unmatchedInclude `json:"unmatched"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Fatal(err)
 	}
-	want := `claude: include pattern "missing" matches no skill in the source`
-	if !slices.Contains(resp.Warnings, want) {
-		t.Fatalf("warnings = %q, want %q", resp.Warnings, want)
+	if len(resp.Unmatched) != 1 || resp.Unmatched[0].Target != "claude" || !slices.Equal(resp.Unmatched[0].Patterns, []string{"missing"}) || !resp.Unmatched[0].All {
+		t.Fatalf("unmatched = %+v, want claude with missing and all", resp.Unmatched)
+	}
+	// The dashboard explains it from unmatched, so it is not repeated as a raw warning.
+	if slices.ContainsFunc(resp.Warnings, func(w string) bool { return strings.Contains(w, `"missing"`) }) {
+		t.Fatalf("warnings = %q, want the unmatched include left out", resp.Warnings)
 	}
 }
 

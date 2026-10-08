@@ -49,8 +49,11 @@ type SkillTargetResult struct {
 	DirCreated string
 	// SymlinkStatus is the target path's status before a symlink-mode sync.
 	SymlinkStatus TargetStatus
-	Warnings      []string // unmatched includes, prune failure, then the prune's own warnings
-	Err           error    // the target failed to sync; nothing else is set
+	Warnings      []string // prune failure, then the prune's own warnings
+	// UnmatchedIncludes are the include patterns that select no skill;
+	// UnmatchedWarnings renders them for the CLI.
+	UnmatchedIncludes []UnmatchedInclude
+	Err               error // the target failed to sync; nothing else is set
 }
 
 // SyncSkillTarget links, copies, or symlinks skills into one target, then
@@ -67,10 +70,11 @@ func SyncSkillTarget(t SkillTarget, skills []DiscoveredSkill, opts SkillRunOptio
 			return res
 		}
 		res.Linked, res.Updated, res.Skipped, res.DirCreated = result.Linked, result.Updated, result.Skipped, result.DirCreated
-		res.addTargetWarnings(result.Warnings)
+		// A partial source may hold what the filter names, so only a full one reports unmatched patterns.
 		if opts.SourceIncomplete {
 			break
 		}
+		res.UnmatchedIncludes = result.UnmatchedIncludes
 		prune, err := PruneOrphanLinksWithSkills(PruneOptions{
 			TargetPath: sc.Path, SourcePath: opts.Source, Skills: skills,
 			Include: sc.Include, Exclude: sc.Exclude, TargetNaming: sc.TargetNaming, TargetName: t.Name,
@@ -88,10 +92,11 @@ func SyncSkillTarget(t SkillTarget, skills []DiscoveredSkill, opts SkillRunOptio
 			return res
 		}
 		res.Linked, res.Updated, res.Skipped, res.DirCreated = result.Copied, result.Updated, result.Skipped, result.DirCreated
-		res.addTargetWarnings(result.Warnings)
+		// A partial source may hold what the filter names, so only a full one reports unmatched patterns.
 		if opts.SourceIncomplete {
 			break
 		}
+		res.UnmatchedIncludes = result.UnmatchedIncludes
 		prune, err := PruneOrphanCopiesWithSkills(sc.Path, skills, sc.Include, sc.Exclude, t.Name, sc.TargetNaming, opts.DryRun)
 		res.addPrune(prune, err)
 
@@ -131,11 +136,13 @@ func SourceLinkWarnings(walk sourcewalk.Options, pruneSkipped bool) []string {
 	return warnings
 }
 
-// addTargetWarnings records warnings about the target's own config.
-func (res *SkillTargetResult) addTargetWarnings(warnings []string) {
-	for _, w := range warnings {
-		res.Warnings = append(res.Warnings, fmt.Sprintf("%s: %s", res.Name, w))
+// UnmatchedWarnings renders the unmatched include patterns, one line each, named by target.
+func (res SkillTargetResult) UnmatchedWarnings() []string {
+	warnings := make([]string, 0, len(res.UnmatchedIncludes))
+	for _, u := range res.UnmatchedIncludes {
+		warnings = append(warnings, fmt.Sprintf("%s: %s", res.Name, u.Warning()))
 	}
+	return warnings
 }
 
 // addPrune records a prune's removals and reports its failure and warnings.

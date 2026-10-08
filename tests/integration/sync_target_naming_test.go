@@ -48,14 +48,14 @@ targets:
 	writeInclude("standard", "dev")
 	second := sb.RunCLI("sync")
 	second.AssertSuccess(t)
-	second.AssertOutputContains(t, `claude: include pattern "dev" matches no skill`)
+	second.AssertOutputContains(t, `claude: include filter "dev" matches no skill`)
 	second.AssertOutputContains(t, "frontend__dev")
 
 	// The heuristic also runs in the default flat naming mode.
 	writeInclude("flat", "dev")
 	third := sb.RunCLI("sync")
 	third.AssertSuccess(t)
-	third.AssertOutputContains(t, `include pattern "dev" matches no skill`)
+	third.AssertOutputContains(t, `include filter "dev" matches no skill`)
 }
 
 func TestSync_TargetNamingStandard_MergeUsesBareName(t *testing.T) {

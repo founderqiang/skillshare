@@ -39,17 +39,22 @@ func (r *TargetSkillResolution) UnmatchedIncludeWarnings() []string {
 
 	warnings := make([]string, 0, len(r.UnmatchedIncludes))
 	for _, unmatched := range r.UnmatchedIncludes {
-		message := fmt.Sprintf("include pattern %q matches no skill in the source", unmatched.Pattern)
-		if len(unmatched.Suggestions) > 0 {
-			quoted := make([]string, 0, len(unmatched.Suggestions))
-			for _, name := range unmatched.Suggestions {
-				quoted = append(quoted, fmt.Sprintf("%q", name))
-			}
-			message += fmt.Sprintf(" (filters use the source path name; did you mean %s?)", strings.Join(quoted, ", "))
-		}
-		warnings = append(warnings, message)
+		warnings = append(warnings, unmatched.Warning())
 	}
 	return warnings
+}
+
+// Warning describes the pattern for the CLI.
+func (u UnmatchedInclude) Warning() string {
+	message := fmt.Sprintf("include filter %q matches no skill in the source, so it adds nothing to this target", u.Pattern)
+	if len(u.Suggestions) > 0 {
+		quoted := make([]string, 0, len(u.Suggestions))
+		for _, name := range u.Suggestions {
+			quoted = append(quoted, fmt.Sprintf("%q", name))
+		}
+		message += fmt.Sprintf(" (filters use the source path name; did you mean %s?)", strings.Join(quoted, ", "))
+	}
+	return message
 }
 
 // ResolveTargetSkillsForTarget applies a target's filters and target_naming

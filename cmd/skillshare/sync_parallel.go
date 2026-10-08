@@ -224,6 +224,7 @@ func collectMergeSyncResult(r *syncTargetResult, run sync.SkillTargetResult, dry
 		countPart{updatedCount, "updated"}, countPart{removedCount, "pruned"})
 
 	r.infos = append(r.infos, dirCreatedInfos(run.DirCreated, dryRun)...)
+	r.warnings = append(r.warnings, run.UnmatchedWarnings()...)
 	r.warnings = append(r.warnings, run.Warnings...)
 }
 
@@ -239,6 +240,7 @@ func collectCopySyncResult(r *syncTargetResult, run sync.SkillTargetResult, dryR
 		countPart{updatedCount, "updated"}, countPart{removedCount, "pruned"})
 
 	r.infos = append(r.infos, dirCreatedInfos(run.DirCreated, dryRun)...)
+	r.warnings = append(r.warnings, run.UnmatchedWarnings()...)
 	r.warnings = append(r.warnings, run.Warnings...)
 }
 
