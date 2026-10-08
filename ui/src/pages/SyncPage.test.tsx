@@ -191,6 +191,20 @@ describe('Sync page failure diagnostics', () => {
     expect(screen.getByRole('link', { name: 'Edit filter' })).toHaveAttribute('href', `/projects/${encodeURIComponent('/home/me/work/api-server')}`);
   });
 
+  it('keeps targets configured apart in separate notices, each with its own link', async () => {
+    vi.mocked(api.syncExtras).mockResolvedValue({ extras: [] });
+    vi.mocked(api.sync).mockResolvedValue({
+      results: [], ignored_count: 0, ignored_skills: [], ignore_root: '', ignore_repos: [],
+      unmatched: ['claude', 'cursor'].map((target) => ({ target, patterns: ['*review*'], all: true })),
+    });
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Sync 1 change' }));
+
+    const links = await screen.findAllByRole('link', { name: 'Edit filter' });
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/targets/claude', '/targets/cursor']);
+  });
+
   it('shows a normal short error without an unnecessary disclosure', async () => {
     vi.mocked(api.syncExtras).mockResolvedValue({ extras: [{ name: 'agents', targets: [{ target: '/home/me/.codex/agents', mode: 'copy', synced: 0, skipped: 0, pruned: 0, error: 'permission denied' }] }] });
     const user = userEvent.setup();

@@ -135,6 +135,13 @@ type UnmatchedInclude struct {
 // a filter that blocks nothing is the normal state of a spare exclusion.
 // Callers must have validated the patterns through FilterSkills first, which is
 // also why an invalid pattern yields no report here.
+// AllIncludesUnmatched reports whether unmatched covers every effective
+// include pattern (blanks are ignored), so the target gets no skills.
+func AllIncludesUnmatched(include []string, unmatched []UnmatchedInclude) bool {
+	patterns, _ := normalizePatterns(include)
+	return len(unmatched) > 0 && len(unmatched) == len(patterns)
+}
+
 func FindUnmatchedIncludes(include []string, skills []DiscoveredSkill) []UnmatchedInclude {
 	patterns, err := normalizePatterns(include)
 	if err != nil || len(patterns) == 0 {

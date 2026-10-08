@@ -278,7 +278,7 @@ func (s *Server) syncResources(start time.Time, dryRun, force bool, kind, projec
 			}
 			warnings = append(warnings, run.Warnings...)
 			if len(run.UnmatchedIncludes) > 0 {
-				u := unmatchedInclude{Target: name, Root: target.ProjectRoot(), Patterns: []string{}, All: len(run.UnmatchedIncludes) == len(sc.Include)}
+				u := unmatchedInclude{Target: name, Root: target.ProjectRoot(), Patterns: []string{}, All: ssync.AllIncludesUnmatched(sc.Include, run.UnmatchedIncludes)}
 				for _, m := range run.UnmatchedIncludes {
 					u.Patterns = append(u.Patterns, m.Pattern)
 					u.Suggestions = append(u.Suggestions, m.Suggestions...)

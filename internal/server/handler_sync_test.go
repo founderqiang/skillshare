@@ -698,7 +698,8 @@ func TestHandleSync_UnmatchedIncludeIsReported(t *testing.T) {
 	s, src := newTestServer(t)
 	addSkill(t, src, "alpha")
 	s.cfg.Targets["claude"] = config.TargetConfig{
-		Skills: &config.ResourceTargetConfig{Path: filepath.Join(t.TempDir(), "claude-skills"), Include: []string{"missing"}},
+		// The blank include is ignored, so "missing" is the only pattern and selects nothing.
+		Skills: &config.ResourceTargetConfig{Path: filepath.Join(t.TempDir(), "claude-skills"), Include: []string{"missing", ""}},
 	}
 	if err := s.cfg.Save(); err != nil {
 		t.Fatal(err)

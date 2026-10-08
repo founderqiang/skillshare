@@ -11,7 +11,8 @@ export default function UnmatchedNotices({ items = [] }: { items?: UnmatchedIncl
   const { locale } = useI18n();
   const groups = new Map<string, UnmatchedInclude[]>();
   for (const u of items) {
-    const key = JSON.stringify([u.root ?? '', u.patterns, u.suggestions ?? [], u.all]);
+    // Only a project's targets share one filter to edit; other targets stay apart.
+    const key = JSON.stringify([u.root ?? u.target, u.patterns, u.suggestions ?? [], u.all]);
     groups.set(key, [...(groups.get(key) ?? []), u]);
   }
   if (groups.size === 0) return null;
