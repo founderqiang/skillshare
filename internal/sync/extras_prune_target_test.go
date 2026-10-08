@@ -3,6 +3,7 @@ package sync
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -140,6 +141,9 @@ func TestPruneExtraTargetFiles_SymlinkRequiresSymlink(t *testing.T) {
 }
 
 func TestClearExtraTarget_SymlinkTargetThatCannotBeInspectedReportsError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows reports a path under a file as not-exist, which is safe to forget")
+	}
 	notDir := filepath.Join(t.TempDir(), "file")
 	os.WriteFile(notDir, []byte("x"), 0644)
 
