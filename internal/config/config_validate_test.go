@@ -527,3 +527,33 @@ func TestValidateProjectConfigForSync_TargetProblemFailsOnlyThatTarget(t *testin
 		t.Fatalf("err = %v, invalid = %v; want only broken invalid", err, invalid)
 	}
 }
+
+func TestValidateConfigForSync_PrefixedNamingRequiresCopyMode(t *testing.T) {
+	dir := func() string { return filepath.Join(t.TempDir(), "skills") }
+	cfg := &Config{
+		Source:       t.TempDir(),
+		Mode:         "copy",
+		TargetNaming: "prefixed",
+		Targets: map[string]TargetConfig{
+			"inherits-copy": {Skills: &ResourceTargetConfig{Path: dir()}},
+			"merge":         {Skills: &ResourceTargetConfig{Path: dir(), Mode: "merge"}},
+			"own-naming":    {Skills: &ResourceTargetConfig{Path: dir(), Mode: "symlink", TargetNaming: "flat"}},
+		},
+	}
+	_, invalid, err := ValidateConfigForSync(cfg)
+	if err != nil || len(invalid) != 1 || invalid["merge"] == nil || !strings.Contains(invalid["merge"].Error(), `target naming "prefixed" requires copy mode`) {
+		t.Fatalf("err = %v, invalid = %v; want only merge invalid", err, invalid)
+	}
+}
+
+func TestValidateProjectConfigForSync_PrefixedNamingRequiresCopyMode(t *testing.T) {
+	root := t.TempDir()
+	cfg := &ProjectConfig{Targets: []ProjectTargetEntry{
+		{Name: "claude", Skills: &ResourceTargetConfig{TargetNaming: "prefixed"}},
+		{Name: "cursor", Skills: &ResourceTargetConfig{TargetNaming: "prefixed", Mode: "copy"}},
+	}}
+	_, invalid, err := ValidateProjectConfigForSync(cfg, root)
+	if err != nil || len(invalid) != 1 || invalid["claude"] == nil || !strings.Contains(invalid["claude"].Error(), `requires copy mode, but the target syncs in "merge" mode`) {
+		t.Fatalf("err = %v, invalid = %v; want only claude invalid", err, invalid)
+	}
+}

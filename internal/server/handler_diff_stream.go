@@ -114,10 +114,10 @@ func (s *Server) computeTargetDiff(name string, target config.TargetConfig, disc
 	dt.CollisionCount = len(resolution.Collisions)
 	dt.SkippedCount = len(filtered) - len(resolution.Skills)
 	validNames := resolution.ValidTargetNames()
-	legacyNames := resolution.LegacyFlatNames()
+	manifest, _ := ssync.ReadManifest(sc.Path)
+	legacyNames := resolution.LegacyNames(mode, sc.Path, manifest)
 
 	if mode == "copy" {
-		manifest, _ := ssync.ReadManifest(sc.Path)
 		for _, resolved := range resolution.Skills {
 			skill := resolved.Skill
 			oldChecksum, isManaged := manifest.Managed[resolved.TargetName]
@@ -197,7 +197,6 @@ func (s *Server) computeTargetDiff(name string, target config.TargetConfig, disc
 
 	// Orphan check
 	entries, _ := os.ReadDir(sc.Path)
-	manifest, _ := ssync.ReadManifest(sc.Path)
 	for _, entry := range entries {
 		eName := entry.Name()
 		if manifest.SkipsHidden(eName) {

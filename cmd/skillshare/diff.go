@@ -578,7 +578,6 @@ func collectTargetDiff(name string, target config.TargetConfig, source, mode str
 	for _, resolved := range resolution.Skills {
 		sourceMap[resolved.TargetName] = resolved.Skill.SourcePath
 	}
-	legacyNames := resolution.LegacyFlatNames()
 
 	if utils.IsSymlinkOrJunction(sc.Path) {
 		r.mode = "symlink"
@@ -587,8 +586,9 @@ func collectTargetDiff(name string, target config.TargetConfig, source, mode str
 		return r
 	}
 
+	manifest, _ := sync.ReadManifest(sc.Path)
+	legacyNames := resolution.LegacyNames(mode, sc.Path, manifest)
 	if mode == "copy" {
-		manifest, _ := sync.ReadManifest(sc.Path)
 		collectCopyDiff(&r, name, sc.Path, resolution.Skills, sourceSkills, legacyNames, manifest, ignorePatterns, dp)
 	} else {
 		// Merge mode (instant)

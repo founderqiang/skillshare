@@ -106,6 +106,7 @@ func DetachSkills(targets map[string]config.TargetConfig, name, sourcePath strin
 		if _, managed := manifest.Managed[entryName]; managed {
 			delete(manifest.Managed, entryName)
 			delete(manifest.Mtimes, entryName)
+			delete(manifest.Naming, entryName)
 			manifestChanged = true
 		}
 	}

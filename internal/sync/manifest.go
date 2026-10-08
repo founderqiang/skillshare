@@ -18,6 +18,7 @@ type Manifest struct {
 	Managed   map[string]string `json:"managed"`           // flatName → "symlink" (merge) or SHA-256 checksum (copy)
 	Mtimes    map[string]int64  `json:"mtimes,omitempty"`  // flatName → source dir max mtime (UnixNano), copy mode only
 	Sources   map[string]string `json:"sources,omitempty"` // output name → SHA-256 of the source it was converted from, extension outputs only
+	Naming    map[string]string `json:"naming,omitempty"`  // entry name → target_naming that produced it, copy mode only
 	UpdatedAt time.Time         `json:"updated_at"`
 }
 

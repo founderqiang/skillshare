@@ -791,7 +791,7 @@ func PruneOrphanLinksWithSkills(opts PruneOptions) (*PruneResult, error) {
 	}
 
 	validTargetNames := resolution.ValidTargetNames()
-	legacyNames := resolution.LegacyFlatNames()
+	legacyNames := resolution.LegacyNames("merge", targetPath, manifest)
 	naming := config.EffectiveTargetNaming(targetNaming)
 	// Scan target directory
 	entries, err := os.ReadDir(targetPath)
@@ -897,6 +897,7 @@ func PruneOrphanLinksWithSkills(opts PruneOptions) (*PruneResult, error) {
 			// Track manifest changes for cleanup
 			if _, inManifest := manifest.Managed[name]; inManifest {
 				delete(manifest.Managed, name)
+				delete(manifest.Naming, name)
 				manifestChanged = true
 			}
 		}

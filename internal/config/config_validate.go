@@ -1,6 +1,7 @@
 package config
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"maps"
@@ -66,7 +67,7 @@ func ValidateConfigForSync(cfg *Config) (warnings []string, invalid map[string]e
 
 	invalid = map[string]error{}
 	for name, target := range cfg.Targets {
-		if problems := validateGlobalTarget(name, target); len(problems) > 0 {
+		if problems := validateGlobalTarget(name, target, cfg.Mode, cfg.TargetNaming); len(problems) > 0 {
 			invalid[name] = errors.New(strings.Join(problems, "; "))
 		}
 	}
@@ -78,7 +79,8 @@ func ValidateConfigForSync(cfg *Config) (warnings []string, invalid map[string]e
 }
 
 // validateGlobalTarget returns the problems of one global target's settings.
-func validateGlobalTarget(name string, target TargetConfig) []string {
+// globalMode and globalNaming are the defaults the target inherits.
+func validateGlobalTarget(name string, target TargetConfig, globalMode, globalNaming string) []string {
 	var problems []string
 	if err := ValidateTargetInstructions(target.Instructions, false); err != nil {
 		problems = append(problems, err.Error())
@@ -92,6 +94,10 @@ func validateGlobalTarget(name string, target TargetConfig) []string {
 	}
 	if !IsValidTargetNaming(sc.TargetNaming) {
 		return append(problems, fmt.Sprintf("invalid target naming %q (valid: %s)", sc.TargetNaming, strings.Join(ValidTargetNamings, ", ")))
+	}
+	naming, mode := cmp.Or(sc.TargetNaming, globalNaming), cmp.Or(sc.Mode, globalMode)
+	if err := TargetNamingModeError(naming, mode); err != nil {
+		problems = append(problems, err.Error())
 	}
 	if sc.Path == "" {
 		// Known built-in targets get their path from targets.yaml at runtime;
@@ -185,6 +191,9 @@ func validateProjectTarget(entry ProjectTargetEntry, projectRoot, sourcePath, ag
 	}
 	if !IsValidTargetNaming(sc.TargetNaming) {
 		return append(problems, fmt.Sprintf("invalid target naming %q (valid: %s)", sc.TargetNaming, strings.Join(ValidTargetNamings, ", ")))
+	}
+	if err := TargetNamingModeError(sc.TargetNaming, sc.Mode); err != nil {
+		problems = append(problems, err.Error())
 	}
 
 	var skillsBuiltin string
