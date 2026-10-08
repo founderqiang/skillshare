@@ -213,7 +213,7 @@ extras:
 	}
 }
 
-func TestExtrasTarget_RemoveTargetPrune_SymlinkTargetRealDirFailsAndKeepsConfig(t *testing.T) {
+func TestExtrasTarget_RemoveTargetPrune_SymlinkTargetRealDirIsKept(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
 
@@ -238,19 +238,65 @@ extras:
 `)
 
 	result := sb.RunCLI("extras", "rules", "--remove-target", dir1, "--prune", "-g")
-	result.AssertFailure(t)
-	result.AssertAnyOutputContains(t, "target is not a symlink")
+	result.AssertSuccess(t)
+	result.AssertAnyOutputContains(t, "left in place")
 
 	if _, err := os.Stat(filepath.Join(dir1, "local.md")); err != nil {
-		t.Fatalf("local file must be preserved after failed prune, stat err = %v", err)
+		t.Fatalf("local file must be preserved, stat err = %v", err)
+	}
+	if strings.Contains(sb.ReadFile(sb.ConfigPath), dir1) {
+		t.Errorf("config should no longer contain removed target %s", dir1)
+	}
+}
+
+// --prune removes a symlink target only when it still links to the extra's
+// source; a link the user pointed elsewhere stays.
+func TestExtrasTarget_RemoveTargetPrune_SymlinkOnlyWhenLinkedToSource(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+
+	srcDir := filepath.Join(sb.Home, ".config", "skillshare", "extras", "rules")
+	sb.WriteFile(filepath.Join(srcDir, "managed.md"), "managed\n")
+	elsewhere := filepath.Join(sb.Home, "elsewhere")
+	if err := os.MkdirAll(elsewhere, 0755); err != nil {
+		t.Fatal(err)
 	}
 
-	configContent := sb.ReadFile(sb.ConfigPath)
-	if !strings.Contains(configContent, dir1) {
-		t.Errorf("config should still contain failed target %s:\n%s", dir1, configContent)
+	ours := filepath.Join(sb.Home, "target-ours")
+	theirs := filepath.Join(sb.Home, "target-theirs")
+	keep := filepath.Join(sb.Home, "target-keep")
+	if err := os.Symlink(srcDir, ours); err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(configContent, dir2) {
-		t.Errorf("config should still contain remaining target %s:\n%s", dir2, configContent)
+	if err := os.Symlink(elsewhere, theirs); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(keep, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	sb.WriteConfig(`source: ` + sb.SourcePath + `
+extras:
+  - name: rules
+    targets:
+      - path: ` + ours + `
+        mode: symlink
+      - path: ` + theirs + `
+        mode: symlink
+      - path: ` + keep + `
+        mode: copy
+`)
+
+	sb.RunCLI("extras", "rules", "--remove-target", ours, "--prune", "-g").AssertSuccess(t)
+	if _, err := os.Lstat(ours); !os.IsNotExist(err) {
+		t.Fatalf("symlink to the source should be removed, lstat err = %v", err)
+	}
+
+	result := sb.RunCLI("extras", "rules", "--remove-target", theirs, "--prune", "-g")
+	result.AssertSuccess(t)
+	result.AssertAnyOutputContains(t, "left in place")
+	if dest, err := os.Readlink(theirs); err != nil || dest != elsewhere {
+		t.Fatalf("symlink pointing elsewhere must stay, readlink = %q, %v", dest, err)
 	}
 }
 

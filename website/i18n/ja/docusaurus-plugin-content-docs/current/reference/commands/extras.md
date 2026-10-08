@@ -222,7 +222,7 @@ skillshare extras <name> --help
 | `--add-target <path>` | Extras に新しい Target を追加 |
 | `--as <filename>` | `--add-target` の Target ファイル名（単一ファイルの Extras のみ。既定値は `file`） |
 | `--remove-target <path>` | Extras から Target を削除（デフォルトでは設定のみ） |
-| `--prune` | `--remove-target` と併用: その Target 配下の skillshare 管理ファイルも削除。単一ファイルの Extras では、代わりに Target のファイルを元に戻す |
+| `--prune` | `--remove-target` と併用: その Target 配下の skillshare 管理ファイルも削除。単一ファイルの Extras では、代わりに Target のファイルを元に戻す。`symlink` の Target は Extras のソースへのリンクのときだけ削除 |
 | `--target <path>` | Target ディレクトリのパス（複数 Target を持つ Extras で `--mode` やフィルターのフラグを使う場合は必須。省略時、`--flatten`/`--no-flatten` はすべての Target に適用される） |
 | `--project, -p` | Project モードの Extras（`.skillshare/`）を使用 |
 | `--global, -g` | グローバルの Extras（`~/.config/skillshare/`）を使用 |

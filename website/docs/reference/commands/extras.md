@@ -291,7 +291,7 @@ skillshare extras <name> --help
 | `--add-target <path>` | Add a new target to the extra |
 | `--as <filename>` | Target filename for `--add-target` (single-file extras only; defaults to `file`) |
 | `--remove-target <path>` | Remove a target from the extra (config-only by default) |
-| `--prune` | With `--remove-target`: also delete skillshare-managed files under that target. For a single-file extra it restores the target file instead |
+| `--prune` | With `--remove-target`: also delete skillshare-managed files under that target. For a single-file extra it restores the target file instead. A `symlink` target is removed only when it still links to the extra's source |
 | `--target <path>` | Target directory path (required for `--mode` and filter flags with multi-target extras; `--flatten`/`--no-flatten` applies to all targets when omitted) |
 | `--project, -p` | Use project-mode extras (`.skillshare/`) |
 | `--global, -g` | Use global extras (`~/.config/skillshare/`) |

@@ -222,7 +222,7 @@ skillshare extras <name> --help
 | `--add-target <path>` | extra에 새 target 추가 |
 | `--as <filename>` | `--add-target`의 target 파일 이름 (single-file extra 전용, 기본값은 `file`) |
 | `--remove-target <path>` | extra에서 target 제거 (기본적으로 config 전용) |
-| `--prune` | `--remove-target`과 함께: 해당 target 아래의 skillshare 관리 파일도 삭제. single-file extra에서는 대신 target 파일을 복원 |
+| `--prune` | `--remove-target`과 함께: 해당 target 아래의 skillshare 관리 파일도 삭제. single-file extra에서는 대신 target 파일을 복원. `symlink` target은 extra의 소스를 가리키는 링크일 때만 삭제 |
 | `--target <path>` | target 디렉터리 경로 (multi-target extra에서 `--mode`나 필터 플래그에 필요; 생략 시 `--flatten`/`--no-flatten`은 모든 target에 적용) |
 | `--project, -p` | 프로젝트 모드 extras 사용 (`.skillshare/`) |
 | `--global, -g` | 전역 extras 사용 (`~/.config/skillshare/`) |

@@ -222,7 +222,7 @@ skillshare extras <name> --help
 | `--add-target <path>` | 為此 extra 新增一個 target |
 | `--as <filename>` | `--add-target` 的 target 檔名（僅限單一檔案 extra；預設為 `file`） |
 | `--remove-target <path>` | 從此 extra 移除一個 target（預設僅變更設定） |
-| `--prune` | 搭配 `--remove-target` 使用：同時刪除該 target 底下由 skillshare 管理的檔案。若是單一檔案 extra，則會改為還原 target 檔案 |
+| `--prune` | 搭配 `--remove-target` 使用：同時刪除該 target 底下由 skillshare 管理的檔案。若是單一檔案 extra，則會改為還原 target 檔案。`symlink` target 只有仍連結到該 extra 的來源時才會刪除 |
 | `--target <path>` | Target 目錄路徑（多 target 的 extra 使用 `--mode` 或篩選旗標時為必填；省略時 `--flatten`/`--no-flatten` 會套用到所有 target） |
 | `--project, -p` | 使用 project mode 的 extras（`.skillshare/`） |
 | `--global, -g` | 使用 global 的 extras（`~/.config/skillshare/`） |
