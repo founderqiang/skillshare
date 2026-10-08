@@ -145,10 +145,12 @@ export function groupByFolder(items: Skill[], links: SourceLink[] = []): FolderG
 }
 
 /** Cut groups down to the first `limit` items, preserving standalone empty groups. */
-export function limitGroups<G extends { items: Skill[] }>(groups: G[], limit: number): G[] {
+export function limitGroups<G extends { items: Skill[] }>(groups: G[], limit: number, collapsed: (g: G) => boolean = () => false): G[] {
   const out: G[] = [];
   let left = limit;
   for (const g of groups) {
+    // A collapsed group shows only its head, so its items cost nothing.
+    if (collapsed(g)) { out.push(g); continue; }
     if (left <= 0 && g.items.length > 0) continue;
     out.push({ ...g, items: g.items.slice(0, left) });
     left -= g.items.length;

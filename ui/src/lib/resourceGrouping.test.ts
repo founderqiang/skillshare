@@ -53,4 +53,10 @@ describe('limitGroups', () => {
 
     expect(limitGroups(groups, 3).map((g) => g.items.map((s) => s.name))).toEqual([['a', 'b'], ['c']]);
   });
+
+  it('does not charge collapsed groups against the limit', () => {
+    const groups = [{ key: 'x', items: [skill('a'), skill('b')] }, { key: 'y', items: [skill('c'), skill('d')] }];
+
+    expect(limitGroups(groups, 1, (g) => g.key === 'x').map((g) => g.items.map((s) => s.name))).toEqual([['a', 'b'], ['c']]);
+  });
 });

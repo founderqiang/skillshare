@@ -17,8 +17,9 @@ vi.mock('../api/client', async (importOriginal) => {
       listSkills: vi.fn(),
       checkStream: vi.fn(),
       updateAllStream: vi.fn(),
-      missingTrackedRepos: vi.fn(),
-      rehydrateTrackedRepos: vi.fn(),
+      missingConfigEntries: vi.fn(),
+      installFromConfig: vi.fn(),
+      batchUninstall: vi.fn(),
       sync: vi.fn().mockResolvedValue({ results: [] }),
     },
   };
@@ -51,7 +52,7 @@ async function findRow(name: string) {
 function cacheStatus(name: string, status: string) {
   localStorage.setItem(
     'skillshare.updateCheckCache.global',
-    JSON.stringify({ version: 1, items: { [name]: { status, checkedAt: new Date(Date.now() - 60_000).toISOString() } } }),
+    JSON.stringify({ version: 2, items: { [name]: { status, checkedAt: new Date(Date.now() - 60_000).toISOString() } } }),
   );
 }
 
@@ -61,7 +62,7 @@ describe('UpdatePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    vi.mocked(api.missingTrackedRepos).mockResolvedValue({ repos: [] });
+    vi.mocked(api.missingConfigEntries).mockResolvedValue({ entries: [], file: '.metadata.json' });
   });
 
   const nestedSkill = {
@@ -145,7 +146,7 @@ describe('UpdatePage', () => {
     vi.mocked(api.listSkills).mockResolvedValue({
       resources: [nestedSkill],
     });
-    cacheStatus('agent-browser', 'update-available');
+    cacheStatus('tools/agent-browser', 'update-available');
 
     renderUpdatePage();
 
@@ -185,7 +186,7 @@ describe('UpdatePage', () => {
       resources: [{ ...nestedSkill, name: 'child', relPath: '_dev-skills/child', isInRepo: true }],
       linked_repos: [linked],
     });
-    cacheStatus('child', 'error');
+    cacheStatus('_dev-skills/child', 'error');
     renderUpdatePage();
 
     const row = await findRow('_dev-skills');
@@ -248,7 +249,7 @@ describe('UpdatePage', () => {
     vi.mocked(api.listSkills).mockResolvedValue({
       resources: [nestedSkill],
     });
-    cacheStatus('agent-browser', 'update-available');
+    cacheStatus('tools/agent-browser', 'update-available');
     vi.mocked(api.updateAllStream).mockImplementation((onStart, onResult, onDone) => {
       queueMicrotask(() => {
         onStart(1);
@@ -282,7 +283,7 @@ describe('UpdatePage', () => {
       isRepo: false,
     };
     vi.mocked(api.listSkills).mockResolvedValue({ resources: [nestedSkill] });
-    cacheStatus('agent-browser', 'update-available');
+    cacheStatus('tools/agent-browser', 'update-available');
     vi.mocked(api.updateAllStream).mockImplementation((onStart, onResult, onDone) => {
       queueMicrotask(() => {
         onStart(1);
@@ -309,7 +310,7 @@ describe('UpdatePage', () => {
   it('syncs the updated kind in place after an update', async () => {
     const updatedResult = { name: 'tools/agent-browser', action: 'updated', message: '', isRepo: false };
     vi.mocked(api.listSkills).mockResolvedValue({ resources: [nestedSkill] });
-    cacheStatus('agent-browser', 'update-available');
+    cacheStatus('tools/agent-browser', 'update-available');
     vi.mocked(api.updateAllStream).mockImplementation((onStart, onResult, onDone) => {
       queueMicrotask(() => {
         onStart(1);
@@ -328,24 +329,67 @@ describe('UpdatePage', () => {
     expect(await screen.findByText('Only skills are written. Agents, extras and MCP stay as they are.')).toBeInTheDocument();
   });
 
-  it('warns about missing tracked repos and rehydrates on click (issue #212)', async () => {
+  it('installs entries missing on disk from config (issue #212)', async () => {
     vi.mocked(api.listSkills).mockResolvedValue({ resources: [nestedSkill] });
-    vi.mocked(api.missingTrackedRepos).mockResolvedValue({
-      repos: [{ name: '_team-skills', source: 'https://github.com/example/team-skills', branch: 'main' }],
+    vi.mocked(api.missingConfigEntries).mockResolvedValue({
+      entries: [{ name: '_team-skills', source: 'https://github.com/example/team-skills', tracked: true, branch: 'main' }],
+      file: '.metadata.json',
     });
-    vi.mocked(api.rehydrateTrackedRepos).mockResolvedValue({
-      results: [{ name: '_team-skills', action: 'rehydrated' }],
-    });
+    vi.mocked(api.installFromConfig).mockResolvedValue({ installed: 1, installedRepos: 1, installedRepoSkills: 3, skipped: 0, failed: [] });
 
     const user = userEvent.setup();
     renderUpdatePage();
 
-    // Banner lists the missing repo.
     expect(await screen.findByText('_team-skills')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /install missing/i }));
 
-    await user.click(screen.getByRole('button', { name: /rehydrate/i }));
+    expect(await screen.findByText(/^Installed 1 tracked repo/)).toBeInTheDocument();
+  });
 
-    await waitFor(() => expect(api.rehydrateTrackedRepos).toHaveBeenCalled());
+  it('lists skills deleted upstream and prunes them', async () => {
+    vi.mocked(api.listSkills).mockResolvedValue({ resources: [nestedSkill] });
+    vi.mocked(api.batchUninstall).mockResolvedValue({ results: [] } as never);
+    vi.mocked(api.checkStream).mockImplementation((_a, _b, _c, onDone) => {
+      queueMicrotask(() => onDone({ tracked_repos: [], skills: [{ name: 'tools/agent-browser', source: nestedSkill.source, version: '1', status: 'stale' }] }));
+      return { close: vi.fn() } as unknown as EventSource;
+    });
+
+    const user = userEvent.setup();
+    renderUpdatePage();
+    await user.click(await screen.findByRole('button', { name: /check for updates/i }));
+    const row = await findRow('agent-browser');
+    await user.click(await row.findByRole('button', { name: 'Prune' }));
+
+    await waitFor(() => expect(api.batchUninstall).toHaveBeenCalledWith({ names: ['tools/agent-browser'], force: true }));
+  });
+
+  it('does not offer prune from a stale status saved by an earlier session', async () => {
+    vi.mocked(api.listSkills).mockResolvedValue({ resources: [nestedSkill] });
+    cacheStatus('tools/agent-browser', 'stale');
+    renderUpdatePage();
+
+    await findRow('agent-browser');
+    expect(screen.queryByRole('button', { name: /^Prune/ })).not.toBeInTheDocument();
+  });
+
+  it('prunes only the skill deleted upstream when another folder has one of the same name', async () => {
+    const foo = (dir: string) => ({ ...nestedSkill, name: 'foo', flatName: `${dir}__foo`, relPath: `${dir}/foo`, sourcePath: `/skills/${dir}/foo`, source: `https://github.com/o/r/${dir}/foo` });
+    vi.mocked(api.listSkills).mockResolvedValue({ resources: [foo('a'), foo('b')] });
+    vi.mocked(api.batchUninstall).mockResolvedValue({ results: [] } as never);
+    vi.mocked(api.checkStream).mockImplementation((_a, _b, _c, onDone) => {
+      queueMicrotask(() => onDone({ tracked_repos: [], skills: [
+        { name: 'a/foo', source: 'https://github.com/o/r/a/foo', version: '1', status: 'up_to_date' },
+        { name: 'b/foo', source: 'https://github.com/o/r/b/foo', version: '1', status: 'stale' },
+      ] }));
+      return { close: vi.fn() } as unknown as EventSource;
+    });
+
+    const user = userEvent.setup();
+    renderUpdatePage();
+    await user.click(await screen.findByRole('button', { name: /check for updates/i }));
+    await user.click(await screen.findByRole('button', { name: 'Prune all' }));
+
+    await waitFor(() => expect(api.batchUninstall).toHaveBeenCalledWith({ names: ['b/foo'], force: true }));
   });
 });
 
@@ -361,7 +405,7 @@ describe('update failure message helpers', () => {
     }));
     const units = updateUnits(resources, 'skill', [{ name: '_dev', target: '/code/dev' }]);
     expect(units.map((unit) => unit.name)).toEqual(['_managed']);
-    expect(countUpdates(new Map(resources.map((item) => [item.name, { status: 'behind' as const }])), units)).toBe(1);
+    expect(countUpdates(new Map(resources.map((item) => [item.relPath, { status: 'behind' as const }])), units)).toBe(1);
   });
 
   it('offers force retry for failures force can actually resolve', () => {

@@ -13,7 +13,7 @@ import SyncPage from './SyncPage';
 
 vi.mock('../api/client', async (load) => ({
   ...await load<typeof import('../api/client')>(),
-  api: { listTargets: vi.fn(), diff: vi.fn(), diffExtras: vi.fn(), listLog: vi.fn(), skillsOffPreview: vi.fn(), updateTarget: vi.fn(), sync: vi.fn(), syncExtras: vi.fn() },
+  api: { listTargets: vi.fn(), listSkills: vi.fn(() => Promise.resolve({ resources: [] })), getSyncMatrix: vi.fn(() => Promise.resolve({ entries: [] })), diff: vi.fn(), diffExtras: vi.fn(), listLog: vi.fn(), skillsOffPreview: vi.fn(), updateTarget: vi.fn(), sync: vi.fn(), syncExtras: vi.fn() },
 }));
 vi.mock('../api/mcp', async (load) => ({ ...await load<typeof import('../api/mcp')>(), mcpApi: { list: vi.fn() } }));
 vi.mock('../api/hooks', async (load) => ({ ...await load<typeof import('../api/hooks')>(), hooksApi: { list: vi.fn(() => Promise.reject(new Error('offline'))) } }));
@@ -71,6 +71,60 @@ describe('Sync page last sync', () => {
     vi.mocked(api.listLog).mockResolvedValue({ entries: [{ ts: '2026-09-30T00:00:00Z', cmd: 'sync', status: 'partial', args: { targets_total: 3, targets_failed: 2, failed_targets: ['codex', 'cursor'] } }] } as never);
     renderPage();
     expect((await screen.findByText('Failed')).nextElementSibling).toHaveTextContent('codex and cursor');
+  });
+
+  it('shows targets with the same changes once and offers to discard only skills never synced anywhere', async () => {
+    const user = userEvent.setup();
+    const skill = (flatName: string) => ({ name: flatName, kind: 'skill', flatName, relPath: flatName, sourcePath: '', isInRepo: true });
+    vi.mocked(api.listTargets).mockResolvedValue({ targets: [target('codex'), target('cursor')], sourceSkillCount: 2 });
+    vi.mocked(api.diff).mockResolvedValue({
+      diffs: ['codex', 'cursor'].map((name) => ({ target: name, items: [{ skill: 'fresh', action: 'link', reason: 'new' }, { skill: 'old', action: 'link', reason: 'new' }] })),
+      ignored_count: 0, ignored_skills: [], ignore_root: '', ignore_repos: [],
+    } as never);
+    vi.mocked(api.listSkills).mockResolvedValue({ resources: [skill('fresh'), skill('old')] } as never);
+    // old is already in claude, so only fresh has never been synced.
+    const entry = (s: string, target: string) => ({ skill: s, target, status: 'synced', reason: '' });
+    vi.mocked(api.getSyncMatrix).mockResolvedValue({ entries: [entry('fresh', 'codex'), entry('fresh', 'cursor'), entry('old', 'codex'), entry('old', 'cursor'), entry('old', 'claude')] } as never);
+    renderPage();
+
+    expect(await screen.findByText('2 targets')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Discard all' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('fresh');
+    expect(dialog).not.toHaveTextContent('old');
+  });
+
+  it('does not offer Discard all for a skill a symlink-mode target already exposes', async () => {
+    const skill = (flatName: string) => ({ name: flatName, kind: 'skill', flatName, relPath: flatName, sourcePath: '', isInRepo: true });
+    vi.mocked(api.listTargets).mockResolvedValue({ targets: [target('codex')], sourceSkillCount: 1 });
+    vi.mocked(api.diff).mockResolvedValue({
+      diffs: [{ target: 'codex', items: [{ skill: 'fresh', action: 'link', reason: 'new' }] }],
+      ignored_count: 0, ignored_skills: [], ignore_root: '', ignore_repos: [],
+    } as never);
+    vi.mocked(api.listSkills).mockResolvedValue({ resources: [skill('fresh')] } as never);
+    // claude links the whole source folder, so fresh is already live there.
+    vi.mocked(api.getSyncMatrix).mockResolvedValue({ entries: [
+      { skill: 'fresh', target: 'codex', status: 'synced', reason: '' },
+      { skill: 'fresh', target: 'claude', status: 'na', reason: 'symlink mode — filters not applicable', reasonCode: 'sync_matrix.symlink_filters_not_applicable' },
+    ] } as never);
+    renderPage();
+
+    expect(await screen.findByText(/Sync 1 change/)).toBeInTheDocument();
+    await waitFor(() => expect(api.getSyncMatrix).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole('button', { name: 'Discard all' })).toBeNull();
+  });
+
+  it('lists a skill and an agent with the same name as two changes', async () => {
+    vi.mocked(api.listTargets).mockResolvedValue({ targets: [target('codex')], sourceSkillCount: 1 });
+    vi.mocked(api.diff).mockResolvedValue({
+      diffs: [{ target: 'codex', items: [{ skill: 'reviewer', action: 'link', reason: 'new' }, { skill: 'reviewer', kind: 'agent', action: 'link', reason: 'new' }] }],
+      ignored_count: 0, ignored_skills: [], ignore_root: '', ignore_repos: [],
+    } as never);
+    renderPage();
+
+    expect(await screen.findByText(/Sync 2 changes/)).toBeInTheDocument();
+    expect(screen.getAllByText('reviewer', { selector: '.grid-cols-3 .truncate' })).toHaveLength(2);
   });
 
   it('counts the failed targets when an older entry has no names', async () => {

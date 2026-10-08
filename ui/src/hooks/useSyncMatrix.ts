@@ -14,11 +14,12 @@ function summarize(entries: SyncMatrixEntry[]): { synced: number; total: number 
   };
 }
 
-export function useSyncMatrix() {
+export function useSyncMatrix(enabled = true) {
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.syncMatrix(),
     queryFn: () => api.getSyncMatrix(),
     staleTime: staleTimes.syncMatrix,
+    enabled,
   });
 
   const matrix = data?.entries ?? EMPTY;

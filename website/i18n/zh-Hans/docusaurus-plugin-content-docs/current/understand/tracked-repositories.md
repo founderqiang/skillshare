@@ -46,7 +46,7 @@ skillshare sync
 ```
 
 **发生了什么：**
-1. 仓库被克隆到 `~/.config/skillshare/skills/_team-skills/`
+1. 仓库被克隆到 `~/.config/skillshare/skills/_team-shared-skills/`
 2. 保留 `.git` 目录
 3. 克隆目录会被加入受管理的 `.gitignore` 区块，使其保持本机专属，不会作为嵌套 Git 仓库被提交
 4. 使用当前 install 阈值（`audit.block_threshold` 或 `--threshold`）对整个仓库进行安全审计
@@ -66,6 +66,8 @@ Tracked repos 会以 `_` 为前缀，以便与普通 Skill 区分：
 ├── code-review/        # 普通 Skill
 └── _team-skills/       # Tracked Repo（下划线前缀）
 ```
+
+文件夹名称取自所有者和仓库（`_<owner>-<repo>`），因此 `alice/skills` 和 `bob/skills` 会分别安装为 `_alice-skills` 和 `_bob-skills`，不会互相冲突。要换名称可以用 `--name`。之前安装的 repo 保留原来的名称。
 
 用 `--into` 安装的 tracked repo 会放在文件夹里，例如 `devops/_team-skills/`。它仍然被视为一个 repo：其中的 Skill 会归在它下面，`status` 会统计这些 Skill，更新或卸载时使用 `devops/_team-skills` 这个名称。在第一层以下，只有 git clone 得到的 `_` 文件夹才算 tracked repo，因此像 `devops/_drafts/` 这样的普通文件夹仍是普通文件夹。
 

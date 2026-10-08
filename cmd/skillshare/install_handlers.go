@@ -747,6 +747,37 @@ func buildInstallSummary(installed, failed, skipped int, noun string) string {
 	return strings.Join(parts, ", ")
 }
 
+// buildConfigInstallSummary formats the summary for installing from config,
+// counting tracked repos apart from single skills.
+func buildConfigInstallSummary(r install.ConfigInstallResult) string {
+	var parts []string
+	plainInstalled := r.Installed - r.InstalledRepos
+	if r.InstalledRepos > 0 {
+		parts = append(parts, fmt.Sprintf("Installed %s (%s)",
+			plural(r.InstalledRepos, "tracked repo"), plural(r.InstalledRepoSkills, "skill")))
+		if plainInstalled > 0 {
+			parts = append(parts, plural(plainInstalled, "skill"))
+		}
+	} else {
+		parts = append(parts, "Installed "+plural(plainInstalled, "skill"))
+	}
+	if r.Skipped > 0 {
+		skipped := fmt.Sprintf("%d skipped", r.Skipped)
+		if r.SkippedRepos > 0 {
+			kinds := []string{plural(r.SkippedRepos, "repo")}
+			if n := r.Skipped - r.SkippedRepos; n > 0 {
+				kinds = append(kinds, plural(n, "skill"))
+			}
+			skipped += " (" + strings.Join(kinds, ", ") + ")"
+		}
+		parts = append(parts, skipped)
+	}
+	if len(r.FailedSkills) > 0 {
+		parts = append(parts, fmt.Sprintf("%d failed", len(r.FailedSkills)))
+	}
+	return strings.Join(parts, ", ")
+}
+
 func handleDirectInstall(source *install.Source, cfg *config.Config, opts install.InstallOptions) (installLogSummary, error) {
 	logSummary := installLogSummary{
 		Source:         source.Raw,
@@ -895,18 +926,11 @@ func installFromGlobalConfig(cfg *config.Config, opts install.InstallOptions) (i
 	}
 
 	elapsed := time.Since(installStart)
-	parts := []string{"Installed " + plural(result.Installed, "skill")}
-	if result.Skipped > 0 {
-		parts = append(parts, fmt.Sprintf("%d skipped", result.Skipped))
-	}
-	if len(result.FailedSkills) > 0 {
-		parts = append(parts, fmt.Sprintf("%d failed", len(result.FailedSkills)))
-	}
 	status := "success"
 	if len(result.FailedSkills) > 0 {
 		status = "error"
 	}
-	ui.StepResult(status, strings.Join(parts, ", "), elapsed)
+	ui.StepResult(status, buildConfigInstallSummary(result), elapsed)
 
 	// Show failed details
 	if len(result.FailedSkills) > 0 {

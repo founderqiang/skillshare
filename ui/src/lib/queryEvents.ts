@@ -20,7 +20,7 @@ const events = {
   skillEdited: (name: string) => keys(k.skills.detail(name)),
   installDialogClosed: () => keys(k.skills.all),
   reposChanged: () => keys(k.overview, k.skills.all, k.trash),
-  skillsUninstalled: () => keys(k.skills.all, k.overview, k.trash, k.syncMatrixAll),
+  skillsUninstalled: () => keys(k.skills.all, k.overview, k.trash, k.syncMatrixAll, k.diff()),
   trashChanged: () => keys(k.trash, k.skills.all, k.syncMatrixAll),
   skillSyncChanged: () => keys(k.skills.all, k.syncMatrixAll),
   skillsToggled: () => keys(k.skills.all, k.syncMatrixAll, k.overview),
@@ -28,7 +28,7 @@ const events = {
   sourceLinked: () => keys(...sourceLinks),
   sourceUnlinked: () => keys(...sourceLinks, k.trash),
   collected: (target?: string) => keys(k.skills.all, k.overview, k.targets.all, k.diff(), k.syncMatrix(), k.collectScan(target)),
-  missingReposChanged: () => keys(k.missingTrackedRepos),
+  configInstalled: () => keys(k.missingConfigEntries, k.skills.all, k.overview, k.syncMatrixAll, k.diff()),
 
   // Targets, projects and sync
   targetsChanged: () => keys(...targets),

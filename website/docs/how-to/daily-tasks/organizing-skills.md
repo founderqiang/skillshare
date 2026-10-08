@@ -182,7 +182,7 @@ skillshare install ~/my-skill --into frontend/react
 
 # Works with --track too
 skillshare install github.com/team/skills --track --into devops
-# → ~/.config/skillshare/skills/devops/_skills/
+# → ~/.config/skillshare/skills/devops/_team-skills/
 
 # Works in project mode
 skillshare install anthropics/skills -s pdf --into tools -p
@@ -192,7 +192,7 @@ skillshare install anthropics/skills -s pdf --into tools -p
 After `skillshare sync`, targets show auto-flattened names:
 - `frontend/pdf/` → `frontend__pdf`
 - `frontend/react/my-skill/` → `frontend__react__my-skill`
-- `devops/_skills/frontend/ui/` → `devops___skills__frontend__ui`
+- `devops/_team-skills/frontend/ui/` → `devops___team-skills__frontend__ui`
 
 :::tip
 `--into` creates intermediate directories automatically. No need to `mkdir` first.

@@ -1,9 +1,9 @@
 import { apiFetch, BASE, createSSEStream } from './http';
-import type { MissingTrackedRepo, RehydrateResultItem, UpdateResultItem, UpdateStreamSummary } from './types/update';
+import type { UpdateResultItem, UpdateStreamSummary } from './types/update';
 
 export const updateApi = {
   update: (opts: { name?: string; kind?: 'skill' | 'agent'; force?: boolean; all?: boolean; skipAudit?: boolean }) =>
-    apiFetch<{ results: UpdateResultItem[]; missingTrackedRepos?: MissingTrackedRepo[] }>('/update', {
+    apiFetch<{ results: UpdateResultItem[] }>('/update', {
       method: 'POST',
       body: JSON.stringify(opts),
     }),
@@ -24,12 +24,4 @@ export const updateApi = {
       done: onDone,
     }, onError, 'Update stream failed');
   },
-  // Tracked repos declared in metadata but absent on disk (issue #212)
-  missingTrackedRepos: () =>
-    apiFetch<{ repos: MissingTrackedRepo[] }>('/update/missing-tracked-repos'),
-  // Rehydrate tracked repos declared in metadata but absent on disk (issue #212)
-  rehydrateTrackedRepos: () =>
-    apiFetch<{ results: RehydrateResultItem[] }>('/update/rehydrate', {
-      method: 'POST',
-    }),
 };

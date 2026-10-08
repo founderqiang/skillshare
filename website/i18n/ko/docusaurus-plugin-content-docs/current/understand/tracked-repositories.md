@@ -46,7 +46,7 @@ skillshare sync
 ```
 
 **일어나는 일:**
-1. repo가 `~/.config/skillshare/skills/_team-skills/`로 clone됨
+1. repo가 `~/.config/skillshare/skills/_team-shared-skills/`로 clone됨
 2. `.git` 디렉터리가 보존됨
 3. clone 디렉터리가 관리되는 `.gitignore` 블록에 추가되어 머신 로컬 상태로 유지되며, 중첩된 git repo로 커밋되지 않음
 4. 활성 install 임계값(`audit.block_threshold` 또는 `--threshold`)을 사용해 전체 repo가 보안 감사됨
@@ -66,6 +66,8 @@ Tracked repo는 일반 skill과 구분하기 위해 `_` 접두사가 붙습니�
 ├── code-review/        # Regular skill
 └── _team-skills/       # Tracked repo (underscore prefix)
 ```
+
+디렉터리 이름은 소유자와 repo 이름으로 정해집니다(`_<owner>-<repo>`). 그래서 `alice/skills`와 `bob/skills`는 각각 `_alice-skills`, `_bob-skills`로 설치되어 충돌하지 않습니다. 다른 이름을 쓰려면 `--name`을 사용하세요. 이전에 설치한 repo는 기존 이름을 유지합니다.
 
 `--into`로 설치한 tracked repo는 `devops/_team-skills/`처럼 폴더 안에 놓입니다. 그래도 하나의 repo로 취급됩니다. 안에 있는 skill은 그 아래로 묶이고, `status`에서도 집계되며, 업데이트나 제거할 때는 `devops/_team-skills`라는 이름을 사용합니다. 최상위 아래에서는 git clone된 `_` 폴더만 tracked repo로 간주되므로, `devops/_drafts/` 같은 일반 폴더는 그대로 일반 폴더입니다.
 

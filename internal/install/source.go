@@ -970,6 +970,10 @@ func (s *Source) TrackName() string {
 	// Try extracting full path from HTTPS clone URL
 	cloneURL = strings.TrimSuffix(cloneURL, ".git")
 	if u, err := url.Parse(cloneURL); err == nil {
+		// A local file:// remote has no owner; its full path is not a name.
+		if u.Scheme == "file" {
+			return s.Name
+		}
 		pathStr := strings.Trim(u.Path, "/")
 		if pathStr != "" {
 			return strings.ReplaceAll(pathStr, "/", "-")

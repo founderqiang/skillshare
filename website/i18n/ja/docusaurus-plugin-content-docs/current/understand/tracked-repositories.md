@@ -46,7 +46,7 @@ skillshare sync
 ```
 
 **何が起こるか:**
-1. リポジトリが `~/.config/skillshare/skills/_team-skills/` にクローンされます
+1. リポジトリが `~/.config/skillshare/skills/_team-shared-skills/` にクローンされます
 2. `.git` ディレクトリが保持されます
 3. クローンディレクトリは管理対象の `.gitignore` ブロックに追加され、マシンローカルにとどまり、ネストされた git リポジトリとしてコミットされないようになります
 4. リポジトリ全体が、有効なインストールしきい値（`audit.block_threshold` または `--threshold`）を使ってセキュリティ監査されます
@@ -66,6 +66,8 @@ skillshare sync
 ├── code-review/        # Regular skill
 └── _team-skills/       # Tracked repo (underscore prefix)
 ```
+
+ディレクトリ名はオーナーとリポジトリ名から付けられます（`_<owner>-<repo>`）。そのため `alice/skills` と `bob/skills` はそれぞれ `_alice-skills` と `_bob-skills` としてインストールされ、衝突しません。別の名前にするには `--name` を使います。以前にインストールしたリポジトリは今の名前のままです。
 
 `--into` でインストールした追跡リポジトリは、`devops/_team-skills/` のようにフォルダの中に置かれます。それでも 1 つのリポジトリとして扱われます。中の Skill はその下にまとめられ、`status` でも数えられ、更新やアンインストールには `devops/_team-skills` という名前を使います。最上位より下では、git clone された `_` フォルダだけが追跡リポジトリとみなされるため、`devops/_drafts/` のような普通のフォルダは通常のフォルダのままです。
 

@@ -72,8 +72,13 @@ type InstallContext interface {
 
 // ConfigInstallResult summarises the outcome of InstallFromConfig.
 type ConfigInstallResult struct {
-	Installed       int
-	Skipped         int
-	InstalledSkills []string
-	FailedSkills    []string
+	Installed int
+	Skipped   int
+	// Tracked repos counted within Installed/Skipped, so the summary can tell
+	// a whole repo apart from a single skill.
+	InstalledRepos      int
+	InstalledRepoSkills int // skills inside InstalledRepos
+	SkippedRepos        int
+	InstalledSkills     []string
+	FailedSkills        []string
 }

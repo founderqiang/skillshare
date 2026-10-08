@@ -356,9 +356,3 @@ func GetTrackedRepos(sourceDir string, walk ...sourcewalk.Options) ([]string, er
 func GetMissingTrackedRepos(sourceDir string, walks ...sourcewalk.Options) ([]TrackedRepoMeta, error) {
 	return getMissingTrackedReposImpl(sourceDir, walks...)
 }
-
-// RehydrateMissingTrackedRepos re-clones tracked repos declared in metadata whose
-// clone directories are absent on disk. Repos already present are left untouched.
-func RehydrateMissingTrackedRepos(sourceDir string, parseOpts ParseOptions, opts InstallOptions) ([]RehydrateResult, error) {
-	return rehydrateMissingTrackedReposImpl(sourceDir, parseOpts, opts)
-}

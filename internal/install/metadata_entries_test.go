@@ -1,20 +1,18 @@
-package main
+package install
 
 import (
 	"testing"
-
-	"skillshare/internal/install"
 )
 
-func TestStoreToSkillEntryDTOs_FullPathKeyWithGroup(t *testing.T) {
-	store := install.NewMetadataStore()
-	store.Set("team/_demo", &install.MetadataEntry{
+func TestMetadataSkillEntries_FullPathKeyWithGroup(t *testing.T) {
+	store := NewMetadataStore()
+	store.Set("team/_demo", &MetadataEntry{
 		Source:  "file:///tmp/demo",
 		Tracked: true,
 		Group:   "team",
 	})
 
-	dtos := storeToSkillEntryDTOs(store)
+	dtos := MetadataSkillEntries(store)
 	if len(dtos) != 1 {
 		t.Fatalf("expected 1 dto, got %d", len(dtos))
 	}
@@ -31,15 +29,15 @@ func TestStoreToSkillEntryDTOs_FullPathKeyWithGroup(t *testing.T) {
 	}
 }
 
-func TestStoreToSkillEntryDTOs_LegacyBasenameKeyWithGroup(t *testing.T) {
-	store := install.NewMetadataStore()
-	store.Set("_demo", &install.MetadataEntry{
+func TestMetadataSkillEntries_LegacyBasenameKeyWithGroup(t *testing.T) {
+	store := NewMetadataStore()
+	store.Set("_demo", &MetadataEntry{
 		Source:  "file:///tmp/demo",
 		Tracked: true,
 		Group:   "team",
 	})
 
-	dtos := storeToSkillEntryDTOs(store)
+	dtos := MetadataSkillEntries(store)
 	if len(dtos) != 1 {
 		t.Fatalf("expected 1 dto, got %d", len(dtos))
 	}

@@ -777,6 +777,11 @@ func TestSource_TrackName(t *testing.T) {
 			raw:  "onprem.gitlab.internal/org/sub1/sub2/project",
 			want: "org-sub1-sub2-project",
 		},
+		{
+			name: "file URL keeps basename",
+			raw:  "file:///tmp/remotes/team-repo",
+			want: "team-repo",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

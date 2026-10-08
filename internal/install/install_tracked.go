@@ -17,13 +17,22 @@ func installTrackedRepoImpl(source *Source, sourceDir string, opts InstallOption
 		return nil, err
 	}
 
-	// Determine repo name: opts.Name > source.Name (from config) > TrackName (derived from URL)
+	// Determine repo name: opts.Name (--name or the name recorded in config) >
+	// TrackName (owner-repo, so two repos both called "skills" don't collide) >
+	// source.Name. ParseSource always fills source.Name with the URL basename,
+	// so it must not win over TrackName.
 	repoName := opts.Name
 	if repoName == "" {
-		repoName = source.Name
+		repoName = source.TrackName()
+		// Before owner-repo naming the clone was _<basename>; keep using that
+		// checkout when it is the same repo, so a repeat install does not clone twice.
+		legacy := filepath.Join(sourceDir, opts.Into, "_"+strings.TrimPrefix(source.Name, "_"))
+		if source.Name != "" && repoURLsMatch(getRemoteURL(legacy), source.CloneURL) {
+			repoName = source.Name
+		}
 	}
 	if repoName == "" {
-		repoName = source.TrackName()
+		repoName = source.Name
 	}
 
 	// Prefix with _ to indicate tracked repo (avoid double prefix if user already added _)

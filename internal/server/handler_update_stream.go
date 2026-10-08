@@ -98,12 +98,11 @@ func (s *Server) handleUpdateStream(w http.ResponseWriter, r *http.Request) {
 
 	var results []updateResultItem
 	summary := struct {
-		Updated             int                      `json:"updated"`
-		UpToDate            int                      `json:"upToDate"`
-		Blocked             int                      `json:"blocked"`
-		Errors              int                      `json:"errors"`
-		Skipped             int                      `json:"skipped"`
-		MissingTrackedRepos []missingTrackedRepoInfo `json:"missingTrackedRepos,omitempty"`
+		Updated  int `json:"updated"`
+		UpToDate int `json:"upToDate"`
+		Blocked  int `json:"blocked"`
+		Errors   int `json:"errors"`
+		Skipped  int `json:"skipped"`
 	}{}
 
 	for _, item := range items {
@@ -148,12 +147,6 @@ func (s *Server) handleUpdateStream(w http.ResponseWriter, r *http.Request) {
 
 	// Surface tracked repos declared in metadata but absent on disk (issue #212).
 	// Only relevant for the update-all flow, not targeted updates.
-	if namesParam == "" {
-		s.mu.RLock()
-		summary.MissingTrackedRepos = s.missingTrackedRepos()
-		s.mu.RUnlock()
-	}
-
 	// Write ops log
 	s.mu.Lock()
 	status := "ok"

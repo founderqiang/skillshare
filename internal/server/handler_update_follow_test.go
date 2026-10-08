@@ -205,7 +205,7 @@ func assertUpdateFollowLink(t *testing.T, link string) {
 	}
 }
 
-func TestHandleRehydrate_FollowedCheckoutWithMetadata(t *testing.T) {
+func TestHandleInstallFromConfig_FollowedCheckoutWithMetadata(t *testing.T) {
 	for _, project := range []bool{false, true} {
 		t.Run(fmt.Sprintf("project=%t", project), func(t *testing.T) {
 			s, source := newUpdateFollowServer(t, project, true)
@@ -220,19 +220,19 @@ func TestHandleRehydrate_FollowedCheckoutWithMetadata(t *testing.T) {
 			if err := store.Save(source); err != nil {
 				t.Fatal(err)
 			}
-			if repos := s.missingTrackedRepos(); len(repos) != 0 {
+			if repos, _ := install.GetMissingTrackedRepos(source, s.skillsWalk()); len(repos) != 0 {
 				t.Fatalf("followed checkout reported missing: %+v", repos)
 			}
 			rr := httptest.NewRecorder()
-			s.handleRehydrateTrackedRepos(rr, httptest.NewRequest(http.MethodPost, "/api/update/rehydrate", nil))
+			s.handleInstallFromConfig(rr, httptest.NewRequest(http.MethodPost, "/api/install/from-config", nil))
 			var resp struct {
-				Results []install.RehydrateResult `json:"results"`
+				Installed int `json:"installed"`
 			}
 			if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 				t.Fatal(err)
 			}
-			if rr.Code != http.StatusOK || len(resp.Results) != 0 {
-				t.Fatalf("followed checkout rehydrated: %d %s", rr.Code, rr.Body.String())
+			if rr.Code != http.StatusOK || resp.Installed != 0 {
+				t.Fatalf("followed checkout reinstalled: %d %s", rr.Code, rr.Body.String())
 			}
 			assertUpdateFollowLink(t, link)
 		})

@@ -46,7 +46,7 @@ skillshare sync
 ```
 
 **會發生什麼事：**
-1. Repo 會被 clone 到 `~/.config/skillshare/skills/_team-skills/`
+1. Repo 會被 clone 到 `~/.config/skillshare/skills/_team-shared-skills/`
 2. `.git` 目錄會被保留
 3. Clone 目錄會被加入受管理的 `.gitignore` 區塊，讓它保持機器本機、不會被當成巢狀 git repository 被 commit 進去
 4. 整個 repo 會用當前生效的安裝門檻（`audit.block_threshold` 或 `--threshold`）進行安全稽核
@@ -66,6 +66,8 @@ Tracked repos 會以 `_` 為前綴，以便與一般 skills 區分：
 ├── code-review/        # Regular skill
 └── _team-skills/       # Tracked repo (underscore prefix)
 ```
+
+資料夾名稱取自擁有者與 repo（`_<owner>-<repo>`），所以 `alice/skills` 和 `bob/skills` 會分別安裝成 `_alice-skills` 與 `_bob-skills`，不會互相衝突。要換名稱可以用 `--name`。先前安裝的 repo 維持原本的名稱。
 
 用 `--into` 安裝的 tracked repo 會放在資料夾裡，例如 `devops/_team-skills/`。它仍然視為一個 repo：裡面的 skills 會歸在它底下，`status` 會計入這些 skills，更新或解除安裝時使用 `devops/_team-skills` 這個名稱。在第一層以下，只有 git clone 出來的 `_` 資料夾才算 tracked repo，所以像 `devops/_drafts/` 這樣的一般資料夾仍是普通資料夾。
 

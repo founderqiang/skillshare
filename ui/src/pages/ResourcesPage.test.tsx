@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -189,6 +189,12 @@ describe('Skills tree view', () => {
   });
 });
 
+/** Link folder sits in the menu beside Install. */
+async function openLinkFolder() {
+  fireEvent.click(await screen.findByRole('button', { name: 'More ways to add' }));
+  fireEvent.mouseDown(await screen.findByRole('menuitem', { name: /^Link folder/ }));
+}
+
 describe('Link folder', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -200,7 +206,7 @@ describe('Link folder', () => {
 
   it('opens the dialog on the skills page', async () => {
     mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'Link folder' }));
+    await openLinkFolder();
     expect(screen.getByRole('dialog', { name: 'Link folder' })).toBeInTheDocument();
     expect(screen.getByLabelText('Folder path')).toBeInTheDocument();
     expect(await screen.findByRole('checkbox', { name: /Enable follow_source_links/ })).not.toBeChecked();
@@ -208,7 +214,7 @@ describe('Link folder', () => {
 
   it('posts the path, optional name and explicit enable flag and refreshes the list', async () => {
     mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'Link folder' }));
+    await openLinkFolder();
     fireEvent.change(screen.getByLabelText('Folder path'), { target: { value: '/work/team' } });
     fireEvent.change(screen.getByLabelText('Link name (optional)'), { target: { value: '_team' } });
     fireEvent.click(await screen.findByRole('checkbox', { name: /Enable follow_source_links/ }));
@@ -223,7 +229,7 @@ describe('Link folder', () => {
     const { ApiError } = await import('../api/client');
     vi.mocked(api.createSourceLink).mockRejectedValue(new ApiError(400, 'target overlaps sync target /tools/skills'));
     mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'Link folder' }));
+    await openLinkFolder();
     fireEvent.change(screen.getByLabelText('Folder path'), { target: { value: '/tools/skills' } });
     await screen.findByRole('checkbox', { name: /Enable follow_source_links/ });
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Link folder' }));
@@ -235,7 +241,7 @@ describe('Link folder', () => {
     vi.mocked(api.getConfig).mockResolvedValue({ config: { FollowSourceLinks: true }, raw: '' });
     vi.mocked(api.createSourceLink).mockResolvedValue({ path: '/source/_team', target: '/work/team', kind: 'symlink', warning: 'target is not a git checkout' });
     mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'Link folder' }));
+    await openLinkFolder();
     fireEvent.change(screen.getByLabelText('Folder path'), { target: { value: '/work/team' } });
     const submit = within(screen.getByRole('dialog')).getByRole('button', { name: 'Link folder' });
     await waitFor(() => expect(submit).not.toBeDisabled());
@@ -348,8 +354,8 @@ describe('Unlink folder', () => {
     expect(api.removeSourceLink).not.toHaveBeenCalled();
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }));
     const plain = [...document.querySelectorAll<HTMLElement>('.ss-gh')].find((g) => g.querySelector('b')?.textContent === 'repo')!;
-    expect(within(plain).getByRole('button', { name: 'Update repo' })).toBeInTheDocument();
     await user.click(within(plain).getByRole('button', { name: 'Repo actions' }));
+    expect(screen.getByRole('menuitem', { name: 'Update repo' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Uninstall repo' })).toBeInTheDocument();
   });
 
@@ -539,6 +545,25 @@ describe('Skills list folders', () => {
   it('shows an unset filter by its name alone', async () => {
     mount();
     expect((await screen.findAllByRole('combobox')).map((el) => el.textContent)).toEqual(['Source', 'Status', 'Folder']);
+  });
+
+  it('collapses every list group and remembers it', async () => {
+    mount();
+    await screen.findAllByText('hooks');
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse all' }));
+    expect(names()).toEqual([]);
+    cleanup();
+    mount();
+    await screen.findByRole('button', { name: 'Expand all' });
+    expect(names()).toEqual([]);
+  });
+
+  it('keeps the chosen filters after the page remounts', async () => {
+    mount();
+    await choose('Folder', 'frontend/react (2)');
+    cleanup();
+    mount();
+    await waitFor(() => expect(names()).toEqual(['hooks', 'router']));
   });
 
   it('clears a filter from its chip', async () => {

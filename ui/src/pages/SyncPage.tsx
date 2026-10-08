@@ -14,29 +14,37 @@ import { useToast } from '../components/Toast';
 import { hookLabel, hookMessage, rootName } from '../components/hooks/hooksView';
 import MCPNotices from '../components/mcp/MCPNotices';
 import { describeMessage, mcpClient, targetLabel } from '../components/mcp/mcpView';
-import { countChanges, countEdited, extraGroups, groupByFolder, groupInSync, HOOKS_CHANGED, hooksGroups, MCP_CHANGED, mcpGroups, otherWarnings, resourceGroups, runSync, type ChangeGroup, type Part, type RowIcon, type SyncFailure } from '../components/sync/syncView';
+import { changeSets, countChanges, countEdited, discardable, receivesSkill, tally, extraGroups, groupByFolder, groupInSync, HOOKS_CHANGED, hooksGroups, MCP_CHANGED, mcpGroups, otherWarnings, resourceGroups, runSync, type ChangeGroup, type Part, type RowIcon, type SyncFailure } from '../components/sync/syncView';
 import SyncResult from '../components/sync/SyncResult';
 import SyncError from '../components/sync/SyncError';
 import SkillsOffDialog from '../components/targets/SkillsOffDialog';
+import SegmentedControl from '../components/SegmentedControl';
+import { UninstallDialog } from '../components/resources/UninstallDialog';
 import { joinList } from '../components/targets/targetView';
 import { formatDateTime, formatRelativeTime, useI18n, useT, plural } from '../i18n';
 import { shortenHome } from '../lib/paths';
-import { formatAgentDisplayName } from '../lib/resourceNames';
+import { formatAgentDisplayName, formatTrackedRepoName } from '../lib/resourceNames';
 import { queryKeys, staleTimes } from '../lib/queryKeys';
-import { useDiffQuery, useHooksQuery, useMcpQuery, useSyncedTargetsQuery } from '../hooks/useSharedQueries';
+import { useDiffQuery, useHooksQuery, useMcpQuery, useSkillsQuery, useSyncedTargetsQuery } from '../hooks/useSharedQueries';
 import { invalidate } from '../lib/queryEvents';
+import { useSyncMatrix } from '../hooks/useSyncMatrix';
 
-const ROW_ICON: Record<RowIcon, React.ReactNode> = {
-  add: <Plus size={16} className="shrink-0 text-ok" />,
-  adopt: <Import size={15} className="shrink-0 text-info" />,
-  update: <RefreshCw size={15} className="shrink-0 text-info" />,
-  remove: <Minus size={16} className="shrink-0 text-bad" />,
-  kept: <CircleMinus size={15} className="shrink-0 text-ink-3" />,
-  conflict: <TriangleAlert size={15} className="shrink-0 text-warn" />,
+const ROW_ICON: Record<RowIcon, [typeof Plus, string]> = {
+  add: [Plus, 'text-ok'], adopt: [Import, 'text-info'], update: [RefreshCw, 'text-info'],
+  remove: [Minus, 'text-bad'], kept: [CircleMinus, 'text-ink-3'], conflict: [TriangleAlert, 'text-warn'],
 };
+/** A row's icon; `small` for names in a grid. Plus and minus draw thinner, so they go a size up. */
+function rowIcon(icon: RowIcon, small = false) {
+  const [Icon, tone] = ROW_ICON[icon];
+  return <Icon size={(icon === 'add' || icon === 'remove' ? 16 : 15) - (small ? 3 : 0)} className={`shrink-0 ${tone}`} />;
+}
 const PART_ICON: Record<Part, React.ReactNode> = { skill: <Puzzle size={14} />, agent: <Bot size={14} />, extra: <FolderPlus size={14} />, mcp: <Plug size={14} />, hooks: <Webhook size={14} /> };
 const PART_LABEL: Record<Part, string> = { skill: 'Skills', agent: 'Agents', extra: 'Extras', mcp: 'MCP', hooks: 'Hooks' };
 const PARTS = Object.keys(PART_LABEL) as Part[];
+/** A target with more rows than this starts collapsed. */
+const OPEN_ROWS = 8;
+const SET_LABEL = [['add', 'sync.set.add'], ['update', 'sync.set.update'], ['remove', 'sync.set.remove'], ['kept', 'sync.set.kept']] as const;
+const GROUP_BODY = 'flex flex-col gap-4 pb-[18px] pl-[52px] pr-[18px] pt-3.5 animate-fade-in [border-top:var(--sep)]';
 
 /** A target in an expanded list: its logo and name. */
 function TargetChip({ target, label }: { target: string; label: string }) {
@@ -82,6 +90,10 @@ export default function SyncPage() {
   const [outcome, setOutcome] = useState<SyncResponse | null>(null);
   const [failures, setFailures] = useState<SyncFailure[]>([]);
   const [stopping, setStopping] = useState('');
+  const [view, setView] = useState<'change' | 'target'>('change');
+  // Explicit open/closed per group; unset follows each group's default.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [discarding, setDiscarding] = useState(false);
 
   const plan = mcp.data?.plan;
   const hooksPlan = hooks.data?.plan;
@@ -94,6 +106,7 @@ export default function SyncPage() {
   // A blocked plan applies nothing, so its rows are shown but not counted.
   const count = countChanges(groups) - (plan?.blocked ? countChanges(mcpShown) : 0) - (hooksPlan?.blocked ? countChanges(hooksShown) : 0);
   const edited = countEdited(groups);
+  const total = tally(groups.flatMap((g) => g.rows).filter((r) => r.counts));
   const loading = diff.isPending || targets.isPending;
 
   const localByTarget = diffs
@@ -110,6 +123,17 @@ export default function SyncPage() {
   const conflicts = diff.data?.folder_conflicts ?? [];
   const stopTarget = targetList.find((x) => x.name === stopping);
   const stopConflict = conflicts.find((c) => c.stop.includes(stopping));
+  // Skill names and Discard all need the skills list and matrix only while skills are being added.
+  const addsSkills = !running && !outcome && resources.groups.some((g) => g.rows.some((r) => r.part === 'skill' && r.icon === 'add'));
+  const skills = useSkillsQuery({ enabled: addsSkills });
+  const matrix = useSyncMatrix(addsSkills);
+  const skillList = skills.data?.resources ?? [];
+  const toDiscard = !addsSkills || !matrix.matrix.length ? [] : discardable(resources.groups, skillList, (name) => matrix.getSkillTargets(name).filter(receivesSkill).map((e) => e.target));
+  // Show a skill by its source path; flattened target names (_repo__skills__x) are hard to read.
+  const relPaths = new Map(skillList.map((s) => [s.flatName, s.relPath]));
+  const display = (r: ChangeGroup['rows'][number]) => (r.part === 'skill' ? formatTrackedRepoName(relPaths.get(r.name) ?? r.name.replace(/__/g, '/')) : r.name);
+  const isOpen = (key: string, byDefault: boolean) => expanded[key] ?? byDefault;
+  const flip = (key: string, byDefault: boolean) => setExpanded((e) => ({ ...e, [key]: !(e[key] ?? byDefault) }));
 
   const toggle = (set: Set<string>, key: string) => { const next = new Set(set); if (next.has(key)) next.delete(key); else next.add(key); return next; };
 
@@ -142,10 +166,13 @@ export default function SyncPage() {
   const failedTargets = new Set(failures.filter((f) => f.part !== 'extra').map((f) => f.target));
   const syncedTargets = new Set((outcome?.results ?? []).map((r) => r.target).filter((name) => !failedTargets.has(name))).size;
 
+  const chevron = (open: boolean) => (open ? <ChevronDown size={15} className="shrink-0 text-ink-3" /> : <ChevronRight size={15} className="shrink-0 text-ink-3" />);
+
+  /** A group head's content; targets wrap it in a button that collapses them. */
   const groupHead = (g: ChangeGroup) => {
     const n = countChanges([g]);
     return (
-      <div className="ss-gh">
+      <>
         {g.part === 'extra' ? <span className="ss-cat sm extra">{PART_ICON.extra}</span> : <span className="ss-at"><AgentIcon target={g.name} size={17} /></span>}
         <span className="font-semibold">{g.part === 'mcp' ? targetLabel(g.name) : g.part === 'hooks' ? hookLabel(g.name) : g.name}</span>
         <span className="ss-tag">{g.part === 'mcp' ? 'MCP' : g.part === 'hooks' ? 'Hooks' : g.mode}</span>
@@ -154,32 +181,100 @@ export default function SyncPage() {
         {g.project && <span className="ss-tag shrink-0" title={g.project}>{g.part === 'hooks' ? rootName(g.project) : t('sync.mcp.offList', { project: shortenHome(g.project) })}</span>}
         <span className="flex-1" />
         {n > 0 && <span className="shrink-0 text-[12px] text-ink-2">{t(plural('sync.changes', n), { count: n })}</span>}
+      </>
+    );
+  };
+
+  const changeRows = (rows: ChangeGroup['rows']) => rows.map((r) => (
+    <div key={r.key} className="ss-r !min-h-[46px]">
+      {rowIcon(r.icon)}
+      <span className={`ss-cat sm ${r.part}`}>{PART_ICON[r.part]}</span>
+      <span className="w-[220px] shrink-0 truncate font-mono text-[13px] font-semibold" title={r.name}>{r.name}</span>
+      {r.part === 'hooks' && r.detail ? (
+        // A hooks reason is worded for this UI and can be long: hover shows all of it.
+        <span className="min-w-0 flex-1">
+          <Tooltip block content={hookMessage(t, r.detail)}>
+            <span className={`block truncate text-[13px] ${r.icon === 'conflict' ? 'text-warn' : 'text-ink-2'}`}>{r.text ? t(r.text) : hookMessage(t, r.detail)}</span>
+          </Tooltip>
+        </span>
+      ) : (
+        <span className={`min-w-0 flex-1 truncate text-[13px] ${r.icon === 'conflict' ? 'text-warn' : 'text-ink-2'}`} title={r.detail}>
+          {r.text ? t(r.text) : r.part === 'mcp' ? describeMessage(t, r.detail) : r.detail}
+        </span>
+      )}
+    </div>
+  ));
+
+  /** Skill and agent changes as names by folder, three to a line: hundreds of rows stay readable. */
+  const itemGrid = (rows: ChangeGroup['rows'], icons = true, from = '') => {
+    // A skill and an agent can share a display path, so a path holds a list.
+    const byPath = new Map<string, ChangeGroup['rows']>();
+    for (const r of rows) byPath.set(display(r), [...(byPath.get(display(r)) ?? []), r]);
+    return groupByFolder([...byPath.keys()]).map(({ folder, items }) => {
+      // The head already names the shared root, so a folder drops it.
+      const label = (from && folder.startsWith(`${from}/`) && folder !== `${from}/` ? folder.slice(from.length + 1) : folder).replace(/\/$/, '');
+      const entries = items.flatMap((name) => byPath.get(folder + name)!.map((r) => ({ name, r })));
+      return (
+      <div key={folder} className="flex flex-col gap-1.5">
+        {folder && <div className="flex items-center gap-[7px] text-[12px] font-semibold text-ink-3"><Folder size={14} className="shrink-0" /><span className="font-mono">{label}</span> · {entries.length}</div>}
+        <div className={`grid grid-cols-3 gap-x-6 gap-y-1.5 font-mono text-[12.5px] ${folder ? 'pl-[21px]' : ''}`}>
+          {entries.map(({ name, r }) => {
+            const why = r.text ? t(r.text) : r.detail;
+            return <span key={r.key} className="flex min-w-0 items-center gap-1.5" title={why ? `${folder + name} · ${why}` : folder + name}>{icons && rowIcon(r.icon, true)}<span className="truncate">{name}</span></span>;
+          })}
+        </div>
       </div>
+      );
+    });
+  };
+
+  const setCard = (set: ReturnType<typeof changeSets>[number], index: number) => {
+    const n = countChanges(set.targets);
+    const open = isOpen(set.key, index === 0);
+    const parts = new Set(set.rows.map((r) => r.part));
+    const counts = tally(set.rows);
+    const shown = SET_LABEL.filter(([icon]) => counts[icon]);
+    const noun = (count: number) => (parts.size === 1 ? [...parts][0] : 'item') + (count === 1 ? '' : 's');
+    // Where the changes come from, when they share one: the tracked repo or folder.
+    const paths = set.rows.map(display);
+    const roots = new Set(paths.map((p) => p.split('/')[0]));
+    const from = paths.length === 1 ? paths[0] : roots.size === 1 ? [...roots][0] : '';
+    return (
+      <Fragment key={set.key}>
+        <button type="button" className="ss-gh w-full cursor-pointer text-left" aria-expanded={open} onClick={() => flip(set.key, index === 0)}>
+          {chevron(open)}
+          {shown[0] && rowIcon(shown[0][0], true)}
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="truncate font-semibold">{shown.map(([icon, key]) => t(key, { count: counts[icon]!, noun: noun(counts[icon]!) })).join(' · ')}</span>
+            {from && <span className="truncate font-mono text-[12px] text-ink-3">{from}</span>}
+          </span>
+          {set.targets.some((g) => failedTargets.has(g.name)) && <span className="ss-tag bad shrink-0">{t('sync.result.lastFailed')}</span>}
+          <span className="ss-stack">{set.targets.slice(0, 5).map((g) => <span key={g.name} className="ss-at"><AgentIcon target={g.name} size={15} /></span>)}</span>
+          <span className="shrink-0 text-[12px] text-ink-2">{t(plural('sync.set.targets', set.targets.length), { count: set.targets.length })}</span>
+          <span className="w-[84px] shrink-0 text-right text-[12px] text-ink-2">{n > 0 && t(plural('sync.changes', n), { count: n })}</span>
+        </button>
+        {open && (
+          <div className={GROUP_BODY}>
+            <div className="flex flex-col gap-2">
+              <span className="text-[12px] font-semibold text-ink-3">{t('sync.set.targetList', { count: set.targets.length })}</span>
+              <div className="flex flex-wrap gap-2">{set.targets.map((g) => <TargetChip key={g.name} target={g.name} label={g.name} />)}</div>
+            </div>
+            {itemGrid(set.rows, shown.length > 1, paths.length > 1 ? from : '')}
+          </div>
+        )}
+      </Fragment>
     );
   };
 
   return (
     <div className="animate-fade-in">
-      <PageHeader
-        title={t('sync.title')}
-        subtitle={t('sync.subtitle')}
-        actions={
-          <span data-tour="sync-actions">
-            <Button variant="primary" onClick={sync} loading={running} disabled={loading || parts.size === 0}>
-              {!running && <RefreshCw size={16} />}
-              {count > 0 ? t(plural('sync.run', count), { count }) : t('sync.run.none')}
-            </Button>
-          </span>
-        }
-      />
-      <div className="grid grid-cols-[minmax(0,1fr)_280px] items-start gap-8">
-        <div className="flex min-w-0 flex-col gap-4">
+      <PageHeader title={t('sync.title')} subtitle={t('sync.subtitle')} />
+      <div className="ss-stickbar !py-3.5 mb-3">
           <div className="flex flex-wrap items-center gap-[18px]">
             <span className="text-[13px] text-ink-3">{t('sync.include')}</span>
             {PARTS.map((p) => (
               <Checkbox key={p} size="sm" label={PART_LABEL[p]} checked={parts.has(p)} disabled={running} onChange={() => setOff((s) => toggle(s, p) as Set<Part>)} />
             ))}
-            <span className="flex-1" />
             <span className="flex items-center gap-2" title={t('sync.forceHint')}>
               <button type="button" role="switch" aria-checked={force} aria-labelledby="sync-force" aria-describedby="sync-force-hint" className={`ss-sw ${force ? 'on' : ''} disabled:opacity-50`} disabled={running} onClick={() => setForce(!force)}>
                 <i />
@@ -187,7 +282,22 @@ export default function SyncPage() {
               <span id="sync-force" className="text-[13px] font-semibold">Force</span>
               <span id="sync-force-hint" className="sr-only">{t('sync.forceHint')}</span>
             </span>
+            <span className="flex-1" />
+            <span className="flex items-center gap-2" data-tour="sync-actions">
+              {toDiscard.length > 0 && (
+                <Button variant="secondary" disabled={running} onClick={() => setDiscarding(true)}>
+                  {t('sync.discard')}
+                </Button>
+              )}
+              <Button variant="primary" onClick={sync} loading={running} disabled={loading || parts.size === 0}>
+                {!running && <RefreshCw size={16} />}
+                {count > 0 ? t(plural('sync.run', count), { count }) : t('sync.run.none')}
+              </Button>
+            </span>
           </div>
+      </div>
+      <div className="grid grid-cols-[minmax(0,1fr)_280px] items-start gap-8">
+        <div className="flex min-w-0 flex-col gap-4">
           {edited > 0 && (
             <div className={`ss-note ${force ? 'warn' : 'inf'}`}>
               {force ? <TriangleAlert size={16} /> : <CircleMinus size={16} />}
@@ -233,6 +343,21 @@ export default function SyncPage() {
             </div>
           ))}
 
+          {!loading && !diff.error && groups.length > 0 && (
+            <div className="flex items-center gap-3">
+              <h2 className="ss-h2">{t(plural('sync.pending', count), { count })}</h2>
+              <span className="flex-1 text-[12px] text-ink-2">
+                {(['add', 'update', 'remove'] as const).filter((icon) => total[icon]).map((icon, i) => (
+                  <Fragment key={icon}>{i > 0 && ' · '}<span className={ROW_ICON[icon][1]}>{t(`sync.sum.${icon}`, { count: total[icon]! })}</span></Fragment>
+                ))}
+              </span>
+              <SegmentedControl
+                value={view}
+                onChange={setView}
+                options={[{ value: 'change', label: t('sync.view.change') }, { value: 'target', label: t('sync.view.target') }]}
+              />
+            </div>
+          )}
           <div className="ss-list">
             {loading ? (
               <div className="ss-r gap-2 text-[13px] text-ink-2"><Spinner size="sm" />{t('sync.checking')}</div>
@@ -248,30 +373,17 @@ export default function SyncPage() {
                 {groups.length === 0 && (
                   <div className="ss-r text-[13px]"><CircleCheck size={16} className="text-ok" />{t('sync.nothing')}</div>
                 )}
-                {groups.map((g) => (
-                  <Fragment key={g.key}>
-                    {groupHead(g)}
-                    {g.rows.map((r) => (
-                      <div key={r.key} className="ss-r !min-h-[46px]">
-                        {ROW_ICON[r.icon]}
-                        <span className={`ss-cat sm ${r.part}`}>{PART_ICON[r.part]}</span>
-                        <span className="w-[220px] shrink-0 truncate font-mono text-[13px] font-semibold" title={r.name}>{r.name}</span>
-                        {r.part === 'hooks' && r.detail ? (
-                          // A hooks reason is worded for this UI and can be long: hover shows all of it.
-                          <span className="min-w-0 flex-1">
-                            <Tooltip block content={hookMessage(t, r.detail)}>
-                              <span className={`block truncate text-[13px] ${r.icon === 'conflict' ? 'text-warn' : 'text-ink-2'}`}>{r.text ? t(r.text) : hookMessage(t, r.detail)}</span>
-                            </Tooltip>
-                          </span>
-                        ) : (
-                          <span className={`min-w-0 flex-1 truncate text-[13px] ${r.icon === 'conflict' ? 'text-warn' : 'text-ink-2'}`} title={r.detail}>
-                            {r.text ? t(r.text) : r.part === 'mcp' ? describeMessage(t, r.detail) : r.detail}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </Fragment>
-                ))}
+                {view === 'change' && changeSets(resources.groups).map((set, i) => setCard(set, i))}
+                {(view === 'change' ? groups.filter((g) => g.part !== 'target') : groups).map((g) => {
+                  if (g.part !== 'target') return <Fragment key={g.key}><div className="ss-gh">{groupHead(g)}</div>{changeRows(g.rows)}</Fragment>;
+                  const open = isOpen(g.key, g.rows.length <= OPEN_ROWS);
+                  return (
+                    <Fragment key={g.key}>
+                      <button type="button" className="ss-gh w-full cursor-pointer text-left" aria-expanded={open} onClick={() => flip(g.key, g.rows.length <= OPEN_ROWS)}>{chevron(open)}{groupHead(g)}</button>
+                      {open && <div className={GROUP_BODY}>{itemGrid(g.rows)}</div>}
+                    </Fragment>
+                  );
+                })}
                 {resources.inSync.length > 0 && (
                   <button type="button" className="ss-gh w-full text-left" aria-expanded={open.has('inSync')} onClick={() => setOpen((s) => toggle(s, 'inSync'))}>
                     {!open.has('inSync') && <span className="ss-stack ml-1.5">{resources.inSync.slice(0, 4).map((name) => <span key={name} className="ss-at"><AgentIcon target={name} size={14} /></span>)}</span>}
@@ -391,7 +503,7 @@ export default function SyncPage() {
 
         </div>
 
-        <aside className="flex flex-col">
+        <aside className="sticky top-[84px] flex flex-col">
           <div className="ss-box flex flex-col gap-3.5">
             <div className="flex items-center justify-between">
               <h3 className="text-[15px] font-semibold">{t('sync.last.title')}</h3>
@@ -423,6 +535,7 @@ export default function SyncPage() {
       </div>
 
       {collecting && <CollectDialog onClose={() => setCollecting(false)} />}
+      {discarding && <UninstallDialog kind="skill" selection={toDiscard} all={skillList} onClose={() => setDiscarding(false)} />}
       {stopTarget && (
         <SkillsOffDialog
           target={stopTarget}

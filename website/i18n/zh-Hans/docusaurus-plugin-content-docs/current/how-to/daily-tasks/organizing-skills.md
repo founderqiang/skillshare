@@ -182,7 +182,7 @@ skillshare install ~/my-skill --into frontend/react
 
 # 也可搭配 --track 使用
 skillshare install github.com/team/skills --track --into devops
-# → ~/.config/skillshare/skills/devops/_skills/
+# → ~/.config/skillshare/skills/devops/_team-skills/
 
 # 在 Project mode 下也可使用
 skillshare install anthropics/skills -s pdf --into tools -p
@@ -192,7 +192,7 @@ skillshare install anthropics/skills -s pdf --into tools -p
 执行 `skillshare sync` 后，Target 会显示自动扁平化后的名称：
 - `frontend/pdf/` → `frontend__pdf`
 - `frontend/react/my-skill/` → `frontend__react__my-skill`
-- `devops/_skills/frontend/ui/` → `devops___skills__frontend__ui`
+- `devops/_team-skills/frontend/ui/` → `devops___team-skills__frontend__ui`
 
 :::tip
 `--into` 会自动创建中间目录，无需先手动 `mkdir`。
