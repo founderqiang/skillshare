@@ -154,3 +154,22 @@ func TestConvertibleProjects_SkipsFoldersWhoseTargetsDisagree(t *testing.T) {
 		t.Fatalf("found %+v", found)
 	}
 }
+
+func TestValidateProjects_PrefixedNamingNeedsCopyMode(t *testing.T) {
+	cfg, root, err := loadWithProjects(t, "", "app")
+	if err != nil {
+		t.Fatal(err)
+	}
+	project := func(mode string) map[string]ManagedProject {
+		return map[string]ManagedProject{filepath.Join(root, "app"): {
+			Targets: []string{"claude"},
+			Skills:  &ResourceTargetConfig{Mode: mode, TargetNaming: "prefixed"},
+		}}
+	}
+	if err := cfg.ValidateProjects(project("")); err == nil || !strings.Contains(err.Error(), "requires copy mode") {
+		t.Fatalf("merge default: err = %v, want copy-mode error", err)
+	}
+	if err := cfg.ValidateProjects(project("copy")); err != nil {
+		t.Fatalf("copy: err = %v", err)
+	}
+}

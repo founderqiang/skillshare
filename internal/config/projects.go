@@ -1,6 +1,7 @@
 package config
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -208,6 +209,11 @@ func (c *Config) ValidateProjects(projects map[string]ManagedProject) error {
 		for _, rc := range []*ResourceTargetConfig{project.Skills, project.Agents} {
 			if rc != nil && !IsValidSyncMode(rc.Mode) {
 				return fmt.Errorf("invalid sync mode %q (valid: %s)", rc.Mode, strings.Join(ValidSyncModes, ", "))
+			}
+		}
+		if sk := project.Skills; sk != nil {
+			if err := TargetNamingModeError(cmp.Or(sk.TargetNaming, c.TargetNaming), cmp.Or(sk.Mode, c.Mode)); err != nil {
+				return err
 			}
 		}
 	}
