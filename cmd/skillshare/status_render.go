@@ -256,8 +256,8 @@ func printExtrasStatus(extras []config.ExtraConfig, sourceDirFn func(config.Extr
 		}
 	}
 	for _, extra := range extras {
-		files, err := sync.DiscoverExtraSource(sourceDirFn(extra), extra.File)
-		if err != nil {
+		sourceDir := sourceDirFn(extra)
+		if _, err := sync.DiscoverExtraSource(sourceDir, extra.File); err != nil {
 			ui.Row(ui.MarkWarn, extra.Name, "source not found", width)
 			continue
 		}
@@ -270,8 +270,13 @@ func printExtrasStatus(extras []config.ExtraConfig, sourceDirFn func(config.Extr
 				ui.Row(ui.MarkWarn, extra.Name, fmt.Sprintf("%s %s", shortenPath(t.Path), err), width)
 				continue
 			}
+			files, _, err := sync.DiscoverExtraTargetFiles(sourceDir, extra.File, t)
+			if err != nil {
+				ui.Row(ui.MarkWarn, extra.Name, fmt.Sprintf("%s %s", shortenPath(t.Path), err), width)
+				continue
+			}
 			mode := sync.ExtraTargetMode(t.Mode, extra.File != "")
-			ui.Row(ui.MarkNone, extra.Name, pad(shortenPath(t.Path), pathW)+"  "+theme.Dim().Render(plural(len(sync.ExtraTargetFiles(files, t)), "file")+" · "+mode), width)
+			ui.Row(ui.MarkNone, extra.Name, pad(shortenPath(t.Path), pathW)+"  "+theme.Dim().Render(plural(len(files), "file")+" · "+mode), width)
 		}
 	}
 }

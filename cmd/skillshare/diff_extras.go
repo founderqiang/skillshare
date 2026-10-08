@@ -55,23 +55,19 @@ func collectExtrasDiff(extras []config.ExtraConfig, sourceResolver func(config.E
 			continue
 		}
 
-		files, err := sync.DiscoverExtraFiles(sourceDir)
-		if err != nil {
-			// Source doesn't exist — report for each target
-			for _, t := range extra.Targets {
+		for _, t := range extra.Targets {
+			mode := sync.ExtraTargetMode(t.Mode, extra.File != "")
+			files, _, err := sync.DiscoverExtraTargetFiles(sourceDir, "", t)
+			if err != nil {
+				// Source doesn't exist
 				results = append(results, extraDiffResult{
 					extraName:  extra.Name,
 					targetPath: t.Path,
-					mode:       sync.ExtraTargetMode(t.Mode, extra.File != ""),
+					mode:       mode,
 					errMsg:     "source directory not found",
 				})
+				continue
 			}
-			continue
-		}
-
-		for _, t := range extra.Targets {
-			files := sync.ExtraTargetFiles(files, t)
-			mode := sync.ExtraTargetMode(t.Mode, extra.File != "")
 			r := extraDiffResult{
 				extraName:  extra.Name,
 				targetPath: t.Path,
