@@ -9,6 +9,53 @@ All notable changes to skillshare are documented here. For the full commit histo
 
 ---
 
+## [0.25.3] - 2026-10-08
+
+### New Features
+
+#### Extras
+
+- **Choose which files each target syncs** — a folder extra used to send every file to every target. Each target can now set `include` and `exclude` patterns in `.gitignore` syntax, matched on the path inside the source. In `merge` mode the next sync removes links to files that stop matching; `copy` mode keeps files it copied before. Filters are refused for `symlink` mode and single-file extras, and `sync` warns when an `include` pattern matches no file. A negated include such as `!draft.md` is not reported as unmatched. Refs: #435.
+  ```bash
+  skillshare extras init docs --target ~/.claude/docs --include index.md --include learning.md
+  skillshare extras docs --target ~/.cursor/docs --add-exclude "draft*"
+  ```
+  - On an extra with more than one target, the filter flags need `--target`, like `--mode`.
+  - Filters written by hand in the config are validated before sync, so a malformed pattern such as `[` stops the sync instead of pruning every link.
+  - Switching a filtered target to `symlink`, from the dashboard or the `extras list` mode picker, is refused.
+- **Edit targets and extras in the dashboard** — **Edit target** changes a target's folder, file name, mode, flatten setting and filters with a live preview. **Edit extra** renames an extra or points it at another source folder. A moved target or source drops the links left at the old place and syncs right away; links into a source folder that was already moved or deleted are relinked too. The config is saved before old links are removed, so a failed save leaves the targets working.
+
+#### Install
+
+- **Install config entries from the dashboard** — what `skillshare install` with no arguments restores is now offered in the dashboard: the **Updates** tab and the install dialog show **Install all** when the config lists entries that are not installed. In project mode they install into the project's `.skillshare/skills`. The install summary counts tracked repos and their skills apart from standalone skills.
+- **Prune skills deleted upstream** — after a check, skills removed from their source repo are listed with **Prune** and **Prune all** on the **Updates** tab, which move them to the trash for 7 days. Prune appears only after a check in the current session.
+- **New tracked repos are named `_<owner>-<repo>`** — `alice/skills` and `bob/skills` install as `_alice-skills` and `_bob-skills` instead of colliding. Existing installs keep their names, and repeating `install --track` for a repo cloned earlier under its old name reuses that checkout instead of cloning a second copy.
+  ```bash
+  skillshare install github.com/alice/skills --track   # → _alice-skills
+  ```
+
+#### Sync
+
+- **Include filters that select no skill are explained** — the CLI says the filter adds nothing to that target. The dashboard's Sync page, sync dialogs and Git Sync (after a pull) show one notice per project, or per global target, saying the target gets no skills, with **Edit filter** linking to where the filter is set. No notice is shown while a followed source link cannot be read, since the skill list is incomplete then.
+- **Calmer Sync page** — targets that get the same changes share one card listing the skills by folder, and the summary and the **Sync** button stay in view while the list scrolls. **Discard all** moves skills that no target has received yet to the trash, after a confirmation. A tracked repo is offered only when none of its skills has been synced, and skills already live through a `symlink`-mode target are left out.
+- **Skills page** — the toolbar and group headings stay in view while scrolling, **New skill** and **Link folder** are in the **Install** menu, filters are remembered in the browser, and **Update repo** is in the repo menu.
+
+### Bug Fixes
+
+#### Extras
+
+- **`--remove-target --prune` keeps a symlink target that does not link to the source** — the CLI removed a `symlink`-mode target wherever it pointed, so a link repointed at your own folder could be lost. Like the dashboard, it now removes only a link to the extra's source, and warns and leaves anything else. Refs: #491.
+  - Windows junctions created when Developer Mode is off are recognized as links to the source, so they are removed instead of left behind.
+  - A real folder reached through a symlinked parent of the source is kept instead of failing with "not a symlink".
+  - When the target cannot be inspected, for example because of a permission error, the target stays in the config and the error is reported, so you can retry.
+
+#### Dashboard
+
+- **A skill and an agent with the same name show as two sync rows** — `reviewer` and `reviewer.md` were merged into one row while the header counted two changes.
+- **Update check statuses are kept per folder** — `a/foo` and `b/foo` shared one status, so a result for one was shown for the other.
+- **Collapsed groups no longer use up Skills list paging** — their items took places on the 100-item page, hiding later groups behind **Show more**.
+- **Context submenus stay open** — moving from one submenu to another and back quickly closed the first one a moment after it opened.
+
 ## [0.25.2] - 2026-10-07
 
 ### Bug Fixes
