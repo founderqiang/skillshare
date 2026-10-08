@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.25.3](https://github.com/runkids/skillshare/compare/v0.25.2...v0.25.3) (2026-10-08)
+## [0.25.3] - 2026-10-08
 
 
 * release 0.25.3 ([a25215d](https://github.com/runkids/skillshare/commit/a25215dfdcbef2bb6cbcb13e889dca70bad93359))
