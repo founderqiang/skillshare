@@ -315,12 +315,8 @@ func clearExtraTarget(file, sourceDir, targetPath, as, mode string) (int, []stri
 		}
 		return 0, nil
 	}
-	if mode == "symlink" {
-		dest, err := filepath.EvalSymlinks(targetPath)
-		src, srcErr := filepath.EvalSymlinks(sourceDir)
-		if err != nil || srcErr != nil || dest != src {
-			return 0, nil
-		}
+	if mode == "symlink" && !linksTo(targetPath, sourceDir) {
+		return 0, nil
 	}
 	return syncpkg.PruneExtraTargetFiles(targetPath, sourceDir, mode, nil)
 }
@@ -345,4 +341,22 @@ func (s *Server) validateExtra(name string) error {
 		return s.projectCfg.ValidateExtras(s.projectRoot, name)
 	}
 	return s.cfg.ValidateExtras(name)
+}
+
+// linksTo reports whether link is a symlink to dir, comparing the link text
+// too, so a link whose folder has since moved or been deleted still counts.
+func linksTo(link, dir string) bool {
+	dest, err := os.Readlink(link)
+	if err != nil {
+		return false
+	}
+	if !filepath.IsAbs(dest) {
+		dest = filepath.Join(filepath.Dir(link), dest)
+	}
+	if filepath.Clean(dest) == filepath.Clean(dir) {
+		return true
+	}
+	real, err := filepath.EvalSymlinks(link)
+	src, srcErr := filepath.EvalSymlinks(dir)
+	return err == nil && srcErr == nil && real == src
 }

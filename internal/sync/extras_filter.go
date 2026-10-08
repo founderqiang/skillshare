@@ -2,6 +2,7 @@ package sync
 
 import (
 	"fmt"
+	"strings"
 
 	"skillshare/internal/config"
 	"skillshare/internal/skillignore"
@@ -44,8 +45,8 @@ func UnmatchedIncludes(files, include []string) []string {
 	var unmatched []string
 	for _, p := range include {
 		m := skillignore.Compile([]string{p})
-		if !m.HasRules() {
-			continue // blank or comment
+		if !m.HasRules() || strings.HasPrefix(strings.TrimSpace(p), "!") {
+			continue // blank, comment, or a negation that only narrows earlier rules
 		}
 		if !matchesAnyFile(m, files) {
 			unmatched = append(unmatched, p)

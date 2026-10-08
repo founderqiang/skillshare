@@ -35,7 +35,7 @@ func TestFilterExtraFiles_GitignoreSemantics(t *testing.T) {
 }
 
 func TestUnmatchedIncludes_ReportsPatternWithNoFile(t *testing.T) {
-	unmatched := UnmatchedIncludes(filterTestFiles, []string{"index.md", "index.mdd"})
+	unmatched := UnmatchedIncludes(filterTestFiles, []string{"index.md", "index.mdd", "!index.md"})
 
 	if !slices.Equal(unmatched, []string{"index.mdd"}) {
 		t.Errorf("unmatched = %v, want [index.mdd]", unmatched)

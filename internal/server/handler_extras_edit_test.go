@@ -149,3 +149,22 @@ func TestHandleExtrasMode_SymlinkRejectedWhenTargetHasFilters(t *testing.T) {
 		t.Errorf("expected 400, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
+
+func TestHandleExtrasEdit_NewSourceRelinksSymlinkWhoseOldFolderIsGone(t *testing.T) {
+	link := filepath.Join(t.TempDir(), "docs")
+	s, docs, _ := newDocsExtraServer(t, config.ExtraTargetConfig{Path: link, Mode: "symlink"})
+	if err := os.Symlink(docs, link); err != nil {
+		t.Fatal(err)
+	}
+	os.RemoveAll(docs)
+	newSrc := t.TempDir()
+
+	rr := serveExtras(s, http.MethodPatch, "/api/extras/docs", `{"source":"`+newSrc+`"}`)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if dest, err := os.Readlink(link); err != nil || dest != newSrc {
+		t.Errorf("target should link to the new folder, got %q, %v", dest, err)
+	}
+}
