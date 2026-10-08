@@ -182,7 +182,7 @@ skillshare install ~/my-skill --into frontend/react
 
 # --track でも使える
 skillshare install github.com/team/skills --track --into devops
-# → ~/.config/skillshare/skills/devops/_skills/
+# → ~/.config/skillshare/skills/devops/_team-skills/
 
 # Project mode でも使える
 skillshare install anthropics/skills -s pdf --into tools -p
@@ -192,7 +192,7 @@ skillshare install anthropics/skills -s pdf --into tools -p
 `skillshare sync` の後、Target には自動フラット化された名前が表示されます。
 - `frontend/pdf/` → `frontend__pdf`
 - `frontend/react/my-skill/` → `frontend__react__my-skill`
-- `devops/_skills/frontend/ui/` → `devops___skills__frontend__ui`
+- `devops/_team-skills/frontend/ui/` → `devops___team-skills__frontend__ui`
 
 :::tip
 `--into` は中間ディレクトリを自動的に作成します。先に `mkdir` する必要はありません。
