@@ -118,6 +118,16 @@ func TestSkillsFolderConflicts_DifferentMode(t *testing.T) {
 	}
 }
 
+func TestSkillsFolderConflicts_SymlinkIgnoresTargetNaming(t *testing.T) {
+	got := SkillsFolderConflicts(map[string]TargetConfig{
+		"aflat": {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills", Mode: "symlink", TargetNaming: "flat"}},
+		"bstd":  {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills", TargetNaming: "standard"}},
+	}, "symlink")
+	if len(got) != 0 {
+		t.Errorf("expected no conflict, got %+v", got)
+	}
+}
+
 func TestSkillsFolderConflicts_UnsetEqualsDefault(t *testing.T) {
 	got := SkillsFolderConflicts(map[string]TargetConfig{
 		"unset":    {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills"}},

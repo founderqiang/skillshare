@@ -158,9 +158,15 @@ func SkillsFolderConflicts(targets map[string]TargetConfig, defaultMode string) 
 }
 
 func sameSkillsSettings(a, b ResourceTargetConfig, defaultMode string) bool {
-	return effectiveMode(a.Mode, defaultMode) == effectiveMode(b.Mode, defaultMode) &&
-		EffectiveTargetNaming(a.TargetNaming) == EffectiveTargetNaming(b.TargetNaming) &&
-		sameSet(a.Include, b.Include) && sameSet(a.Exclude, b.Exclude)
+	mode := effectiveMode(a.Mode, defaultMode)
+	if mode != effectiveMode(b.Mode, defaultMode) {
+		return false
+	}
+	// symlink mode links the whole folder to the source, so skill names never apply.
+	if mode != "symlink" && EffectiveTargetNaming(a.TargetNaming) != EffectiveTargetNaming(b.TargetNaming) {
+		return false
+	}
+	return sameSet(a.Include, b.Include) && sameSet(a.Exclude, b.Exclude)
 }
 
 // effectiveMode mirrors the sync package's mode resolution: the target's own,
