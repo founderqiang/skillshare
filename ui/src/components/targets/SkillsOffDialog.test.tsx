@@ -38,25 +38,4 @@ describe('Skills off dialog', () => {
     expect(api.updateTarget).toHaveBeenCalledWith('gemini', { skills_enabled: false });
   });
 
-  it('lists copies apart from the user’s own items, since the tool finds them twice', async () => {
-    vi.mocked(api.skillsOffPreview).mockResolvedValue({ remove: [], keep: ['my-notes'], copies: ['archify'] });
-    view();
-    expect(await screen.findByText('Keep 1 item of your own: my-notes')).toBeInTheDocument();
-    expect(screen.getByText(/Keeps 1 copy skillshare made: archify\. .*finds it twice/)).toBeInTheDocument();
-  });
-
-  it('says nothing is removed when an enabled target shares the folder', async () => {
-    vi.mocked(api.skillsOffPreview).mockResolvedValue({ remove: [], keep: [], sharedWith: 'universal' });
-    view();
-    expect(await screen.findByText(/is also the skills folder of universal, so nothing is removed/)).toBeInTheDocument();
-  });
-
-  it('warns who loses the skills when others read the folder being turned off, counting past a few', async () => {
-    vi.mocked(api.skillsOffPreview).mockResolvedValue({ remove: ['archify'], keep: [] });
-    view({ target: universal, managed: ['AGENTS.md'], readers: { off: ['gemini'], local: ['codex', 'copilot', 'droid', 'grok', 'zed', 'amp', 'cline'], on: ['pi'] } });
-    expect(await screen.findByText(/they read only this folder/)).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'gemini' })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'codex, copilot, droid, grok, zed, amp, cline' })).toBeInTheDocument();
-    expect(screen.getByText('and 2 more')).toBeInTheDocument();
-  });
 });

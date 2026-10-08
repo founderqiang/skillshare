@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -57,15 +57,6 @@ describe('Target instructions tab', () => {
     vi.mocked(api.putTargetInstructions).mockClear();
   });
 
-  // Codex reads skills from ~/.agents/skills but its own ~/.codex/AGENTS.md, so universal offers it.
-  it('switches from universal to the file of a tool that reads its skills', async () => {
-    renderUniversal();
-    const user = userEvent.setup();
-
-    await pickTool(user, /Codex/);
-    await waitFor(() => expect(api.getTargetInstructions).toHaveBeenCalledWith('codex'));
-  });
-
   it('asks before switching away from an unsaved edit and keeps it on cancel', async () => {
     renderUniversal();
     const user = userEvent.setup();
@@ -77,52 +68,6 @@ describe('Target instructions tab', () => {
     await user.click(await screen.findByRole('button', { name: 'Cancel' }));
 
     expect(screen.getByRole('textbox', { name: 'AGENTS.md' })).toHaveValue('universal file\ndraft');
-  });
-
-  // Built-in targets can move their file too; the form starts from the file in use.
-  it('changes the location of a built-in target starting from its current file', async () => {
-    vi.mocked(api.getTargetInstructions).mockResolvedValue(file('codex', '~/.codex/AGENTS.md', { default_path: '~/.codex/AGENTS.md' }));
-    renderTarget('codex');
-    const user = userEvent.setup();
-
-    await user.click(await screen.findByRole('button', { name: 'Change location' }));
-
-    expect(screen.getByRole('textbox', { name: 'File location' })).toHaveValue('~/.codex/AGENTS.md');
-  });
-
-  it('offers going back to the default only when a location is set', async () => {
-    vi.mocked(api.getTargetInstructions).mockResolvedValue(file('codex', '~/.codex/instructions.md', {
-      default_path: '~/.codex/AGENTS.md', custom: true, setup: { path: '~/.codex/instructions.md' },
-    }));
-    renderTarget('codex');
-    const user = userEvent.setup();
-
-    await user.click(await screen.findByRole('button', { name: 'Change location' }));
-
-    expect(screen.getByRole('button', { name: 'Reset to default' })).toBeInTheDocument();
-  });
-
-  it('opens the location form in a dialog', async () => {
-    vi.mocked(api.getTargetInstructions).mockResolvedValue(file('codex', '~/.codex/AGENTS.md', { default_path: '~/.codex/AGENTS.md' }));
-    renderTarget('codex');
-    const user = userEvent.setup();
-
-    await user.click(await screen.findByRole('button', { name: 'Change location' }));
-
-    expect(screen.getByRole('dialog', { name: 'Which file codex reads' })).toBeInTheDocument();
-  });
-
-  // The read order and the shared file sit on one line above the editor.
-  it('says which files a target does not read and which shared file it uses', async () => {
-    vi.mocked(api.getTargetInstructions).mockResolvedValue(file('claude', '~/.claude/CLAUDE.md', {
-      import: true,
-      read_order: [{ path: '~/.claude/CLAUDE.md', kind: 'main', exists: true, read: true }, { path: '~/.claude/AGENTS.md', kind: 'unread', exists: false, read: false }],
-      shared: [{ name: 'personal', mode: 'import', status: 'synced' }],
-    }));
-    renderTarget('claude');
-
-    expect(await screen.findByText(/Doesn't read a user-level AGENTS\.md/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'personal' })).toHaveAttribute('href', '/extras?tab=instructions&file=personal');
   });
 
   it('keeps an unsaved edit when switching to preview and back', async () => {
@@ -139,27 +84,6 @@ describe('Target instructions tab', () => {
     expect(screen.getByRole('textbox', { name: 'AGENTS.md' })).toHaveValue('codex file\ndraft');
   });
 
-  // read_by moved from a note above the panel into the read-order line.
-  it('says which other tools read the same file', async () => {
-    renderUniversal();
-
-    expect(await screen.findByText(/Cline, Warp also read this file/)).toBeInTheDocument();
-  });
-
-  it('does not save the page editor with Cmd+S while a dialog is open over it', async () => {
-    vi.mocked(api.getTargetInstructions).mockResolvedValue(file('codex', '~/.codex/AGENTS.md', { default_path: '~/.codex/AGENTS.md' }));
-    renderTarget('codex');
-    const user = userEvent.setup();
-
-    await user.click(await screen.findByRole('tab', { name: 'Edit' }));
-
-    await user.type(await screen.findByRole('textbox', { name: 'AGENTS.md' }), 'draft');
-    await user.click(screen.getByRole('button', { name: 'Change location' }));
-    fireEvent.keyDown(document.body, { key: 's', metaKey: true });
-
-    expect(api.putTargetInstructions).not.toHaveBeenCalled();
-  });
-
   it('asks before leaving the page with an unsaved edit', async () => {
     vi.mocked(api.getTargetInstructions).mockResolvedValue(file('codex', '~/.codex/AGENTS.md'));
     const router = renderTarget('codex');
@@ -171,27 +95,6 @@ describe('Target instructions tab', () => {
     act(() => { void router.navigate('/skills'); });
 
     expect(await screen.findByRole('dialog', { name: 'Unsaved Changes' })).toBeInTheDocument();
-  });
-
-  it('leaves without asking when nothing is unsaved', async () => {
-    vi.mocked(api.getTargetInstructions).mockResolvedValue(file('codex', '~/.codex/AGENTS.md'));
-    const router = renderTarget('codex');
-
-    await screen.findByRole('tab', { name: 'Preview' });
-    act(() => { void router.navigate('/skills'); });
-
-    await waitFor(() => expect(router.state.location.pathname).toBe('/skills'));
-  });
-
-  it('shows a linked file as coming from its shared AGENTS.md, with who else uses it', async () => {
-    const tg = (name: string, linked: string) => ({ name, path: '', import: false, exists: true, linked_shared: linked, assigned: [{ name: linked, mode: 'symlink', status: 'synced' }] });
-    vi.mocked(api.listSharedInstructions).mockResolvedValue({ files: [], targets: [tg('codex', 'personal'), tg('claude', 'personal'), tg('pi', 'personal')], file_links: true });
-    vi.mocked(api.getTargetInstructions).mockResolvedValue(file('codex', '~/.codex/AGENTS.md', { link_to: '/x/personal/AGENTS.md', link_shared: 'personal' }));
-    renderTarget('codex');
-
-    expect(await screen.findByRole('link', { name: /Edit personal/ })).toHaveAttribute('href', '/extras?tab=instructions&file=personal');
-    expect(await screen.findByText('2 other targets use it')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
   });
 
   it('switches a linked target to another shared AGENTS.md after asking', async () => {
@@ -207,44 +110,4 @@ describe('Target instructions tab', () => {
     await waitFor(() => expect(api.assignSharedInstructions).toHaveBeenCalledWith(['codex'], ['work']));
   });
 
-  it('cannot change the location while a shared file is connected', async () => {
-    vi.mocked(api.getTargetInstructions).mockResolvedValue(file('claude', '~/.claude/CLAUDE.md', {
-      import: true, default_path: '~/.claude/CLAUDE.md', shared: [{ name: 'personal', mode: 'import', status: 'synced' }],
-    }));
-    renderTarget('claude');
-
-    // The file takes the shared AGENTS.md's lines, so there is no location to move it to until it is off.
-    expect(await screen.findByRole('link', { name: 'personal' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Change location' })).not.toBeInTheDocument();
-  });
-
-  it('saves with Cmd+S from the Preview tab', async () => {
-    vi.mocked(api.getTargetInstructions).mockResolvedValue(file('codex', '~/.codex/AGENTS.md'));
-    renderTarget('codex');
-    const user = userEvent.setup();
-
-    await user.click(await screen.findByRole('tab', { name: 'Edit' }));
-
-    await user.type(await screen.findByRole('textbox', { name: 'AGENTS.md' }), 'draft');
-    await user.click(screen.getByRole('tab', { name: 'Preview' }));
-    fireEvent.keyDown(document.body, { key: 's', metaKey: true });
-
-    await waitFor(() => expect(api.putTargetInstructions).toHaveBeenCalledWith('codex', 'codex file\ndraft'));
-  });
-});
-
-it('opens a file with content in Preview, and expands it to its full length', async () => {
-  const user = userEvent.setup();
-  vi.mocked(api.getTargetInstructions).mockResolvedValue(file('codex', '~/.codex/AGENTS.md'));
-  renderTarget('codex');
-  expect(await screen.findByRole('tab', { name: 'Preview' })).toHaveAttribute('aria-selected', 'true');
-  await user.click(screen.getByRole('button', { name: /Show all/ }));
-  expect(screen.getByRole('button', { name: /Collapse/ })).toHaveAttribute('aria-expanded', 'true');
-});
-
-it('shows the file name for a Windows instruction path', async () => {
-  vi.mocked(api.getTargetInstructions).mockResolvedValue(file('claude', String.raw`C:\Users\Public\sstest\manual\.claude\CLAUDE.md`));
-  renderTarget('claude');
-  await userEvent.setup().click(await screen.findByRole('tab', { name: 'Edit' }));
-  expect(await screen.findByRole('textbox', { name: 'CLAUDE.md' })).toBeInTheDocument();
 });

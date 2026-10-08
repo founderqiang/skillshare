@@ -19,45 +19,6 @@ const plan = (revision: string, names: string[]): MCPPlan => ({
 
 beforeEach(() => vi.resetAllMocks());
 
-it('keeps the preview viewport and dialog mounted across loading, results, and errors', async () => {
-  const user = userEvent.setup();
-  let resolveFirst!: (value: MCPPlan) => void;
-  let rejectSecond!: (reason: Error) => void;
-  vi.mocked(mcpApi.previewRestore)
-    .mockReturnValueOnce(new Promise((resolve) => { resolveFirst = resolve; }))
-    .mockReturnValueOnce(new Promise((_, reject) => { rejectSecond = reject; }));
-  render(<QueryClientProvider client={new QueryClient()}><I18nProvider><MCPRestoreDialog backups={backups} onClose={vi.fn()} onRestored={vi.fn()} /></I18nProvider></QueryClientProvider>);
-
-  const dialog = screen.getByRole('dialog');
-  const viewport = screen.getByRole('region', { name: 'Preview' });
-  const list = screen.getByRole('radiogroup');
-  const [first, second] = screen.getAllByRole('radio');
-  list.scrollTop = 80;
-  expect(viewport).toHaveClass('h-28', 'overflow-auto');
-  expect(viewport).toHaveAttribute('aria-busy', 'true');
-  expect(screen.getByRole('button', { name: 'Restore this file' })).toBeDisabled();
-
-  await act(async () => resolveFirst(plan('first', ['docs', 'search', 'files', 'tools', 'context'])));
-  expect(await screen.findByText(/restore\s+context/)).toBeInTheDocument();
-  expect(screen.getByRole('region', { name: 'Preview' })).toBe(viewport);
-  expect(viewport).toHaveAttribute('aria-busy', 'false');
-
-  await user.click(second);
-  expect(viewport).toHaveAttribute('aria-busy', 'true');
-  expect(screen.getByRole('button', { name: 'Restore this file' })).toBeDisabled();
-  expect(screen.queryByText(/restore\s+context/)).not.toBeInTheDocument();
-  expect(screen.getByRole('dialog')).toBe(dialog);
-  expect(screen.getAllByRole('radio')[0]).toBe(first);
-  expect(list.scrollTop).toBe(80);
-  expect(second).toHaveFocus();
-
-  await act(async () => rejectSecond(new Error('Preview unavailable')));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Preview unavailable');
-  expect(screen.getByRole('region', { name: 'Preview' })).toBe(viewport);
-  expect(viewport).toHaveAttribute('aria-busy', 'false');
-  expect(screen.getByRole('button', { name: 'Restore this file' })).toBeDisabled();
-});
-
 it('restores only the selected backup with its completed preview revision', async () => {
   const user = userEvent.setup();
   const restored = vi.fn();

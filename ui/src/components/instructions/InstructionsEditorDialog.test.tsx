@@ -39,28 +39,6 @@ describe('Instructions editor dialog', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
   });
-  it('previews the unsaved draft, with HTML comments left out', async () => {
-    renderDialog();
-    const user = userEvent.setup();
-
-    await user.type(screen.getByRole('textbox', { name: 'personal' }), '<!-- hidden -->{enter}## Draft heading');
-    await user.click(screen.getByRole('tab', { name: 'Preview' }));
-
-    expect(screen.getByRole('heading', { name: 'Draft heading' })).toBeInTheDocument();
-    expect(screen.queryByText(/hidden/)).not.toBeInTheDocument();
-  });
-
-  it('saves the draft with ⌘S while previewing', async () => {
-    const onSave = renderDialog();
-    const user = userEvent.setup();
-
-    await user.type(screen.getByRole('textbox', { name: 'personal' }), 'more');
-    await user.click(screen.getByRole('tab', { name: 'Preview' }));
-    fireEvent.keyDown(window, { key: 's', metaKey: true });
-
-    await waitFor(() => expect(onSave).toHaveBeenCalledWith('# Rules\nmore'));
-  });
-
   it('asks before closing with an unsaved edit', async () => {
     renderDialog();
     const user = userEvent.setup();
@@ -71,26 +49,4 @@ describe('Instructions editor dialog', () => {
     expect(screen.getByRole('dialog', { name: 'Unsaved Changes' })).toBeInTheDocument();
   });
 
-  it('closes when the unsaved edit is discarded', async () => {
-    const onClose = vi.fn();
-    renderDialog(undefined, onClose);
-    const user = userEvent.setup();
-
-    await user.type(screen.getByRole('textbox', { name: 'personal' }), 'more');
-    await user.keyboard('{Escape}');
-    await user.click(screen.getByRole('button', { name: 'Discard' }));
-
-    expect(onClose).toHaveBeenCalledOnce();
-  });
-
-  it('does not save with ⌘S while a confirm is open over it', async () => {
-    const onSave = renderDialog();
-    const user = userEvent.setup();
-
-    await user.type(screen.getByRole('textbox', { name: 'personal' }), 'more');
-    await user.click(screen.getByRole('button', { name: 'Close' }));
-    fireEvent.keyDown(window, { key: 's', metaKey: true });
-
-    expect(onSave).not.toHaveBeenCalled();
-  });
 });

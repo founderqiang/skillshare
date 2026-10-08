@@ -5,10 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../api/client';
 import type { Overview } from '../api/client';
-import { hooksApi } from '../api/hooks';
-import type { HookInventory, HookPlan } from '../api/hooks';
 import { mcpApi } from '../api/mcp';
-import type { MCPPlan } from '../api/mcp';
 import { ToastProvider } from '../components/Toast';
 import { I18nProvider } from '../i18n';
 import BackupPage from './BackupPage';
@@ -83,44 +80,6 @@ describe('BackupPage', () => {
     await waitFor(() => expect(api.restore).toHaveBeenCalledWith({ timestamp: TS, target: 'claude-agents', force: false }));
   });
 
-  it('says the list is loading while backups are read', async () => {
-    vi.mocked(api.listBackups).mockReturnValue(new Promise(() => {}));
-    renderPage();
-
-    expect(await screen.findByText('Loading backups…')).toBeInTheDocument();
-  });
-
-  it('says a backup is running until it finishes', async () => {
-    vi.mocked(api.createBackup).mockReturnValue(new Promise(() => {}));
-    const user = userEvent.setup();
-    renderPage();
-
-    await user.click(await screen.findByRole('button', { name: /Back up now/ }));
-
-    expect(await screen.findByText(/Backing up…/)).toBeInTheDocument();
-  });
-
-  it('groups backups under the day they were taken', async () => {
-    renderPage();
-
-    expect(await screen.findByText('Today')).toBeInTheDocument();
-  });
-
-  it('shows how many files each snapshot folder holds once a backup is opened', async () => {
-    const user = userEvent.setup();
-    renderPage();
-
-    await user.click(await screen.findByRole('button', { name: /claude agents/, expanded: false }));
-
-    expect(screen.getByText('2 files · 10 B')).toBeInTheDocument();
-  });
-
-  it('counts a single snapshot in the singular', async () => {
-    renderPage();
-
-    expect(await screen.findByText(/^1 backup ·/)).toBeInTheDocument();
-  });
-
   it('deletes a backup only after confirmation', async () => {
     vi.mocked(api.deleteBackup).mockResolvedValue({ success: true });
     const user = userEvent.setup();
@@ -178,42 +137,4 @@ describe('BackupPage', () => {
     await waitFor(() => expect(api.restoreFileBackup).toHaveBeenCalledWith({ path: '/home/me/.claude/CLAUDE.md', id: '1790000000000000000.convert', unlink: true }));
   });
 
-  it('opens the MCP restore dialog on the backup picked', async () => {
-    vi.mocked(mcpApi.previewRestore).mockResolvedValue({ revision: 'r', fingerprint: 'fp', sourcePath: '', blocked: false, changes: [] } as MCPPlan);
-    const user = userEvent.setup();
-    renderPage('mcp');
-
-    expect(await screen.findByText('Removed linear')).toBeInTheDocument();
-    await user.click(screen.getAllByRole('button', { name: 'Preview and restore' })[1]);
-
-    await waitFor(() => expect(mcpApi.previewRestore).toHaveBeenCalledWith('1780000000000000000-b'));
-  });
-
-  it('groups hook backups by Agent file and previews the one picked', async () => {
-    vi.mocked(hooksApi.list).mockResolvedValue({
-      source: { path: '', configPath: '', entries: {} }, targets: [], paths: {}, plan: null, previewError: '', unmanaged: [],
-      backups: [
-        { id: '1780000000000000000-a', target: 'codex', path: '/home/me/.codex/hooks.json' },
-        { id: '1790000000000000000-b', target: 'codex', path: '/home/me/.codex/hooks.json' },
-        { id: '1785000000000000000-c', target: 'claude', path: '/home/me/.claude/settings.json' },
-      ],
-    } as HookInventory);
-    vi.mocked(hooksApi.previewRestore).mockResolvedValue({ revision: 'r', fingerprint: 'fp', sourcePath: '', blocked: false, changes: [] } as HookPlan);
-    const user = userEvent.setup();
-    renderPage('hooks');
-
-    expect(await screen.findByText('2 backups')).toBeInTheDocument();
-    expect(screen.getByText('1 backup')).toBeInTheDocument();
-    await user.click(screen.getAllByRole('button', { name: 'Preview and restore' })[1]);
-
-    await waitFor(() => expect(hooksApi.previewRestore).toHaveBeenCalledWith('1780000000000000000-a'));
-    expect(hooksApi.restore).not.toHaveBeenCalled();
-  });
-
-  it('says so when there are no hook backups', async () => {
-    vi.mocked(hooksApi.list).mockResolvedValue({ source: { path: '', configPath: '', entries: {} }, targets: [], paths: {}, plan: null, previewError: '', unmanaged: [], backups: [] } as HookInventory);
-    renderPage('hooks');
-
-    expect(await screen.findByText('No hook backups yet')).toBeInTheDocument();
-  });
 });

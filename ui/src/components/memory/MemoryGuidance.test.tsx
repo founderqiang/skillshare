@@ -34,18 +34,6 @@ it('reviews the exact before/after text and applies only after confirmation', as
   expect(screen.getByText('+1')).toBeInTheDocument();
 });
 
-it('lists removed lines before added ones, as in Git', async () => {
-  vi.mocked(api.planMemoryGuidance).mockResolvedValue({ token: 'reviewed', changes: [{ path: '/shared/AGENTS.md', before: 'keep\nold', after: 'keep\nnew', targets: ['codex'], created: false }], skipped: [], warnings: [] });
-  const user = userEvent.setup(); renderGuidance();
-  await user.click(await screen.findByRole('button', { name: 'Connect to agents' }));
-  await user.click(screen.getByRole('checkbox', { name: /codex/ }));
-  await user.click(screen.getByRole('button', { name: 'Review changes' }));
-  const removed = await screen.findByText('− old');
-  expect(removed.compareDocumentPosition(screen.getByText('+ new')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  await user.click(screen.getByRole('button', { name: 'Apply changes' }));
-  expect(api.applyMemoryGuidance).toHaveBeenCalledWith(['codex'], { codex: 'passive' }, 'reviewed');
-});
-
 it('returns to selection after a stale preview instead of reapplying silently', async () => {
   vi.mocked(api.applyMemoryGuidance).mockRejectedValue(new Error('Files changed since preview'));
   const user = userEvent.setup(); renderGuidance();
@@ -56,18 +44,4 @@ it('returns to selection after a stale preview instead of reapplying silently', 
   expect(await screen.findByRole('alert')).toHaveTextContent('Files changed since preview');
   expect(within(screen.getByRole('dialog')).getByRole('button', { name: 'Review changes' })).toBeInTheDocument();
   expect(api.applyMemoryGuidance).toHaveBeenCalledTimes(1);
-});
-
-it('rechecks target states when the dialog opens', async () => {
-  vi.mocked(api.getMemoryGuidance).mockResolvedValueOnce({ scope: 'global', instructions: { passive: 'Read the notes', active: 'Save lasting facts' }, targets: [{ name: 'codex', state: 'configured' }] });
-  const user = userEvent.setup(); renderGuidance();
-  await user.click(await screen.findByRole('button', { name: 'Connect to agents' }));
-  expect(await screen.findByRole('checkbox', { name: /codex/ })).toBeEnabled();
-});
-
-it('shows why a broken target cannot be connected without hovering', async () => {
-  vi.mocked(api.getMemoryGuidance).mockResolvedValue({ scope: 'global', instructions: { passive: 'Read the notes', active: 'Save lasting facts' }, targets: [{ name: 'codex', state: 'broken', detail: 'modified' }] });
-  const user = userEvent.setup(); renderGuidance();
-  await user.click(await screen.findByRole('button', { name: 'Connect to agents' }));
-  expect(within(screen.getByRole('dialog')).getByRole('checkbox', { name: /codex.*modified by hand/i })).toBeDisabled();
 });

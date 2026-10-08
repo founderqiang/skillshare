@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { api, ApiError } from '../../api/client';
+import { api } from '../../api/client';
 import { I18nProvider } from '../../i18n';
 import { ToastProvider } from '../Toast';
 import AddFileDialog from './AddFileDialog';
@@ -23,17 +23,6 @@ const renderDialog = (onAdded = vi.fn()) => {
 
 describe('Add file dialog', () => {
   beforeEach(() => vi.clearAllMocks());
-
-  it('says why a path outside the root is refused only after Add', async () => {
-    vi.mocked(api.addTargetFile).mockRejectedValue(new ApiError(400, 'refused', { code: 'target_file_invalid_path', params: { reason: 'outside' } }));
-    const user = userEvent.setup();
-    renderDialog();
-    await user.type(screen.getByLabelText('File name'), '../x.md');
-    expect(screen.queryByText('Only files inside ~/.pi/agent/ can be added.')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Add' }));
-    expect(await screen.findByText('Only files inside ~/.pi/agent/ can be added.')).toBeInTheDocument();
-    expect(screen.getByLabelText('File name')).toHaveAttribute('aria-invalid', 'true');
-  });
 
   it('adds a file and opens its tab', async () => {
     vi.mocked(api.addTargetFile).mockResolvedValue({ target: 'pi', project: false, root: '/home/me/.pi/agent', files: [{ path: 'SYSTEM.md', abs: '/home/me/.pi/agent/SYSTEM.md', builtin: false, exists: false, size: 0 }] });

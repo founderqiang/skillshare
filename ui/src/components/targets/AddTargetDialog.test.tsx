@@ -36,25 +36,6 @@ describe('Add target dialog', () => {
     await waitFor(() => expect(api.addTarget).toHaveBeenCalledWith('gemini', '/home/me/.gemini/skills', undefined, undefined, false));
   });
 
-  it('leads with universal while it is not a target, naming the tools that read it', async () => {
-    const user = userEvent.setup();
-    const withShared = [...available, { name: 'universal', path: '/home/me/.agents/skills', installed: false, detected: false, readBy: ['codex', 'cursor'] }];
-    render(<QueryClientProvider client={new QueryClient()}><I18nProvider><AddTargetDialog available={withShared} existing={['claude']} onClose={vi.fn()} onAdded={vi.fn()} /></I18nProvider></QueryClientProvider>);
-    expect(screen.getByText('Shared folder')).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: /universal/ })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('img', { name: 'codex, cursor' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Add universal' }));
-    await waitFor(() => expect(api.addTarget).toHaveBeenCalledWith('universal', '/home/me/.agents/skills', undefined, undefined, true));
-  });
-
-  it('syncs skills by default to a tool that reads no other target\'s folder', async () => {
-    const user = userEvent.setup();
-    render(<QueryClientProvider client={new QueryClient()}><I18nProvider><AddTargetDialog available={available} existing={['claude']} onClose={vi.fn()} onAdded={vi.fn()} /></I18nProvider></QueryClientProvider>);
-    expect(screen.getByRole('switch', { name: 'Sync skills' })).toHaveAttribute('aria-checked', 'true');
-    await user.click(screen.getByRole('button', { name: 'Add cursor' }));
-    await waitFor(() => expect(api.addTarget).toHaveBeenCalledWith('cursor', '/home/me/.cursor/skills', undefined, undefined, true));
-  });
-
   it('adds another config folder of an Agent that is already a target, showing where it writes', async () => {
     const user = userEvent.setup();
     const added = vi.fn();

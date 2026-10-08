@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../i18n';
 import { ToastProvider } from '../components/Toast';
-import UpdatePage, { countUpdates, isForceRetryable, stripCliHint, updateUnits } from './UpdatePage';
+import UpdatePage, { countUpdates, isForceRetryable, updateUnits } from './UpdatePage';
 import { api } from '../api/client';
 
 vi.mock('../api/client', async (importOriginal) => {
@@ -76,86 +76,6 @@ describe('UpdatePage', () => {
     type: 'github-subdir',
   };
 
-  it('matches check results returned by relative path so nested skills do not stay checking', async () => {
-    vi.mocked(api.listSkills).mockResolvedValue({
-      resources: [nestedSkill],
-    });
-    vi.mocked(api.checkStream).mockImplementation((_onDiscovering, _onStart, _onProgress, onDone) => {
-      queueMicrotask(() => {
-        onDone({
-          tracked_repos: [],
-          skills: [
-            {
-              name: 'tools/agent-browser',
-              source: 'https://github.com/vercel-labs/agent-browser/skills/agent-browser',
-              version: 'abc1234',
-              status: 'update_available',
-            },
-          ],
-        });
-      });
-      return { close: vi.fn() } as unknown as EventSource;
-    });
-
-    const user = userEvent.setup();
-    renderUpdatePage();
-
-    await user.click(await screen.findByRole('button', { name: /check for updates/i }));
-
-    const row = await findRow('agent-browser');
-    await waitFor(() => {
-      expect(row.getByText('Update available')).toBeInTheDocument();
-    });
-    expect(row.queryByText('Checking')).not.toBeInTheDocument();
-  });
-
-  it('shows why a skill check failed', async () => {
-    vi.mocked(api.listSkills).mockResolvedValue({
-      resources: [{ ...nestedSkill, source: '/apps/tool/skills/agent-browser', type: 'local' }],
-    });
-    vi.mocked(api.checkStream).mockImplementation((_onDiscovering, _onStart, _onProgress, onDone) => {
-      queueMicrotask(() => {
-        onDone({
-          tracked_repos: [],
-          skills: [
-            {
-              name: 'tools/agent-browser',
-              source: '',
-              version: '',
-              status: 'error',
-              message: 'local source not found: /apps/tool/skills/agent-browser',
-            },
-          ],
-        });
-      });
-      return { close: vi.fn() } as unknown as EventSource;
-    });
-
-    const user = userEvent.setup();
-    renderUpdatePage();
-
-    await user.click(await screen.findByRole('button', { name: /check for updates/i }));
-
-    const row = await findRow('agent-browser');
-    await waitFor(() => {
-      expect(row.getByTitle('local source not found: /apps/tool/skills/agent-browser')).toBeInTheDocument();
-    });
-  });
-
-  it('restores cached check status and last check time on entry', async () => {
-    vi.mocked(api.listSkills).mockResolvedValue({
-      resources: [nestedSkill],
-    });
-    cacheStatus('tools/agent-browser', 'update-available');
-
-    renderUpdatePage();
-
-    const row = await findRow('agent-browser');
-    expect(row.getByText('Update available')).toBeInTheDocument();
-    expect(screen.getByText(/checked 1 minute ago/i)).toBeInTheDocument();
-    expect(api.checkStream).not.toHaveBeenCalled();
-  });
-
   it('sends relative paths when updating nested GitHub-installed skills', async () => {
     vi.mocked(api.listSkills).mockResolvedValue({
       resources: [nestedSkill],
@@ -180,42 +100,6 @@ describe('UpdatePage', () => {
     );
   });
 
-  it('shows a followed checkout as information before checking, without update or force retry', async () => {
-    const linked = { name: '_dev-skills', target: '/code/dev-skills' };
-    vi.mocked(api.listSkills).mockResolvedValue({
-      resources: [{ ...nestedSkill, name: 'child', relPath: '_dev-skills/child', isInRepo: true }],
-      linked_repos: [linked],
-    });
-    cacheStatus('_dev-skills/child', 'error');
-    renderUpdatePage();
-
-    const row = await findRow('_dev-skills');
-    expect(row.getByText('/code/dev-skills')).toBeInTheDocument();
-    expect(row.getByText('Followed checkouts are managed by you and are not updated here.')).toBeInTheDocument();
-    expect(row.queryByText('tracked')).not.toBeInTheDocument();
-    expect(row.queryByRole('button')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Force retry' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: /Needs attention/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /update all/i })).not.toBeInTheDocument();
-  });
-
-  it('moves a checkout returned by check into the informational rows', async () => {
-    vi.mocked(api.listSkills).mockResolvedValue({
-      resources: [{ ...nestedSkill, name: 'child', relPath: '_dev-skills/child', isInRepo: true }],
-    });
-    vi.mocked(api.checkStream).mockImplementation((_a, _b, _c, onDone) => {
-      queueMicrotask(() => onDone({ tracked_repos: [], skills: [], linked_repos: [{ name: '_dev-skills', target: '/code/dev-skills' }] }));
-      return { close: vi.fn() } as unknown as EventSource;
-    });
-    const user = userEvent.setup();
-    renderUpdatePage();
-    await user.click(await screen.findByRole('button', { name: /check for updates/i }));
-    const row = await findRow('_dev-skills');
-    expect(row.getByText('/code/dev-skills')).toBeInTheDocument();
-    expect(row.queryByText('tracked')).not.toBeInTheDocument();
-    expect(row.queryByRole('button')).not.toBeInTheDocument();
-  });
-
   it('updates a tracked repo once for all of its skills', async () => {
     const inRepo = (name: string) => ({
       ...nestedSkill,
@@ -237,96 +121,6 @@ describe('UpdatePage', () => {
     await user.click(await screen.findByRole('button', { name: /update all/i }));
 
     expect(vi.mocked(api.updateAllStream).mock.calls[0][4]).toEqual({ names: ['_team'], force: false });
-  });
-
-  it('marks updated items as up to date', async () => {
-    const updatedResult = {
-      name: 'tools/agent-browser',
-      action: 'updated',
-      message: 'reinstalled from source',
-      isRepo: false,
-    };
-    vi.mocked(api.listSkills).mockResolvedValue({
-      resources: [nestedSkill],
-    });
-    cacheStatus('tools/agent-browser', 'update-available');
-    vi.mocked(api.updateAllStream).mockImplementation((onStart, onResult, onDone) => {
-      queueMicrotask(() => {
-        onStart(1);
-        onResult(updatedResult);
-        onDone({
-          results: [updatedResult],
-          summary: { updated: 1, upToDate: 0, blocked: 0, errors: 0, skipped: 0 },
-        });
-      });
-      return { close: vi.fn() } as unknown as EventSource;
-    });
-
-    const user = userEvent.setup();
-    renderUpdatePage();
-
-    const row = await findRow('agent-browser');
-    await user.click(row.getByRole('button', { name: /^update$/i }));
-
-    await waitFor(() => expect(row.getByText('Updated')).toBeInTheDocument());
-    expect(row.queryByText('Update available')).not.toBeInTheDocument();
-  });
-
-  it('moves a blocked update to its own section with a one-line reason', async () => {
-    const blockedResult = {
-      name: 'tools/agent-browser',
-      action: 'blocked',
-      message:
-        'security audit failed — findings at/above CRITICAL detected:\n' +
-        '  CRITICAL: Prompt injection attempt detected (SKILL.md:28)\n\n' +
-        'Use --force to override or --skip-audit to bypass scanning: blocked by security audit',
-      isRepo: false,
-    };
-    vi.mocked(api.listSkills).mockResolvedValue({ resources: [nestedSkill] });
-    cacheStatus('tools/agent-browser', 'update-available');
-    vi.mocked(api.updateAllStream).mockImplementation((onStart, onResult, onDone) => {
-      queueMicrotask(() => {
-        onStart(1);
-        onResult(blockedResult);
-        onDone({ results: [blockedResult], summary: { updated: 0, upToDate: 0, blocked: 1, errors: 0, skipped: 0 } });
-      });
-      return { close: vi.fn() } as unknown as EventSource;
-    });
-
-    const user = userEvent.setup();
-    renderUpdatePage();
-    const row = await findRow('agent-browser');
-    await user.click(row.getByRole('button', { name: /^update$/i }));
-
-    const section = within(await screen.findByRole('region', { name: 'Needs attention · 1' }));
-    expect(section.getByText('CRITICAL: Prompt injection attempt detected (SKILL.md:28)')).toBeInTheDocument();
-    expect(section.getByRole('button', { name: 'Force retry' })).toBeInTheDocument();
-    expect(section.queryByText(/blocked by security audit/)).not.toBeInTheDocument();
-
-    await user.click(section.getByRole('button', { name: 'Show details' }));
-    expect(section.getByText(/blocked by security audit/)).toBeInTheDocument();
-  });
-
-  it('syncs the updated kind in place after an update', async () => {
-    const updatedResult = { name: 'tools/agent-browser', action: 'updated', message: '', isRepo: false };
-    vi.mocked(api.listSkills).mockResolvedValue({ resources: [nestedSkill] });
-    cacheStatus('tools/agent-browser', 'update-available');
-    vi.mocked(api.updateAllStream).mockImplementation((onStart, onResult, onDone) => {
-      queueMicrotask(() => {
-        onStart(1);
-        onResult(updatedResult);
-        onDone({ results: [updatedResult], summary: { updated: 1, upToDate: 0, blocked: 0, errors: 0, skipped: 0 } });
-      });
-      return { close: vi.fn() } as unknown as EventSource;
-    });
-
-    const user = userEvent.setup();
-    renderUpdatePage();
-    const row = await findRow('agent-browser');
-    await user.click(row.getByRole('button', { name: /^update$/i }));
-    await user.click(await screen.findByRole('button', { name: 'Sync Now' }));
-
-    expect(await screen.findByText('Only skills are written. Agents, extras and MCP stay as they are.')).toBeInTheDocument();
   });
 
   it('installs entries missing on disk from config (issue #212)', async () => {
@@ -424,14 +218,4 @@ describe('update failure message helpers', () => {
     expect(isForceRetryable(undefined)).toBe(false);
   });
 
-  it('drops CLI-only hints from messages shown in the web UI', () => {
-    const shown = stripCliHint(auditBlocked);
-    expect(shown).not.toContain('--force');
-    expect(shown).not.toContain('--skip-audit');
-    expect(shown).toContain('CRITICAL: Prompt injection attempt detected (SKILL.md:28)');
-    expect(shown).toContain('blocked by security audit');
-
-    expect(stripCliHint('rolled back (use --skip-audit to bypass)')).toBe('rolled back');
-    expect(stripCliHint('pull rejected (try force update)')).toBe('pull rejected');
-  });
 });

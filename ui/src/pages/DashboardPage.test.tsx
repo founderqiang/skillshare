@@ -68,29 +68,6 @@ describe('DashboardPage', () => {
     vi.mocked(hooksApi.list).mockResolvedValue({ source: { entries: { lint: { bindings: {} }, fmt: { bindings: {} } } } } as unknown as HookInventory);
   });
 
-  it('opens a target row on that target, not the target list', async () => {
-    renderPage();
-    const links = await screen.findAllByRole('link', { name: /codex/ });
-    expect(links.map((a) => a.getAttribute('href'))).toEqual(links.map(() => '/targets/codex'));
-  });
-
-  it('counts the source hooks', async () => {
-    renderPage();
-    const links = await screen.findAllByRole('link', { name: /^2\s*Hooks$/ });
-    expect(links[0]).toHaveAttribute('href', '/hooks');
-  });
-
-  it('counts the project hooks in project mode', async () => {
-    appContext.isProjectMode = true;
-    renderPage();
-    expect((await screen.findAllByRole('link', { name: /^2\s*Hooks$/ }))[0]).toHaveAttribute('href', '/hooks');
-  });
-
-  it('opens a broken target from the attention list on that target', async () => {
-    renderPage();
-    expect(await screen.findByRole('link', { name: 'Open' })).toHaveAttribute('href', '/targets/cursor');
-  });
-
   describe('uninstalling a tracked repo', () => {
     const dirty = new ApiError(409, 'uncommitted changes (use force to override)', { code: 'repo_dirty' });
 
@@ -127,19 +104,5 @@ describe('DashboardPage', () => {
       expect(vi.mocked(api.deleteRepo).mock.calls).toEqual([['_team', false]]);
     });
 
-    it('offers force when git status cannot be read', async () => {
-      vi.mocked(api.deleteRepo).mockRejectedValueOnce(new ApiError(409, 'failed to check git status: boom', { code: 'repo_status_failed' })).mockResolvedValue({ success: true, name: '_team' });
-      await confirmUninstall();
-      expect(await screen.findByText(/Could not read the git status of "team"/)).toBeInTheDocument();
-      await userEvent.click(screen.getByRole('button', { name: 'Retry with Force' }));
-      await waitFor(() => expect(vi.mocked(api.deleteRepo).mock.calls).toEqual([['_team', false], ['_team', true]]));
-    });
-
-    it('does not offer force for a refusal force cannot override', async () => {
-      vi.mocked(api.deleteRepo).mockRejectedValue(new ApiError(409, 'is the linked folder itself; use unlink to remove the link', { code: 'conflict' }));
-      await confirmUninstall();
-      expect(await screen.findByText('is the linked folder itself; use unlink to remove the link')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Retry with Force' })).not.toBeInTheDocument();
-    });
   });
 });

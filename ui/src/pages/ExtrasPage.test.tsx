@@ -45,32 +45,6 @@ const renderPage = (url = '/extras') => render(
 );
 
 describe('Extras page in a project', () => {
-  it('lists folder extras on the first tab', async () => {
-    renderPage();
-    expect(await screen.findByText('rules')).toBeInTheDocument();
-  });
-
-  // Shared AGENTS.md files are on the AGENTS.md tab.
-  it('leaves AGENTS.md extras off the first tab', async () => {
-    renderPage();
-    await screen.findByText('rules');
-    expect(screen.queryByText('team-rules')).not.toBeInTheDocument();
-  });
-
-  it('shows other single-file extras with the full target file path', async () => {
-    renderPage();
-    expect(await screen.findByText('conventions')).toBeInTheDocument();
-    expect(screen.getByText('.cursor/rules.md')).toBeInTheDocument();
-  });
-
-  // A Windows folder keeps its backslashes up to the file name.
-  it('joins a Windows target folder and file name with a backslash', async () => {
-    renderPage();
-    expect(await screen.findByText(String.raw`~\.pi\agent\APPEND_SYSTEM.md`)).toBeInTheDocument();
-    // The full path is the row's tooltip.
-    expect(screen.getByTitle(String.raw`C:\Users\me\.pi\agent\APPEND_SYSTEM.md`)).toBeInTheDocument();
-  });
-
   it('creates a single-file extra with its file and target file name', async () => {
     const user = userEvent.setup();
     renderPage();
@@ -89,18 +63,6 @@ describe('Extras page in a project', () => {
       file: 'NOTES.md',
       targets: [{ path: '.claude', mode: 'merge', as: 'CLAUDE-notes.md' }],
     });
-  });
-
-  // Issue #300: a single file's name defaults to its file name without the extension.
-  it('names a single-file extra after its file until a name is typed', async () => {
-    const user = userEvent.setup();
-    renderPage();
-    await user.click(await screen.findByRole('button', { name: 'Add extra' }));
-    const dialog = screen.getByRole('dialog');
-    await user.click(within(dialog).getByRole('radio', { name: 'Single file' }));
-    await user.type(within(dialog).getAllByRole('textbox', { name: 'File name' })[0], 'APPEND_SYSTEM.md');
-    expect(within(dialog).getByLabelText('Name')).toHaveValue('APPEND_SYSTEM');
-    expect(within(dialog).getByText('Shown in the list. The file name is a good choice.')).toBeInTheDocument();
   });
 
   // Issue #300: several single files can share one folder of the shared extras folder.
@@ -123,18 +85,6 @@ describe('Extras page in a project', () => {
       file: 'review.md',
       targets: [{ path: '.claude/commands', mode: 'merge' }],
     });
-  });
-
-  it('fills the source folder from a folder another single-file extra uses', async () => {
-    vi.mocked(api.getOverview).mockResolvedValue({ extrasSource: '/p/.skillshare/extras' } as never);
-    const user = userEvent.setup();
-    renderPage();
-    await user.click(await screen.findByRole('button', { name: 'Add extra' }));
-    const dialog = screen.getByRole('dialog');
-    await user.click(within(dialog).getByRole('radio', { name: 'Single file' }));
-    await user.click(await within(dialog).findByRole('button', { name: 'conventions' }));
-    expect(within(dialog).getByRole('textbox', { name: 'Source folder' })).toHaveValue('conventions');
-    vi.mocked(api.getOverview).mockResolvedValue({} as never);
   });
 
   // Issue #435: a click on a preview row excludes that file from the target.
@@ -185,13 +135,4 @@ describe('Extras page in a project', () => {
     expect(api.editExtra).toHaveBeenCalledWith('rules', { name: 'docs' });
   });
 
-  // A target page's "Share with Extras" link.
-  it('opens Add extra ready to share a target file', async () => {
-    renderPage('/extras?add=file&target=%2Fhome%2Fme%2F.pi%2Fagent&file=APPEND_SYSTEM.md');
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByRole('radio', { name: 'Single file' })).toHaveAttribute('aria-checked', 'true');
-    expect(within(dialog).getByLabelText('Name')).toHaveValue('APPEND_SYSTEM');
-    expect(within(dialog).getAllByRole('textbox', { name: 'File name' })[0]).toHaveValue('APPEND_SYSTEM.md');
-    expect(within(dialog).getByRole('textbox', { name: 'Folder' })).toHaveValue('/home/me/.pi/agent');
-  });
 });

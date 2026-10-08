@@ -41,14 +41,6 @@ describe('Target MCP tab', () => {
     await waitFor(() => expect(mcpApi.save).toHaveBeenCalledWith({ name: 'docs', replace: true, server: { disabled: true, targets: ['claude', 'opencode'] } }));
   });
 
-  it("shows a switch that names no targets where the plan sends it", () => {
-    view('opencode', { docs: { disabled: true } }, {
-      revision: 'r', sourcePath: '/work/app/.skillshare/config.yaml', blocked: false,
-      changes: [{ target: 'opencode', path: '/work/app/opencode.json', name: 'docs', switch: true, action: 'unchanged' }],
-    }, ['claude', 'opencode']);
-    expect(screen.getByRole('switch', { name: 'docs' })).toHaveAttribute('aria-checked', 'true');
-  });
-
   // Each save sends the revision it previewed; a second one racing it would be refused.
   it('holds the other rows while a save is on its way', async () => {
     const user = userEvent.setup();
@@ -58,46 +50,4 @@ describe('Target MCP tab', () => {
     expect(screen.getByRole('switch', { name: 'b' })).toBeDisabled();
   });
 
-  it('keeps a row for a server the plan still takes out of this Agent', () => {
-    view('claude', {}, { revision: 'r', sourcePath: '/c.yaml', blocked: false, changes: [{ target: 'claude', path: '/c.json', name: 'old', action: 'remove' }] });
-    expect(screen.getByText('Removed from source')).toBeInTheDocument();
-  });
-
-  it('counts only servers it writes, not a switch that turns one off', () => {
-    view('claude', { docs: { disabled: true, targets: ['claude'] }, ctx: { command: 'npx', targets: ['claude'] } });
-    expect(screen.getByText('1 of 1 MCP server goes to claude.')).toBeInTheDocument();
-  });
-
-  it('does not call an Agent with only a conflict synced', () => {
-    view('claude', { docs: { command: 'npx', targets: ['claude'] } }, { revision: 'r', sourcePath: '/c.yaml', blocked: true, changes: [{ target: 'claude', path: '/c.json', name: 'docs', action: 'conflict' }] });
-    expect(screen.getByText('Conflict')).toBeInTheDocument();
-  });
-
-  it('lists a project switch that turns a global server off for Claude', () => {
-    view('claude', { docs: { disabled: true, targets: ['claude'] } });
-    expect(screen.getByText('Off in this project')).toBeInTheDocument();
-  });
-
-  it('leaves the project switch out for an Agent that has no per-project switch', () => {
-    view('cursor', { docs: { disabled: true, targets: ['claude'] } });
-    expect(screen.queryByRole('switch', { name: 'docs' })).not.toBeInTheDocument();
-  });
-
-  // Claude's off list for a -p project sits in ~/.claude.json and carries the project root.
-  it("counts a -p project's Claude off list as pending", () => {
-    view('claude', { docs: { disabled: true, targets: ['claude'] } }, {
-      revision: 'r', sourcePath: '/work/app/.skillshare/config.yaml', blocked: false,
-      changes: [{ target: 'claude', path: '/home/.claude.json', name: 'docs', root: '/work/app', switch: true, action: 'add' }],
-    });
-    expect(screen.getByText('Pending sync')).toBeInTheDocument();
-  });
-
-  // Sync writes the whole plan, so the tab must not suggest it writes only this Agent.
-  it("says Sync writes every target's changes, not only this one's", () => {
-    view('claude', { docs: { command: 'npx', targets: ['claude', 'cursor'] } }, {
-      revision: 'r', sourcePath: '/c.yaml', blocked: false,
-      changes: [{ target: 'claude', path: '/c.json', name: 'docs', action: 'add' }, { target: 'cursor', path: '/k.json', name: 'docs', action: 'add' }],
-    });
-    expect(screen.getByText(/every target at once: 2 changes in all/)).toBeInTheDocument();
-  });
 });

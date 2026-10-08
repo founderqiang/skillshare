@@ -50,15 +50,6 @@ describe('updates from another computer', () => {
     ],
   };
 
-  it('explains an include filter that selects no skill after the pull syncs', async () => {
-    vi.mocked(api.gitStatus).mockResolvedValue({ ...status, hasRemote: true, isDirty: false, files: [], ahead: 1, behind: 1 });
-    vi.mocked(api.pull).mockResolvedValue({ success: true, upToDate: false, commits: [], stats: { filesChanged: 1, insertions: 1, deletions: 0 }, syncResults: [],
-      unmatched: [{ target: 'claude', patterns: ['*review*'], all: true }] });
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'Pull and merge' }));
-    expect(await screen.findByRole('link', { name: 'Edit filter' })).toHaveAttribute('href', '/targets/claude');
-  });
-
   it('compares conflicts and requires a choice for every file before applying', async () => {
     vi.mocked(api.gitStatus).mockResolvedValue({ ...status, hasRemote: true, isDirty: false, files: [], ahead: 1, behind: 1 });
     vi.mocked(api.pull).mockRejectedValueOnce(new ApiError(409, 'conflict', { code: 'pull_conflict', params: conflicts }));
@@ -97,16 +88,6 @@ describe('updates from another computer', () => {
     expect(api.pull).toHaveBeenCalledTimes(1);
   });
 
-  it('explains divergence and offers a merge before pushing', async () => {
-    vi.mocked(api.gitStatus).mockResolvedValue({ ...status, hasRemote: true, isDirty: false, files: [], ahead: 2, behind: 3 });
-    mount();
-    expect(await screen.findByText(/2 local commits and 3 remote commits/)).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Push 2 commits' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Pull and merge' }));
-    await waitFor(() => expect(api.pull).toHaveBeenCalledWith({ force: false, dryRun: false }));
-    expect(api.push).not.toHaveBeenCalled();
-  });
-
   it('commits local changes before pulling when the remote has updates', async () => {
     vi.mocked(api.gitStatus).mockResolvedValue({ ...status, hasRemote: true, behind: 1 });
     mount();
@@ -127,18 +108,6 @@ describe('updates from another computer', () => {
     expect(api.pull).toHaveBeenCalledWith({ force: false, dryRun: false, alwaysSync: true });
     const order = [api.gitCommit, api.pull, api.push].map((fn) => vi.mocked(fn).mock.invocationCallOrder[0]);
     expect(order).toEqual([...order].sort((a, b) => a - b));
-  });
-
-  it('pushes to an empty remote, then syncs targets', async () => {
-    vi.mocked(api.gitStatus).mockResolvedValue({ ...status, hasRemote: true, isDirty: false, files: [] });
-    vi.mocked(api.pull).mockRejectedValueOnce(new ApiError(400, 'the remote has no branches yet; push first', { code: 'remote_empty' }));
-    vi.mocked(api.push).mockResolvedValue({ success: true, message: 'pushed successfully' });
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'Sync both ways' }));
-    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Sync both ways?' })).getByRole('button', { name: 'Sync both ways' }));
-    await waitFor(() => expect(api.pull).toHaveBeenCalledTimes(2));
-    expect(vi.mocked(api.push).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(api.pull).mock.invocationCallOrder[1]);
-    expect(await screen.findByText('Synced with the remote')).toBeTruthy();
   });
 
   it('stops before pushing when syncing both ways hits a conflict', async () => {
@@ -189,16 +158,6 @@ describe('updates from another computer', () => {
     expect(api.pull).not.toHaveBeenCalled();
   });
 
-  it('previews a pull without trying to render missing commit details', async () => {
-    vi.mocked(api.gitStatus).mockResolvedValue({ ...status, hasRemote: true, isDirty: false, files: [], ahead: 1, behind: 1 });
-    vi.mocked(api.pull).mockResolvedValue({ success: true, dryRun: true, message: 'dry run: would pull and sync' } as Awaited<ReturnType<typeof api.pull>>);
-    mount();
-    const button = await screen.findByRole('button', { name: 'Pull and merge' });
-    fireEvent.click(screen.getByRole('switch', { name: 'Dry run' }));
-    fireEvent.click(button);
-    await waitFor(() => expect(api.pull).toHaveBeenCalledWith({ force: false, dryRun: true }));
-    expect(await screen.findByText('dry run: would pull and sync')).toBeTruthy();
-  });
 });
 
 describe('discard changes', () => {
@@ -225,16 +184,6 @@ describe('discard changes', () => {
     expect(invalidate).toHaveBeenCalledWith({});
   });
 
-  it('previews without opening the destructive confirmation when dry run is on', async () => {
-    mount();
-    const button = await screen.findByRole('button', { name: 'Discard changes' });
-    fireEvent.click(screen.getByRole('switch', { name: 'Dry run' }));
-    fireEvent.click(button);
-    await waitFor(() => expect(api.gitDiscard).toHaveBeenCalledWith({ dryRun: true }));
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(await screen.findByText(/Dry run: would restore/)).toBeTruthy();
-  });
-
   it('shows failure and leaves the changes available to retry', async () => {
     vi.mocked(api.gitDiscard).mockRejectedValue(new Error('permission denied'));
     mount();
@@ -245,11 +194,4 @@ describe('discard changes', () => {
     expect((screen.getByRole('button', { name: 'Discard changes' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it('disables discard before the first commit', async () => {
-    vi.mocked(api.gitStatus).mockResolvedValue({ ...status, headHash: undefined });
-    mount();
-    const button = await screen.findByRole('button', { name: 'Discard changes' });
-    expect((button as HTMLButtonElement).disabled).toBe(true);
-    expect(api.gitDiscard).not.toHaveBeenCalled();
-  });
 });

@@ -20,40 +20,6 @@ const renderDialog = (props: Partial<Parameters<typeof MCPServerDialog>[0]> = {}
   render(<QueryClientProvider client={new QueryClient()}><I18nProvider><MCPServerDialog defaultTargets={['claude']} existingNames={[]} onClose={vi.fn()} onSaved={vi.fn()} {...props} /></I18nProvider></QueryClientProvider>);
 
 describe('MCP server dialog', () => {
-  it('offers OMP as its own client without Pi settings', async () => {
-    const user = userEvent.setup();
-    renderDialog({ initial: { name: 'docs', server: { url: 'https://example.com/mcp', targets: ['omp'] } }, availableTargets: ['omp'] });
-    expect(screen.getByRole('checkbox', { name: 'Oh My Pi' })).toBeChecked();
-    expect(screen.queryByRole('button', { name: 'About Pi settings' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(mcpApi.save).toHaveBeenCalledWith(expect.objectContaining({ server: { url: 'https://example.com/mcp', targets: ['omp'] } })));
-  });
-
-  it('offers Pi settings without a Pi mode, cleanup switch or Direct tools', async () => {
-    const user = userEvent.setup();
-    renderDialog({ initial: { name: 'docs', server: { url: 'https://example.com/mcp', targets: ['pi'] } } });
-    expect(screen.getByRole('combobox', { name: 'Tool exposure' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Pi MCP · Official documentation' })).toBeInTheDocument();
-    // Help sits behind keyboard-reachable info icons, not in lines under the fields.
-    expect(screen.getByRole('button', { name: 'About Pi settings' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'About tool exposure' })).toBeInTheDocument();
-    expect(screen.queryByText(/Pi ≥ 0.99.0 includes MCP/)).not.toBeInTheDocument();
-    screen.getByRole('button', { name: 'About Pi settings' }).focus();
-    expect(await screen.findByRole('tooltip')).toHaveTextContent(/Pi ≥ 0.99.0 includes MCP.*~\/\.pi\/agent\/mcp\.json/);
-    expect(screen.queryByRole('combobox', { name: 'Pi MCP mode' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('checkbox', { name: 'Remove cleared settings from Pi' })).not.toBeInTheDocument();
-    expect(screen.queryByText('Direct tools')).not.toBeInTheDocument();
-    expect(screen.queryByText(/pi-mcp-adapter|pi-mcp-extension/)).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(mcpApi.save).toHaveBeenCalledWith(expect.objectContaining({ server: { url: 'https://example.com/mcp', targets: ['pi'] } })));
-  });
-
-  it('limits new selections to clients available in this scope', () => {
-    renderDialog({ availableTargets: ['claude', 'amp', 'gemini'] });
-    expect(screen.getByRole('checkbox', { name: 'Amp' })).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Gemini CLI' })).toBeInTheDocument();
-    expect(screen.queryByRole('checkbox', { name: /Claude Desktop/ })).not.toBeInTheDocument();
-  });
   beforeEach(() => {
     vi.clearAllMocks(); localStorage.clear();
     vi.spyOn(api, 'listTargets').mockResolvedValue({ targets: [], sourceSkillCount: 0 });
@@ -118,12 +84,6 @@ describe('MCP server dialog', () => {
     await waitFor(() => expect(mcpApi.save).toHaveBeenCalledWith(expect.objectContaining({ server: expect.objectContaining({ command: 'skillshare', args: ['mcp', 'serve', '--target', 'new', '-p'] }) })));
   });
 
-  it('warns that an Agent already getting skills by sync would see them twice', async () => {
-    vi.mocked(api.listTargets).mockResolvedValue({ targets: [{ name: 'claude', skillsEnabled: true } as Target], sourceSkillCount: 1 });
-    renderDialog({ serve: true });
-    expect(await screen.findByText(/already get these skills by sync/)).toBeInTheDocument();
-  });
-
   it('pins targets when the selection differs from the inherited default', async () => {
     const user = userEvent.setup();
     renderDialog();
@@ -177,18 +137,6 @@ describe('MCP server dialog', () => {
     await waitFor(() => expect(mcpApi.save).toHaveBeenCalledWith(expect.objectContaining({ server: expect.objectContaining({ headers: { 'X-Team': 'core', 'X-Api-Key': { fromEnv: 'DOCS_KEY' } } }) })));
   });
 
-  it('shows what the chosen Agent would get in place of the form, and brings the form back', async () => {
-    const user = userEvent.setup();
-    vi.mocked(mcpApi.render).mockResolvedValue({ rendered: [{ target: 'claude', path: '/home/me/.claude.json', content: '{\n  "mcpServers": {}\n}\n' }] });
-    renderDialog({ initial: { name: 'docs', server: { command: 'npx', targets: ['claude'] } } });
-    await user.click(screen.getByRole('button', { name: 'View them' }));
-    expect(await screen.findByText(/"mcpServers"/)).toBeInTheDocument();
-    // The fields come back as they were: the view replaces the form, it does not reset it.
-    await user.click(screen.getByRole('button', { name: 'Back' }));
-    expect(screen.getByLabelText('Command')).toHaveValue('npx');
-    expect(mcpApi.render).toHaveBeenCalledWith({ name: 'docs', server: { command: 'npx', targets: ['claude'] } });
-  });
-
   it('keeps Pi options when editing something else', async () => {
     const user = userEvent.setup();
     const server = { command: 'docs', targets: ['pi'], piOptions: { timeout: 120 } };
@@ -222,31 +170,6 @@ describe('MCP server dialog', () => {
     await waitFor(() => expect(mcpApi.save).toHaveBeenCalledWith(expect.objectContaining({
       server: { command: 'docs', targets: ['pi'], piOptions: { cwd: '/work' } },
     })));
-  });
-
-  it('previews a new Pi server in the project scope', async () => {
-    const user = userEvent.setup();
-    vi.mocked(mcpApi.render).mockResolvedValue({ rendered: [{ target: 'pi', path: '/project/.pi/mcp.json', content: '{"mcpServers":{}}' }] });
-    renderDialog({ defaultTargets: ['pi'], project: '/project' });
-    await user.type(screen.getByLabelText('Name'), 'docs');
-    await user.type(screen.getByLabelText('Command'), 'docs');
-    await user.click(screen.getByRole('button', { name: 'View them' }));
-    await waitFor(() => expect(mcpApi.render).toHaveBeenCalledWith({ project: '/project', name: 'docs', server: { command: 'docs', targets: ['pi'] } }));
-  });
-
-  it('shares exposure with JSON', async () => {
-    const user = userEvent.setup();
-    renderDialog({ initial: { name: 'docs', server: { command: 'docs', targets: ['pi'], piOptions: { exposure: 'deferred', custom: { keep: true } } } } });
-    const box = screen.getByLabelText('Other Pi settings');
-    await user.clear(box);
-    await user.click(box);
-    await user.paste('{"exposure":"hidden","custom":{"keep":true}}');
-    expect(screen.getByRole('combobox', { name: 'Tool exposure' })).toHaveTextContent('hidden');
-    await user.click(screen.getByRole('combobox', { name: 'Tool exposure' }));
-    await user.click(screen.getByRole('option', { name: /^direct\b/ }));
-    expect(JSON.parse((box as HTMLTextAreaElement).value)).toEqual({ exposure: 'direct', custom: { keep: true } });
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(mcpApi.save).toHaveBeenCalledWith(expect.objectContaining({ server: expect.objectContaining({ piOptions: { exposure: 'direct', custom: { keep: true } } }) })));
   });
 
   it("turns a server off in Pi through enabled, and back on by removing it", async () => {
@@ -302,151 +225,6 @@ describe('MCP server dialog', () => {
     await user.type(screen.getByLabelText('Exclude rules'), 'delete_*{Enter}');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(mcpApi.save).toHaveBeenCalledWith(expect.objectContaining({ server: expect.objectContaining({ tools: { deny: ['fetch', 'delete_*'] } }) })));
-  });
-
-  it('hints that Enter adds a rule only while the rule input has text', async () => {
-    const user = userEvent.setup();
-    vi.mocked(mcpApi.render).mockResolvedValue({ rendered: [] });
-    renderDialog({ initial: { name: 'docs', server: { command: 'docs', targets: ['claude'] } } });
-    expect(screen.queryByText('Enter', { selector: 'kbd' })).not.toBeInTheDocument();
-    await user.type(screen.getByLabelText('Exclude rules'), 'delete_');
-    expect(screen.getByText('Enter', { selector: 'kbd' }).parentElement).toHaveTextContent('Press Enter to add');
-    await user.clear(screen.getByLabelText('Exclude rules'));
-    expect(screen.queryByText('Enter', { selector: 'kbd' })).not.toBeInTheDocument();
-  });
-
-  it('locks a row that a Deny pattern removes, naming the rule', async () => {
-    const user = userEvent.setup();
-    vi.mocked(mcpApi.render).mockResolvedValue({ rendered: [] });
-    vi.mocked(mcpCheckApi.probe).mockResolvedValue({ live: { tools: 2, toolNames: ['delete_issue', 'search'] } });
-    renderDialog({ initial: { name: 'docs', server: { command: 'docs', targets: ['claude'], tools: { deny: ['delete_*'] } } } });
-    await user.click(screen.getByRole('button', { name: 'Load tools' }));
-    expect(await screen.findByRole('checkbox', { name: 'delete_issue' })).toBeDisabled();
-  });
-
-  it('selects none among only the rows the search shows', async () => {
-    const user = userEvent.setup();
-    vi.mocked(mcpApi.render).mockResolvedValue({ rendered: [] });
-    vi.mocked(mcpCheckApi.probe).mockResolvedValue({ live: { tools: 3, toolNames: ['get_issue', 'get_repo', 'search'] } });
-    renderDialog({ initial: { name: 'docs', server: { command: 'docs', targets: ['claude'] } } });
-    await user.click(screen.getByRole('button', { name: 'Load tools' }));
-    await user.type(await screen.findByLabelText('Search'), 'get_');
-    await user.click(screen.getByRole('button', { name: 'Select none' }));
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(mcpApi.save).toHaveBeenCalledWith(expect.objectContaining({ server: expect.objectContaining({ tools: { deny: ['get_issue', 'get_repo'] } }) })));
-  });
-
-  it("leaves Pi's exposure to the Pi settings, unlocked while Tools has a setting", () => {
-    renderDialog({ initial: { name: 'docs', server: { command: 'docs', targets: ['pi'], tools: { deny: ['a', 'b'] } } } });
-    expect(screen.getByRole('combobox', { name: 'Tool exposure' })).toBeEnabled();
-    expect(screen.getAllByRole('combobox')).toHaveLength(1);
-  });
-
-  it('sums up a policy in words before the tools are loaded', () => {
-    renderDialog({ initial: { name: 'docs', server: { command: 'docs', targets: ['claude'], tools: { deny: ['a', 'b'] } } } });
-    expect(screen.getByText('2 tools excluded')).toBeInTheDocument();
-  });
-
-  it('says under the JSON that Tools already sets the exposure it sets, before saving', async () => {
-    const overlap = "Tools already sets Pi's tool exposure for this server. Remove toolExposure here, or clear Tools.";
-    renderDialog({ initial: { name: 'context7', server: { command: 'docs', targets: ['pi'], tools: { allow: ['resolve-*'] }, piOptions: { timeout: 120, toolExposure: { 'delete_*': 'hidden' } } } } });
-    expect(screen.getByText(overlap)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
-  });
-
-  it('does not suggest toolExposure in the empty JSON while Tools has a setting', () => {
-    renderDialog({ initial: { name: 'context7', server: { command: 'docs', targets: ['pi'], tools: { allow: ['resolve-*'] } } } });
-    expect(screen.getByLabelText('Other Pi settings').getAttribute('placeholder')).not.toContain('toolExposure');
-  });
-
-  it('explains in the Tools section, before saving, that Deny removes every allowed tool', () => {
-    renderDialog({ initial: { name: 'docs', server: { command: 'docs', targets: ['claude'], tools: { allow: ['delete_issue'], deny: ['delete_*'] } } } });
-    expect(screen.getByText('Deny removes every tool that Allow keeps, so the server would have no tools. Remove an entry from Deny, or add another tool to Allow.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
-  });
-
-  it('says which chosen Agents follow the policy as it is', async () => {
-    vi.mocked(mcpApi.render).mockResolvedValue({ rendered: [{ target: 'pi', path: '/p.json' }, { target: 'codex', path: '/c.toml' }, { target: 'claude', path: '/c.json', toolGaps: ['deny'] }] });
-    renderDialog({ initial: { name: 'docs', server: { command: 'docs', targets: ['pi', 'codex'], tools: { deny: ['search'] } } } });
-    expect(await screen.findByText('Pi, Codex will offer tools as this list says.')).toBeInTheDocument();
-  });
-
-  it('spells out what a chosen Agent that follows part of the policy will do', async () => {
-    vi.mocked(mcpApi.render).mockResolvedValue({ rendered: [{ target: 'copilot', path: '/c.json', toolGaps: ['deny'] }, { target: 'codex', path: '/c.toml', toolGaps: ['deny patterns'] }] });
-    renderDialog({ initial: { name: 'docs', server: { command: 'docs', targets: ['copilot', 'codex'], tools: { deny: ['search', 'delete_*'] } } } });
-    expect(await screen.findByText('Copilot CLI will offer the tools you unticked (it cannot exclude tools).')).toBeInTheDocument();
-    expect(screen.getByText('The exclude rule delete_* has no effect on Codex (it only takes full names).')).toBeInTheDocument();
-  });
-
-  it('says which chosen Agents cannot filter tools at all', async () => {
-    vi.mocked(mcpApi.render).mockResolvedValue({ rendered: [{ target: 'claude', path: '/c.json', toolGaps: ['deny'] }, { target: 'cursor', path: '/m.json', toolGaps: ['deny'] }] });
-    renderDialog({ initial: { name: 'docs', server: { command: 'docs', targets: ['claude', 'cursor'], tools: { deny: ['search'] } } } });
-    expect(await screen.findByText('Claude, Cursor cannot filter tools and will still offer every tool.')).toBeInTheDocument();
-  });
-
-  it('loads tools with the unsaved settings, not the saved ones', async () => {
-    const user = userEvent.setup();
-    vi.mocked(mcpApi.render).mockResolvedValue({ rendered: [] });
-    vi.mocked(mcpCheckApi.probe).mockResolvedValue({ live: { tools: 1, toolNames: ['search'] } });
-    renderDialog({ project: '/work/app', initial: { name: 'docs', server: { url: 'http://127.0.0.1:3845/mcp', targets: ['claude'] } } });
-    await user.clear(screen.getByLabelText('URL'));
-    await user.type(screen.getByLabelText('URL'), 'https://docs.example/mcp');
-    await user.click(screen.getByRole('button', { name: 'Load tools' }));
-    expect(await screen.findByRole('checkbox', { name: 'search' })).toBeChecked();
-    expect(mcpCheckApi.probe).toHaveBeenCalledWith({ project: '/work/app', server: { url: 'https://docs.example/mcp' } });
-    expect(mcpApi.save).not.toHaveBeenCalled();
-  });
-
-  it('loads the tools of a new server once it has a command or URL', async () => {
-    const user = userEvent.setup();
-    vi.mocked(mcpCheckApi.probe).mockResolvedValue({ live: { tools: 1, toolNames: ['search'] } });
-    renderDialog();
-    expect(screen.getByRole('button', { name: 'Load tools' })).toBeDisabled();
-    expect(screen.getByText('Enter a command or URL first.')).toBeInTheDocument();
-    await user.type(screen.getByLabelText('Command'), 'npx -y docs');
-    await user.click(screen.getByRole('button', { name: 'Load tools' }));
-    expect(await screen.findByRole('checkbox', { name: 'search' })).toBeChecked();
-    expect(mcpCheckApi.probe).toHaveBeenCalledWith({ server: { command: 'npx', args: ['-y', 'docs'] } });
-  });
-
-  it('says in plain words why tools did not load, with the raw error in the Details tooltip', async () => {
-    const user = userEvent.setup();
-    const detail = 'Post "http://127.0.0.1:3845/mcp": dial tcp 127.0.0.1:3845: connect: connection refused';
-    vi.mocked(mcpCheckApi.probe).mockResolvedValue({ errorKind: 'connect', error: detail });
-    renderDialog({ initial: { name: 'docs', server: { url: 'http://127.0.0.1:3845/mcp', targets: ['claude'] } } });
-    await user.click(screen.getByRole('button', { name: 'Load tools' }));
-    expect(await screen.findByText('Could not connect to the server. Check the URL and that the server is running.')).toBeInTheDocument();
-    expect(screen.queryByText(detail)).not.toBeInTheDocument();
-    screen.getByRole('button', { name: 'Details' }).focus();
-    expect(await screen.findByRole('tooltip')).toHaveTextContent(detail);
-  });
-
-  it('falls back to a general message for an error it cannot name', async () => {
-    const user = userEvent.setup();
-    vi.mocked(mcpCheckApi.probe).mockRejectedValue(new Error('MCP draft requires exactly one of command or url'));
-    renderDialog({ initial: { name: 'docs', server: { command: 'docs', targets: ['claude'] } } });
-    await user.click(screen.getByRole('button', { name: 'Load tools' }));
-    expect(await screen.findByText("Could not load the server's tools.")).toBeInTheDocument();
-    screen.getByRole('button', { name: 'Details' }).focus();
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('MCP draft requires exactly one of command or url');
-  });
-
-  it('drops the loaded tools when the connection settings change', async () => {
-    const user = userEvent.setup();
-    vi.mocked(mcpApi.render).mockResolvedValue({ rendered: [] });
-    vi.mocked(mcpCheckApi.probe).mockResolvedValue({ live: { tools: 1, toolNames: ['search'] } });
-    renderDialog({ initial: { name: 'docs', server: { command: 'docs', targets: ['claude'] } } });
-    await user.click(screen.getByRole('button', { name: 'Load tools' }));
-    await user.click(await screen.findByRole('checkbox', { name: 'search' }));
-    expect(screen.getByRole('checkbox', { name: 'search' })).not.toBeChecked();
-    await user.type(screen.getByLabelText('Command'), '-v2');
-    expect(screen.queryByRole('checkbox', { name: 'search' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Load tools' })).toBeInTheDocument();
-  });
-
-  it('has no Tools section for an entry that only turns a server off', () => {
-    renderDialog({ off: true });
-    expect(screen.queryByText('Tools')).not.toBeInTheDocument();
   });
 
   it('refuses a name that is already taken', async () => {

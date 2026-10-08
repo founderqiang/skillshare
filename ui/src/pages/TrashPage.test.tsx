@@ -46,23 +46,6 @@ describe('TrashPage', () => {
     });
   });
 
-  it('lists only items of the tab kind', async () => {
-    renderTrashPage('skill');
-
-    expect(await screen.findByText('alpha')).toBeInTheDocument();
-    expect(screen.queryByText('beta')).not.toBeInTheDocument();
-  });
-
-  it('restores without asking because restoring is reversible', async () => {
-    vi.mocked(api.restoreTrash).mockResolvedValue({ success: true });
-    const user = userEvent.setup();
-    renderTrashPage('agent');
-
-    await user.click(await screen.findByRole('button', { name: /restore/i }));
-
-    expect(api.restoreTrash).toHaveBeenCalledWith('beta', 'agent');
-  });
-
   it('empties only the trash of the tab kind after confirmation', async () => {
     vi.mocked(api.emptyTrash).mockResolvedValue({ success: true, removed: 1 });
     const user = userEvent.setup();

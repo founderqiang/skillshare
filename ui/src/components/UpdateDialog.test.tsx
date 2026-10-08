@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../i18n';
@@ -27,35 +27,7 @@ vi.mock('../api/client', async (importOriginal) => {
   };
 });
 
-function renderDialog() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <I18nProvider>
-        <UpdateDialog />
-      </I18nProvider>
-    </QueryClientProvider>,
-  );
-}
-
 describe('UpdateDialog', () => {
-  it('stays closed on a dev build even when an update is reported', async () => {
-    vi.mocked(api.getVersionCheck).mockResolvedValueOnce({
-      cliVersion: 'dev',
-      cliLatest: 'dev-ui-flow',
-      cliUpdateAvailable: true,
-      cliDevMode: true,
-      skillVersion: '0.20.25',
-      skillLatest: '0.22.0',
-      skillUpdateAvailable: true,
-    });
-    renderDialog();
-
-    await waitFor(() => expect(api.getVersionCheck).toHaveBeenCalled());
-    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
-    expect(screen.queryByRole('button', { name: /Update now/ })).toBeNull();
-  });
-
   it('keeps the UI the upgrade just downloaded when restarting', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(

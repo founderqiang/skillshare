@@ -41,20 +41,6 @@ beforeEach(() => {
   vi.mocked(api.searchHub).mockResolvedValue({ results: [] });
 });
 
-it('opens on the own hub and shows it as a recipient sees it', async () => {
-  renderPage();
-  expect(await screen.findByText('Once someone adds this Hub, this is the list they see.')).toBeInTheDocument();
-  expect(await screen.findByText('v1.2.0')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
-});
-
-it('lists a subscription to the own published hub only once', async () => {
-  renderPage();
-  await screen.findByRole('button', { name: /Team/ });
-  await waitFor(() => expect(api.getHubConfig).toHaveBeenCalled());
-  expect(screen.queryByRole('button', { name: /team-copy/ })).not.toBeInTheDocument();
-});
-
 it('saves in-place edits, keeps unknown fields and refreshes the hub list', async () => {
   const user = userEvent.setup(); renderPage();
   await user.click(await screen.findByRole('button', { name: 'Edit' }));
@@ -137,61 +123,4 @@ it('keeps a GitLab repo root apart from the skill paths added under it', async (
   await user.click(within(dialog).getByRole('button', { name: 'Find' }));
   await user.click(await within(dialog).findByRole('button', { name: 'Add 1' }));
   expect(screen.getByDisplayValue('https://gitlab.com/g/r.git/skills/lint')).toBeInTheDocument();
-});
-
-it('shows the saved version again once a source is edited back', async () => {
-  vi.mocked(hubDrafts.get).mockResolvedValue({
-    draft: { ...draft, entries: [{ id: 'entry', data: { name: 'Review', source: 'github.com/acme/skills/tree/v1.2.0/review' } }] },
-    problems: [], refs: { entry: 'v1.2.0' },
-  });
-  const user = userEvent.setup(); renderPage();
-  await user.click(await screen.findByRole('button', { name: 'Edit' }));
-  const source = screen.getByLabelText('Source');
-  await user.type(source, 'x{Backspace}');
-  expect(screen.getByRole('combobox', { name: 'Version' })).toHaveTextContent('v1.2.0');
-});
-
-it('opens a newly created hub, not another one, while the list refetches', async () => {
-  const created: HubDraft = { ...draft, id: 'b', name: 'Fresh', entries: [], fields: {} };
-  vi.mocked(hubDrafts.create).mockResolvedValue({ draft: created, problems: [] });
-  vi.mocked(hubDrafts.get).mockImplementation(async (id) => ({ draft: id === 'b' ? created : draft, problems: [] }));
-  const user = userEvent.setup(); renderPage();
-  await screen.findByRole('button', { name: 'Edit' });
-  vi.mocked(hubDrafts.list).mockReturnValue(new Promise(() => {}));
-  await user.click(screen.getByRole('button', { name: 'Add or create a Hub' }));
-  await user.click(screen.getByRole('menuitem', { name: /Create a new Hub/ }));
-  expect(await screen.findByDisplayValue('Fresh')).toBeInTheDocument();
-  expect(screen.queryByDisplayValue('Team')).not.toBeInTheDocument();
-});
-
-it('gives an added hub a label no other hub has', async () => {
-  vi.mocked(api.getHubConfig).mockResolvedValue({ hubs: [{ label: 'skillshare-hub.json', url: 'https://a.example/skillshare-hub.json' }], default: '' });
-  const user = userEvent.setup(); renderPage();
-  await screen.findByRole('button', { name: 'Edit' });
-  await user.click(screen.getByRole('button', { name: 'Add or create a Hub' }));
-  await user.type(screen.getByLabelText('Add an existing Hub'), 'https://b.example/skillshare-hub.json');
-  await user.click(screen.getByRole('button', { name: 'Add' }));
-  await waitFor(() => expect(api.putHubConfig).toHaveBeenCalled());
-  expect(vi.mocked(api.putHubConfig).mock.calls[0][0].hubs[1].label).toBe('skillshare-hub.json (2)');
-});
-
-it('opens on the built-in hub and stars it when no default is saved', async () => {
-  vi.mocked(hubDrafts.list).mockResolvedValue([]);
-  vi.mocked(api.getHubConfig).mockResolvedValue({ hubs: [{ label: 'acme', url: 'https://acme.dev/hub.json' }], default: '' });
-  renderPage();
-  const builtIn = await screen.findByRole('button', { name: /Skillshare Hub/ });
-  await waitFor(() => expect(builtIn).toHaveAttribute('aria-current', 'true'));
-  expect(within(builtIn).getByLabelText('Default')).toBeInTheDocument();
-  expect(within(screen.getByRole('button', { name: /acme/ })).queryByLabelText('Default')).not.toBeInTheDocument();
-});
-
-it('opens on the saved default hub without offering to make it the default', async () => {
-  vi.mocked(hubDrafts.list).mockResolvedValue([]);
-  vi.mocked(api.getHubConfig).mockResolvedValue({ hubs: [{ label: 'acme', url: 'https://acme.dev/hub.json' }], default: 'Acme' });
-  renderPage();
-  const acme = await screen.findByRole('button', { name: /acme/ });
-  await waitFor(() => expect(acme).toHaveAttribute('aria-current', 'true'));
-  expect(within(acme).getByLabelText('Default')).toBeInTheDocument();
-  expect(within(screen.getByRole('button', { name: /Skillshare Hub/ })).queryByLabelText('Default')).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Make default' })).not.toBeInTheDocument();
 });

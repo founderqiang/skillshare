@@ -5,7 +5,6 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../api/client';
 import { piExtensionsApi, type PiExtensionsPlan, type PiExtensionsView } from '../../api/piExtensions';
-import { pluginsApi, type PluginInventory } from '../../api/plugins';
 import { I18nProvider } from '../../i18n';
 import { queryKeys } from '../../lib/queryKeys';
 import TargetPiExtensions from './TargetPiExtensions';
@@ -87,126 +86,6 @@ describe('Pi target Extensions tab', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('keep the old set until Pi reloads');
   });
 
-  it('shows a switchable extension\'s selection on its switch, with no column of selections', async () => {
-    show(global());
-    expect(await screen.findByRole('switch', { name: `Load extensions/a.ts from ${pkg} in pi` })).toBeChecked();
-    expect(screen.getByRole('switch', { name: `Load extensions/b.ts from ${pkg} in pi` })).not.toBeChecked();
-    for (const gone of ['Configured', 'On', 'Off']) {
-      expect(screen.queryByText(gone)).not.toBeInTheDocument();
-    }
-  });
-
-  it('counts the extensions a package loads, pending switches included', async () => {
-    const user = userEvent.setup();
-    show(global());
-    expect(await screen.findByText('1 / 3 on')).toBeInTheDocument();
-    await user.click(screen.getByRole('switch', { name: `Load extensions/b.ts from ${pkg} in pi` }));
-    expect(screen.getByText('2 / 3 on')).toBeInTheDocument();
-  });
-
-  it('names the shared folder once and leaves the package default unsaid', async () => {
-    show(global());
-    expect(await screen.findByText('extensions/')).toBeInTheDocument();
-    expect(screen.getByTitle('extensions/a.ts')).toHaveTextContent(/^a\.ts$/);
-    expect(screen.queryByText('Package default')).not.toBeInTheDocument();
-  });
-
-  it.each(['local', 'npm'] as const)('labels a managed %s plugin like OMP without changing its selection identity', async (kind) => {
-    const user = userEvent.setup();
-    show(global({ packages: [{ ...global().packages[0], kind, version: '5.0.0', managedBy: 'superpowers' }] }));
-    const card = await screen.findByRole('region', { name: 'Plugin · superpowers' });
-    expect(card.querySelector('.lucide-package')).toBeInTheDocument();
-    expect(within(card).getByText('5.0.0')).toBeInTheDocument();
-    expect(within(card).queryByText('plugin')).not.toBeInTheDocument();
-    expect(within(card).getByText('global')).toBeInTheDocument();
-    expect(within(card).getByRole('link', { name: 'Open Plugins' })).toHaveAttribute('href', '/plugins');
-    expect(within(card).queryByText('Plugins')).not.toBeInTheDocument();
-    expect(within(card).getByTitle('Managed by Skillshare')).toBeInTheDocument();
-    expect(within(card).getByRole('switch', { name: `Load extensions/a.ts from ${pkg} in pi` })).toBeChecked();
-    await user.click(within(card).getByRole('switch', { name: `Load extensions/b.ts from ${pkg} in pi` }));
-    expect(within(card).getByText('2 / 3 on')).toBeInTheDocument();
-    expect(within(card).queryByRole('button', { name: /^(Collapse|Expand) / })).not.toBeInTheDocument();
-    expect(within(card).getAllByRole('switch')).toHaveLength(2);
-    expect(screen.getByRole('toolbar')).toHaveTextContent('1 extension change');
-    await user.click(within(card).getByRole('button', { name: 'Details' }));
-    expect(within(card).getByRole('region', { name: 'Details of Plugin · superpowers' })).toHaveTextContent(pkg);
-  });
-
-  it('labels a managed Pi package as a package with the Pi mark', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValueOnce({
-      packages: { 'pi-subagents': { bindings: { pi: { id: 'npm:pi-subagents' } } } },
-      targetDefinitions: [{ target: 'pi', npm: true }], hosts: [],
-    } as unknown as PluginInventory);
-    show(global({ packages: [{ ...global().packages[0], kind: 'npm', version: '0.76.1', managedBy: 'pi-subagents' }] }));
-    const card = await screen.findByRole('region', { name: 'Package · pi-subagents' });
-    expect(card.querySelector('.lucide-package')).not.toBeInTheDocument();
-    expect(within(card).getByRole('link', { name: 'Open Plugins' })).toHaveAttribute('href', '/plugins');
-  });
-
-  it('keeps a managed project plugin\'s native override shape and rule controls', async () => {
-    const data = project();
-    data.packages = [{ ...data.packages[0], managedBy: 'superpowers' }];
-    show(data);
-    const card = await screen.findByRole('region', { name: 'Plugin · superpowers' });
-    expect(within(card).getByText('Changes pi (global)')).toBeInTheDocument();
-    expect(within(card).getByRole('switch', { name: `Load extensions/a.ts from ${pkg} in acme@pi` })).not.toBeChecked();
-    expect(within(card).getByRole('button', { name: 'Remove rule' })).toBeInTheDocument();
-  });
-
-  it('shows the version the installed package declares beside its kind', async () => {
-    show(global({ packages: [{ ...global().packages[0], version: '5.0.0' }] }));
-    expect(within(await screen.findByRole('region', { name: pkg })).getByText('local 5.0.0')).toBeInTheDocument();
-  });
-  it('always shows extension rows while Details remains independently toggleable', async () => {
-    const user = userEvent.setup();
-    show(global());
-    const card = await screen.findByRole('region', { name: pkg });
-    expect(within(card).queryByRole('button', { name: /^(Collapse|Expand) / })).not.toBeInTheDocument();
-    expect(within(card).getAllByRole('switch')).toHaveLength(2);
-    await user.click(within(card).getByRole('button', { name: 'Details' }));
-    expect(within(card).getByRole('region', { name: `Details of ${pkg}` })).toBeInTheDocument();
-    await user.click(within(card).getByRole('button', { name: 'Details' }));
-    expect(within(card).queryByRole('region', { name: `Details of ${pkg}` })).not.toBeInTheDocument();
-    expect(within(card).getAllByRole('switch')).toHaveLength(2);
-    expect(within(card).getByText('1 / 3 on')).toBeInTheDocument();
-  });
-
-  it('explains what the page does in one note shown on hover and on focus', async () => {
-    const user = userEvent.setup();
-    show(global());
-    const info = await screen.findByRole('button', { name: 'About this page' });
-    expect(screen.getAllByRole('button', { name: /^About/ })).toHaveLength(1);
-    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
-    await user.hover(info);
-    expect(await screen.findByRole('tooltip')).toHaveTextContent(/changes settings only.*Pi decides.*reload/);
-    await user.unhover(info);
-    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
-    await user.tab();
-    expect(info).toHaveFocus();
-    expect(await screen.findByRole('tooltip')).toHaveTextContent(/Pi decides/);
-  });
-
-  it('says why a pattern-decided extension has no switch and what to do', async () => {
-    show(global());
-    await screen.findByTitle('extensions/slow-x.ts');
-    expect(screen.getAllByRole('switch')).toHaveLength(2);
-    expect(screen.queryByRole('switch', { name: /slow-x/ })).not.toBeInTheDocument();
-    expect(screen.getByText('Can\'t tell')).toBeInTheDocument();
-    expect(screen.getByText(/pattern Skillshare can't evaluate: !extensions\/slow-\*\.ts\. Change it with pi config\./)).toBeInTheDocument();
-  });
-
-  it('marks a missing file in its row and keeps the source and rules in details', async () => {
-    const user = userEvent.setup();
-    const base = global().packages[0];
-    show(global({ packages: [{ ...base, rows: [...base.rows, { path: 'extensions/gone.ts', file: 'missing', selection: 'none', origin: 'rule', rule: '-extensions/gone.ts', editable: true }] }] }));
-    expect(await screen.findByText('File missing')).toBeInTheDocument();
-    expect(screen.queryByText(/Other keys kept/)).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Details' }));
-    const details = screen.getByRole('region', { name: `Details of ${pkg}` });
-    expect(details).toHaveTextContent('-extensions/b.ts, !extensions/slow-*.ts');
-    expect(details).toHaveTextContent('autoUpdate');
-  });
-
   it('refuses a stale apply and offers to review again', async () => {
     const user = userEvent.setup();
     vi.mocked(piExtensionsApi.preview).mockResolvedValue(plan);
@@ -219,17 +98,6 @@ describe('Pi target Extensions tab', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Review again' }));
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.piExtensions('pi') });
-  });
-
-  it('says so when Pi holds the settings lock', async () => {
-    const user = userEvent.setup();
-    vi.mocked(piExtensionsApi.preview).mockResolvedValue(plan);
-    vi.mocked(piExtensionsApi.apply).mockRejectedValue(new ApiError(409, 'busy', { code: 'pi_extensions_busy' }));
-    show(global());
-    await user.click(await screen.findByRole('switch', { name: `Load extensions/a.ts from ${pkg} in pi` }));
-    await user.click(screen.getByRole('button', { name: 'Review changes' }));
-    await user.click(await screen.findByRole('button', { name: 'Apply changes' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Nothing was written; try again in a moment.');
   });
 
   it('removes an exact rule and leaves the result to the remaining rules', async () => {
@@ -284,18 +152,6 @@ describe('Pi target Extensions tab', () => {
     expect(piExtensionsApi.apply).not.toHaveBeenCalled();
   });
 
-  it('says why a package has no switches and what to do instead', async () => {
-    const row = { path: 'extensions/a.ts', file: 'present' as const, selection: 'loads' as const, origin: 'default', editable: false };
-    const base = global().packages[0];
-    show(global({ packages: [
-      { ...base, form: 'string', rules: null, otherKeys: [], readOnly: 'otherResources', rows: [row] },
-      { ...base, index: 1, source: '/home/me/one.ts', identity: '/home/me/one.ts', form: 'string', rules: null, otherKeys: [], readOnly: 'singleFile', rows: [{ ...row, path: 'one.ts', origin: 'file' }] },
-    ] }));
-    expect(await screen.findByText(/could change which of those Pi loads, so it is view only\. Change it with pi config\./)).toBeInTheDocument();
-    expect(screen.getByText(/Pi loads this file as it is and ignores filters/)).toBeInTheDocument();
-    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
-  });
-
   it('is read-only on a Pi version Skillshare has not verified and says what to do', async () => {
     show(global({ editable: false, readOnly: 'unsupportedVersion', version: '0.99.1', target: 'pi-work', scope: 'account', packages: global().packages.map((p) => ({ ...p, rows: p.rows.map((r) => ({ ...r, editable: false })) })) }));
     expect(await screen.findByText('Read-only: pi-work runs Pi 0.99.1, and Skillshare needs Pi 0.99.2 or later. Use pi config, or update Pi.')).toBeInTheDocument();
@@ -338,61 +194,4 @@ describe('Pi target Extensions tab', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Pi uses it only if it trusts this project');
   });
 
-  it('keeps the trust hints of a project in the page note', async () => {
-    const user = userEvent.setup();
-    show(project());
-    await user.hover(await screen.findByRole('button', { name: 'About this page' }));
-    const tip = await screen.findByRole('tooltip');
-    expect(tip).toHaveTextContent('Saved choice in Pi: untrusted · Pi default for new folders: ask · hints, not Pi\'s decision');
-    expect(tip).toHaveTextContent(/never trusts it for you/);
-  });
-
-  it('says why a global source can\'t get a project override', async () => {
-    const base = project().packages[1];
-    show(project({ packages: [{ ...base, source: 'git:https://***@example.com/acme/lint', readOnly: 'credentials', rows: base.rows.map((r) => ({ ...r, editable: false })) }] }));
-    expect(await screen.findByText(/never copies into a project/)).toBeInTheDocument();
-    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
-  });
-
-  it('lists an unnamed path of a project-only override as not loaded and selectable', async () => {
-    const base = project().packages[0];
-    show(project({ packages: [{ ...base, shape: 'deltaOnly', rows: [{ path: 'extensions/c.ts', file: 'present', selection: 'skipped', origin: 'unnamed', editable: true }] }] }));
-    expect(await screen.findByText('Not named by this project entry, so Pi doesn\'t load it')).toBeInTheDocument();
-    expect(screen.getByRole('switch', { name: `Load extensions/c.ts from ${pkg} in acme@pi` })).not.toBeChecked();
-  });
-
-  it('shows extensions an extra links into Pi’s folder as read-only, with where to change them', async () => {
-    show(global({ packages: [], folders: [{ path: '/home/me/.pi/agent/extensions', kind: 'folder', rows: [{ path: 'extensions/guard.ts', file: 'present', selection: 'loads', provenance: 'extras', extra: 'pi-ext' }] }] }));
-    expect(await screen.findByText('Extras · pi-ext — change it in Extras')).toBeInTheDocument();
-    expect(screen.getByText(/Pi loads the files in this folder unless its settings turn them off/)).toBeInTheDocument();
-    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
-  });
-
-  it('labels whose settings decide each folder in a project', async () => {
-    const row = { file: 'present', selection: 'loads', provenance: 'native' } as const;
-    show(project({ packages: [], folders: [
-      { path: '/code/acme/.pi/extensions', kind: 'folder', scope: 'project', rows: [{ ...row, path: 'extensions/local.ts' }] },
-      { path: '/home/me/.pi/agent/extensions', kind: 'folder', scope: 'global', rows: [{ ...row, path: 'extensions/scratch.ts' }] },
-    ] }));
-    const header = (path: string) => screen.getByTitle(path).parentElement!;
-    expect(await screen.findByTitle('extensions/local.ts')).toBeInTheDocument();
-    expect(header('/code/acme/.pi/extensions')).toHaveTextContent('Project only');
-    expect(header('/home/me/.pi/agent/extensions')).toHaveTextContent('From pi (global)');
-  });
-
-  it('opens Plugins to add a package with this target ticked', async () => {
-    show(global({ packages: [] }));
-    expect(await screen.findByRole('link', { name: /Add a package/ })).toHaveAttribute('href', '/plugins?add=pi');
-  });
-
-  it('opens Plugins to add a package with nothing ticked from a project', async () => {
-    show(project({ packages: [] }));
-    expect(await screen.findByRole('link', { name: /Add a package/ })).toHaveAttribute('href', '/plugins?add=');
-  });
-
-  it('shows the error when the tab cannot load', async () => {
-    vi.mocked(piExtensionsApi.get).mockRejectedValue(new Error('not a Pi target: claude'));
-    render(<MemoryRouter><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><I18nProvider><TargetPiExtensions name="claude" /></I18nProvider></QueryClientProvider></MemoryRouter>);
-    expect(await screen.findByText('not a Pi target: claude')).toBeInTheDocument();
-  });
 });

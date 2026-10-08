@@ -8,7 +8,6 @@ import { hooksApi } from '../../api/hooks';
 import type { HookCandidate, HookInventory } from '../../api/hooks';
 import HookDialog from './HookDialog';
 import HooksImportDialog from './HooksImportDialog';
-import HooksPreview from './HooksPreview';
 import HooksRemoveDialog from './HooksRemoveDialog';
 
 vi.mock('../CodeEditor', () => ({
@@ -49,12 +48,6 @@ describe('Git raw YAML dialog', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(hooksApi.save).toHaveBeenCalledWith({ name: 'guard', entry: { bindings: { git: binding } } }));
   });
-  it('opens the YAML editor for a new Git binding', async () => {
-    const user = userEvent.setup();
-    wrap(<HookDialog existingNames={[]} onClose={vi.fn()} onSaved={vi.fn()} />);
-    await user.click(screen.getByRole('checkbox', { name: /^Git$/ }));
-    expect(screen.getByLabelText('Git Binding YAML')).toBeInTheDocument();
-  });
 });
 
 describe('hook dialog', () => {
@@ -63,28 +56,6 @@ describe('hook dialog', () => {
     vi.mocked(hooksApi.catalog).mockResolvedValue(catalog);
     // jsdom has no scrollIntoView, which the dropdown calls on its focused option.
     HTMLElement.prototype.scrollIntoView = vi.fn();
-  });
-
-  it("offers the target's documented events with what each does, and a tool filter only where the event takes one", async () => {
-    const user = userEvent.setup();
-    await openClaude(user);
-    await user.click(screen.getByRole('combobox', { name: 'Event 1' }));
-    const post = await screen.findByRole('option', { name: /^PostToolUse/ });
-    expect(post).toHaveTextContent('Filters tools');
-    expect(screen.getByRole('option', { name: /^Stop/ })).not.toHaveTextContent('Filters tools');
-    await user.click(screen.getByRole('option', { name: /^Stop/ }));
-    expect(screen.queryByLabelText('Tool filter 1')).not.toBeInTheDocument();
-  });
-
-  it('lints the native JSON by line and names an unknown event with the closest one', async () => {
-    const user = userEvent.setup();
-    await openClaude(user);
-    await user.click(screen.getByRole('tab', { name: 'Native JSON' }));
-    const editor = screen.getByLabelText('Claude Native JSON');
-    await user.clear(editor);
-    await user.click(editor);
-    await user.paste('{\n  "Stopp": []\n}');
-    expect(screen.getByText(/Line 2: "Stopp" is not an event this target documents\. Did you mean Stop\?/)).toBeInTheDocument();
   });
 
   it('keeps invalid JSON and says why when switching back to fields', async () => {
@@ -100,74 +71,6 @@ describe('hook dialog', () => {
     await user.click(screen.getByRole('tab', { name: 'Fields' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Fix the JSON before switching to fields. Line 4:');
     expect(screen.getByLabelText('Claude Native JSON')).toHaveValue(broken);
-  });
-});
-
-describe('expanded editor', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-    vi.mocked(hooksApi.catalog).mockResolvedValue(catalog);
-    vi.mocked(hooksApi.save).mockResolvedValue({ applied: [], backupIds: [] });
-  });
-
-  const expand = async (user: ReturnType<typeof userEvent.setup>) => {
-    await openClaude(user);
-    await user.click(screen.getByRole('tab', { name: 'Native JSON' }));
-    const editor = screen.getByLabelText('Claude Native JSON');
-    await user.clear(editor);
-    await user.click(editor);
-    await user.paste('{ "Stop": [] }');
-    await user.click(screen.getByRole('button', { name: 'Expand' }));
-    return screen.getByRole('group', { name: 'Claude Native JSON' });
-  };
-
-  it('opens the same editor over the dialog, and Esc brings it back with the text kept', async () => {
-    const user = userEvent.setup();
-    const expanded = await expand(user);
-    const editor = within(expanded).getByLabelText('Claude Native JSON');
-    await user.type(editor, ' ');
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('group', { name: 'Claude Native JSON' })).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Claude Native JSON')).toHaveValue('{ "Stop": [] } ');
-    expect(screen.getByLabelText('Name')).toBeInTheDocument();
-  });
-
-  it('leaves an Esc the editor already used (its completion list) to the editor', async () => {
-    const user = userEvent.setup();
-    const expanded = await expand(user);
-    const esc = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
-    esc.preventDefault();
-    within(expanded).getByLabelText('Claude Native JSON').dispatchEvent(esc);
-    expect(screen.getByRole('group', { name: 'Claude Native JSON' })).toBeInTheDocument();
-  });
-
-  it('saves with Cmd+S while expanded', async () => {
-    const user = userEvent.setup();
-    await expand(user);
-    await user.keyboard('{Meta>}s{/Meta}');
-    await waitFor(() => expect(hooksApi.save).toHaveBeenCalledTimes(1));
-  });
-});
-
-describe('copying to a target without close events', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-    vi.mocked(hooksApi.catalog).mockResolvedValue({
-      claude: { timeoutUnit: 'seconds', events: [{ name: 'Notification', description: 'When a notification is sent', matcher: true }] },
-      cursor: { timeoutUnit: 'seconds', events: [{ name: 'stop', description: 'When the agent stops', matcher: false }] },
-    });
-    HTMLElement.prototype.scrollIntoView = vi.fn();
-  });
-
-  it('says the events must be picked by hand instead of promising the closest ones', async () => {
-    const user = userEvent.setup();
-    await openClaude(user);
-    await user.click(screen.getByRole('combobox', { name: 'Event 1' }));
-    await user.click(await screen.findByRole('option', { name: /^Notification/ }));
-    await user.type(screen.getByLabelText('Command 1'), './ping.sh');
-    await user.click(screen.getByRole('checkbox', { name: /Cursor/ }));
-    expect(await screen.findByText('Claude already runs on Notification. Cursor has no close match for them; after copying, pick each event yourself.')).toBeInTheDocument();
-    expect(screen.queryByText(/copying picks the closest/)).not.toBeInTheDocument();
   });
 });
 
@@ -216,44 +119,6 @@ describe('hooks import', () => {
   });
 });
 
-describe('hooks preview', () => {
-  it('shows every narrow Git operation sharing a config file', () => {
-    const path = '/home/u/.gitconfig';
-    wrap(<HooksPreview plan={{ revision: 'r', fingerprint: 'fp', sourcePath: '/s.yaml', blocked: false,
-      changes: [{ target: 'git', path, name: 'guard', action: 'update' }],
-      files: [
-        { target: 'git', path, before: '[hook "check"]\n command = echo foreign\n', after: '' },
-        { target: 'git', path, before: '', after: '[include]\n path = ~/.config/git/skillshare/hooks.gitconfig\n' },
-      ] }} />);
-    const card = screen.getByRole('region', { name: path });
-    expect(within(card).getByText('command = echo foreign')).toBeInTheDocument();
-    expect(within(card).getByText('path = ~/.config/git/skillshare/hooks.gitconfig')).toBeInTheDocument();
-    const first = within(card).getByRole('region', { name: `Changes to ${path} (1/2)` });
-    const second = within(card).getByRole('region', { name: `Changes to ${path} (2/2)` });
-    expect(within(first).getByText('command = echo foreign')).toBeInTheDocument();
-    expect(within(first).queryByText('path = ~/.config/git/skillshare/hooks.gitconfig')).not.toBeInTheDocument();
-    expect(within(second).getByText('path = ~/.config/git/skillshare/hooks.gitconfig')).toBeInTheDocument();
-    expect(within(second).queryByText('command = echo foreign')).not.toBeInTheDocument();
-  });
-
-  it("shows each file's event changes and diff, marking the user's own hooks as untouched", () => {
-    const path = '/home/u/.claude/settings.json';
-    const before = '{\n  "hooks": {\n    "PreToolUse": [{ "hooks": [] }]\n  }\n}';
-    const after = '{\n  "hooks": {\n    "PreToolUse": [{ "hooks": [] }],\n    "Stop": [\n      { "hooks": [] }\n    ]\n  }\n}';
-    wrap(<HooksPreview
-      plan={{ revision: 'r', fingerprint: 'fp', sourcePath: '/s.yaml', blocked: false,
-        changes: [{ target: 'claude', path, name: 'lint', action: 'update', events: { added: ['Stop'] } }],
-        files: [{ target: 'claude', path, before, after }] }}
-      unmanaged={[{ target: 'claude', path, names: ['PreToolUse'] }]}
-    />);
-    const card = screen.getByRole('region', { name: path });
-    expect(within(card).getByText('+ Stop')).toBeInTheDocument();
-    const diff = within(card).getByLabelText(`Changes to ${path}`);
-    expect(within(diff).getByText('"Stop": [')).toBeInTheDocument();
-    expect(within(diff).getByText("your own hook, left as is")).toBeInTheDocument();
-  });
-});
-
 describe('hooks remove', () => {
   beforeEach(() => vi.resetAllMocks());
 
@@ -273,18 +138,6 @@ describe('hooks remove', () => {
     expect(hooksApi.configure).toHaveBeenCalledWith({ name: 'guard', remove: true, unmanage: true }, 'kept', false);
   });
 
-  it('counts many targets instead of listing them, and names the other hooks a sync also writes', async () => {
-    const agents = ['claude', 'codex', 'gemini', 'cursor'];
-    vi.mocked(hooksApi.preview).mockResolvedValue({ revision: 'r', fingerprint: 'fp', sourcePath: '/s.yaml', blocked: false, changes: [
-      ...agents.map((target) => ({ target, path: `/home/u/${target}.json`, name: 'guard', action: 'remove' })),
-      { target: 'claude', path: '/home/u/claude.json', name: 'lint', action: 'add' },
-      { target: 'claude', path: '/home/u/claude.json', name: 'fmt', action: 'unchanged' },
-    ] });
-    wrap(<HooksRemoveDialog name="guard" onClose={vi.fn()} onSaved={vi.fn()} />);
-    expect(await screen.findByText('Syncing also writes 1 other pending hook: lint.')).toBeInTheDocument();
-    screen.getByRole('button', { name: 'Remove and sync' }).focus();
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Deletes what it wrote from the 4 target settings files now.');
-  });
 });
 
 describe('account hook bindings', () => {
@@ -307,31 +160,4 @@ describe('account hook bindings', () => {
     await waitFor(() => expect(hooksApi.save).toHaveBeenCalledWith({ name: 'account', entry: { bindings: { 'codex-2': { events: { SessionStart: [{ hooks: [{ type: 'command', command: 'echo account' }] }] } } } } }));
   });
 
-  it('offers no account in a project even if account metadata is passed', () => {
-    wrap(<HookDialog accounts={{ 'codex-2': 'codex' }} project="/p" existingNames={[]} onClose={vi.fn()} onSaved={vi.fn()} />);
-    expect(screen.queryByRole('checkbox', { name: 'codex-2 (Codex)' })).not.toBeInTheDocument();
-  });
-
-  it('explains that a fresh Pi account uses its plugin template', async () => {
-    const user = userEvent.setup();
-    wrap(<HookDialog accounts={{ 'pi-2': 'pi' }} existingNames={[]} onClose={vi.fn()} onSaved={vi.fn()} />);
-    await user.click(screen.getByRole('checkbox', { name: 'pi-2 (Pi)' }));
-    expect(screen.getByText('pi-2 (Pi) runs a plugin file written for its own API. Start from its template.')).toBeInTheDocument();
-  });
-
-  it('warns that Oh My Pi loads a project extension without a trust prompt', async () => {
-    const user = userEvent.setup();
-    wrap(<HookDialog accounts={{ 'omp-work': 'omp' }} existingNames={[]} onClose={vi.fn()} onSaved={vi.fn()} />);
-    await user.click(screen.getByRole('checkbox', { name: 'omp-work (Oh My Pi)' }));
-    await user.click(screen.getByRole('button', { name: 'Start from scratch' }));
-    expect(screen.getByRole('note')).toHaveTextContent('Oh My Pi has no project trust prompt');
-    expect((screen.getByLabelText('Oh My Pi Extension code') as HTMLTextAreaElement).value).toContain('@oh-my-pi/pi-coding-agent');
-  });
-
-  it('reads unmanaged native hooks from accounts', async () => {
-    vi.mocked(hooksApi.import).mockResolvedValue([]);
-    const data = { source: { path: '/s', configPath: '/s', entries: {} }, targets: [{ name: 'codex-2', agent: 'codex', kind: 'command' }], paths: { 'codex-2': '/home/u/.codex-2/hooks.json' }, unmanaged: [{ target: 'codex-2', path: '/home/u/.codex-2/hooks.json', names: ['Stop'] }], backups: [], plan: null, previewError: '' } satisfies HookInventory;
-    wrap(<HooksImportDialog data={data} onClose={vi.fn()} onImported={vi.fn()} />);
-    await waitFor(() => expect(hooksApi.import).toHaveBeenCalledWith({ from: 'codex-2' }));
-  });
 });

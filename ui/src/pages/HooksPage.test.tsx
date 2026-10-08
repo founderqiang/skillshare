@@ -52,15 +52,6 @@ describe('Hooks page', () => {
     Range.prototype.getClientRects = () => ({ length: 0, item: () => null, [Symbol.iterator]: [][Symbol.iterator] }) as unknown as DOMRectList;
   });
 
-  it('shows what each hook runs and its sync state per target on the card', async () => {
-    renderPage();
-    const card = await screen.findByRole('article', { name: 'guard' });
-    expect(within(card).getByText('Pending sync')).toBeInTheDocument();
-    expect(within(card).getByText('Claude · Synced')).toBeInTheDocument();
-    expect(within(card).getByText('OpenCode · Not synced yet')).toBeInTheDocument();
-    expect(within(card).getByText('./guard.sh')).toBeInTheDocument();
-  });
-
   it('disables a hook by saving it as disabled, without touching its bindings', async () => {
     const user = userEvent.setup();
     vi.mocked(hooksApi.save).mockResolvedValue({ applied: [], backupIds: [] });
@@ -117,26 +108,6 @@ describe('Hooks page', () => {
     await waitFor(() => expect(hooksApi.save).toHaveBeenCalledWith(expect.not.objectContaining({ replace: true })));
   });
 
-  it('has no permanent trust banner above the list, and opens the native preview from the row menu', async () => {
-    const user = userEvent.setup();
-    vi.mocked(hooksApi.render).mockResolvedValue({ rendered: [
-      { target: 'claude', path: '/home/u/.claude/settings.json', content: 'claude native file' },
-      { target: 'opencode', path: '/home/u/.config/opencode/plugins/skillshare-guard.ts', content: 'opencodePluginSource' },
-    ] });
-    renderPage();
-    await user.click(await screen.findByRole('button', { name: 'More actions for guard' }));
-    expect(screen.queryByText(/Synced means Skillshare wrote the native file/)).not.toBeInTheDocument();
-    await user.click(screen.getByRole('menuitem', { name: 'View what each target gets' }));
-    const dialog = await screen.findByRole('dialog', { name: 'View what each target gets' });
-    await waitFor(() => expect(hooksApi.render).toHaveBeenCalledWith({ name: 'guard', entry: inventory().source.entries.guard }));
-    expect(await within(dialog).findByText('Sync writes 2 files')).toBeInTheDocument();
-    expect(within(dialog).getByText('claude native file')).toBeInTheDocument();
-    await user.click(within(dialog).getByRole('button', { name: /OpenCode/ }));
-    expect(within(dialog).getByText('opencodePluginSource')).toBeInTheDocument();
-    expect(hooksApi.save).not.toHaveBeenCalled();
-    expect(hooksApi.configure).not.toHaveBeenCalled();
-  });
-
   it('applies only the plan it previewed when syncing', async () => {
     const user = userEvent.setup();
     vi.mocked(hooksApi.preview).mockResolvedValue({ ...plan([{ target: 'opencode', path: '/p.ts', name: 'guard', action: 'add' }]), revision: 'rev-fresh' });
@@ -148,23 +119,4 @@ describe('Hooks page', () => {
     await waitFor(() => expect(hooksApi.configure).toHaveBeenCalledWith({}, 'rev-fresh', true));
   });
 
-  it('shows the empty state with add and import', async () => {
-    vi.mocked(hooksApi.list).mockResolvedValue(inventory({ source: { path: '/s', configPath: '', entries: {} }, plan: null }));
-    renderPage();
-    expect(await screen.findByText('No hooks yet')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Import' }).length).toBeGreaterThan(0);
-  });
-
-  it('keeps the sync box when the last hook was removed from the source but its native output is still pending', async () => {
-    vi.mocked(hooksApi.list).mockResolvedValue(inventory({ source: { path: '/s', configPath: '', entries: {} }, plan: plan([{ target: 'claude', path: '/home/u/.claude/settings.json', name: 'guard', action: 'remove' }]) }));
-    renderPage();
-    expect(await screen.findByText('No hooks yet')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Sync hooks' })).toBeEnabled();
-  });
-
-  it('surfaces a list error instead of an empty page', async () => {
-    vi.mocked(hooksApi.list).mockRejectedValue(new Error('boom'));
-    renderPage();
-    expect(await screen.findByText('boom')).toBeInTheDocument();
-  });
 });

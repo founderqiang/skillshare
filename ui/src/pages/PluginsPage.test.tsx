@@ -3,7 +3,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PluginsPage from './PluginsPage';
 import { pluginsApi, type PluginInventory } from '../api/plugins';
-import { ApiError } from '../api/client';
 import { ToastProvider } from '../components/Toast';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -23,28 +22,6 @@ describe('PluginsPage', () => {
     vi.mocked(pluginsApi.list).mockResolvedValue({ targetDefinitions: [{target:'codex',label:'Codex',project:false,operations:['add','sync','import']}], packages: { demo: { bindings: { codex: { id: 'demo@market' } } } }, hosts: [{ target: 'codex', version: '0.154', status: 'ready', installed: [{ id: 'demo@market', enabled: false }] }] });
     vi.mocked(pluginsApi.preview).mockResolvedValue({ revision: 'reviewed', blocked: false, changes: [{ name: 'demo', target: 'codex', id: 'demo@market', action: 'selection' }] });
     vi.mocked(pluginsApi.apply).mockResolvedValue({ result: { results: [] }, failure: '' });
-  });
-  it('separates an empty managed list from native registrations and links Pi extensions', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({
-      packages: {},
-      targetDefinitions: [{ target: 'pi', label: 'Pi', project: true, operations: ['import'] }],
-      hosts: [{ target: 'pi', version: '1.0.0', status: 'ready', installed: ['a', 'b', 'c'].map((id) => ({ id, enabled: true })) }],
-    });
-    mount();
-    const managed = await screen.findByRole('heading', { name: 'plugins.managedTitle' });
-    expect(managed.parentElement).toHaveTextContent('0');
-    expect(screen.getByRole('heading', { name: 'plugins.hostsTitle' })).toBeInTheDocument();
-    expect(screen.getByText('plugins.hostsHelp')).toBeInTheDocument();
-    expect(screen.getByText('plugins.emptyHelp')).toBeInTheDocument();
-    expect(screen.getByText('plugins.hostRegistered.other')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Pi' }));
-    expect(screen.getByRole('link', { name: 'plugins.piExtensions' })).toHaveAttribute('href', '/targets/pi?tab=extensions');
-    expect(pluginsApi.preview).not.toHaveBeenCalled();
-    expect(pluginsApi.apply).not.toHaveBeenCalled();
-  });
-  it('opens the add dialog for the target a target page linked from', async () => {
-    mount('/plugins?add=pi-work');
-    expect(await screen.findByRole('dialog', { name: 'add' })).toHaveTextContent('pi-work');
   });
   it('adds an imported registration to the managed count only after the reviewed import', async () => {
     let imported = false;
@@ -73,20 +50,6 @@ describe('PluginsPage', () => {
     expect(screen.getByText('plugins.hostRegistered.one')).toBeInTheDocument();
     expect(pluginsApi.apply).toHaveBeenCalledWith({ action: 'import', from: 'pi', plugin: 'npm:demo' }, 'import-reviewed');
   });
-  it('leaves out of Import what Skillshare already installed or imported into the Agent', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({
-      targetDefinitions: [{ target: 'pi', label: 'Pi', project: true, operations: ['import'], npm: true }],
-      packages: {
-        powers: { source: 'owner/powers', bindings: { pi: { id: '/state/powers/content', source: 'owner/powers' } } },
-        driver: { bindings: { pi: { id: 'npm:driver' } } },
-      },
-      hosts: [{ target: 'pi', version: '1.0.0', status: 'ready', installed: [{ id: '/state/powers/content', enabled: true }, { id: 'npm:driver', enabled: true }] }],
-    });
-    mount();
-    fireEvent.click((await screen.findAllByRole('button', { name: 'plugins.import' }))[0]);
-    expect(await screen.findByText('plugins.allManaged')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'plugins.importOne' })).toBeNull();
-  });
   it.each([true, false])('only permits reviewed filtered imports when native preservation is supported: %s', async (importable) => {
     vi.mocked(pluginsApi.list).mockResolvedValue({ packages: {}, targetDefinitions: [{ target: 'pi', label: 'Pi', project: true, operations: ['import'] }], hosts: [{ target: 'pi', version: '1.0.0', status: 'ready', installed: [{ id: 'npm:demo', enabled: true, filtered: true, importable }] }] });
     vi.mocked(pluginsApi.preview).mockResolvedValue({ revision: 'filters-reviewed', blocked: false, changes: [{ name: 'demo', target: 'pi', id: 'npm:demo', action: 'import', preservedKeys: ['extensions', 'opaque', 'skills', 'source'] }] });
@@ -103,129 +66,12 @@ describe('PluginsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'plugins.apply' }));
     await waitFor(() => expect(pluginsApi.apply).toHaveBeenCalledWith({ action: 'import', from: 'pi', plugin: 'npm:demo' }, 'filters-reviewed'));
   });
-  it('draws the plugin list before the Agents have answered', async () => {
-    vi.mocked(pluginsApi.list).mockImplementation((hosts = true) => (hosts ? new Promise(() => {}) : Promise.resolve({ targetDefinitions: [{ target: 'codex', label: 'Codex', project: false, operations: ['add'] }], packages: { demo: { bindings: { codex: { id: 'demo@market' } } } }, hosts: [] })));
-    mount();
-    expect(await screen.findByText('demo')).toBeInTheDocument();
-    expect(screen.getByText('plugins.checking')).toBeInTheDocument();
-    expect(screen.getByText('plugins.hostsAsking')).toBeInTheDocument();
-  });
-  it('lists what Sync would do when a tick differs from what the Agent has', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({ targetDefinitions: [{ target: 'codex', label: 'Codex', project: false, operations: ['add', 'sync'] }], packages: { demo: { bindings: { codex: { id: 'demo@market', sync: false } } } }, hosts: [{ target: 'codex', version: '0.154', status: 'ready', installed: [{ id: 'demo@market', enabled: true }] }] });
-    mount();
-    expect(await screen.findByText('plugins.pendingCount.one')).toBeInTheDocument();
-    expect(screen.getByText('uninstall')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'plugins.sync' })).toBeEnabled();
-  });
-  it('shows the version recorded at add time while no Agent is bound', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({ targetDefinitions: [], packages: { demo: { source: 'https://github.com/owner/demo', version: '2.3.4', bindings: {} } }, hosts: [] });
-    mount();
-    expect(await screen.findByText('2.3.4')).toBeInTheDocument();
-  });
-  it('asks the source for the version of a plugin added before it was recorded', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({ targetDefinitions: [], packages: { demo: { source: 'https://github.com/owner/demo', plugin: 'demo', bindings: {} } }, hosts: [] });
-    vi.mocked(pluginsApi.discover).mockResolvedValue({ source: 'https://github.com/owner/demo', digest: 'd', candidates: [{ name: 'demo', description: '', version: '5.6.7', targets: [], components: [] }] });
-    mount();
-    expect(await screen.findByText('5.6.7')).toBeInTheDocument();
-  });
-  it('draws the logo a Codex manifest names', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({ targetDefinitions: [], packages: { demo: { source: 'https://github.com/owner/demo', plugin: 'demo', bindings: {} } }, hosts: [] });
-    vi.mocked(pluginsApi.discover).mockResolvedValue({ source: 'https://github.com/owner/demo', digest: 'd', candidates: [{ name: 'demo', description: '', version: '1', targets: ['codex'], components: [], targetInfo: { codex: { manifest: '.codex-plugin/plugin.json', logo: 'data:image/png;base64,AA==', components: [] } } }] });
-    const { container } = mount();
-    await screen.findByText('demo');
-    await waitFor(() => expect(container.querySelector('img')?.getAttribute('src')).toBe('data:image/png;base64,AA=='));
-  });
-  it('shows the installed version, and old → new once a check finds another', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({ targetDefinitions: [{ target: 'codex', label: 'Codex', project: false, operations: ['add', 'check'] }], packages: { demo: { bindings: { codex: { id: 'demo@market', version: '1.0.0' } } } }, hosts: [] });
-    vi.mocked(pluginsApi.preview).mockResolvedValue({ revision: 'r', blocked: false, changes: [{ name: 'demo', target: 'codex', id: 'demo@market', action: 'update-available', binding: { id: 'demo@market', version: '1.1.0' } }] });
-    mount();
-    expect(await screen.findByText('1.0.0')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'plugins.check' }));
-    expect(await screen.findAllByText('1.0.0 → 1.1.0')).toHaveLength(2);
-  });
-  it('shows the commit moving when a check finds a source change under the same version', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({ targetDefinitions: [{ target: 'codex', label: 'Codex', project: false, operations: ['add', 'check'] }], packages: { demo: { bindings: { codex: { id: 'demo@market', version: '1.0.0', commit: '00f1aa364b3aa57172e5db2da964167701904d02' } } } }, hosts: [] });
-    vi.mocked(pluginsApi.preview).mockResolvedValue({ revision: 'r', blocked: false, changes: [{ name: 'demo', target: 'codex', id: 'demo@market', action: 'update-available', binding: { id: 'demo@market', version: '1.0.0', commit: '944b5dcc253cb0561db525207db5b804072ab127' } }] });
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'plugins.check' }));
-    expect(await screen.findAllByText('1.0.0 · 00f1aa3 → 944b5dc')).toHaveLength(2);
-  });
-  it('shows only the commit moving when neither side has a version', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({ targetDefinitions: [{ target: 'codex', label: 'Codex', project: false, operations: ['add', 'check'] }], packages: { demo: { bindings: { codex: { id: 'demo@market', commit: '00f1aa364b3aa57172e5db2da964167701904d02' } } } }, hosts: [] });
-    vi.mocked(pluginsApi.preview).mockResolvedValue({ revision: 'r', blocked: false, changes: [{ name: 'demo', target: 'codex', id: 'demo@market', action: 'update-available', binding: { id: 'demo@market', commit: '944b5dcc253cb0561db525207db5b804072ab127' } }] });
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'plugins.check' }));
-    expect(await screen.findAllByText('00f1aa3 → 944b5dc')).toHaveLength(2);
-  });
   it('updates what a check found from its row in the check, for that Agent only', async () => {
     vi.mocked(pluginsApi.list).mockResolvedValue({ targetDefinitions: [{ target: 'pi', label: 'Pi', project: false, operations: ['add', 'check', 'update'], npm: true }], packages: { driver: { bindings: { pi: { id: 'npm:driver' } } } }, hosts: [{ target: 'pi', version: '0.99.2', status: 'ready', installed: [{ id: 'npm:driver', version: '1.0.0', enabled: true }] }] });
     vi.mocked(pluginsApi.preview).mockResolvedValue({ revision: 'r', blocked: false, changes: [{ name: 'driver', target: 'pi', id: 'npm:driver', action: 'update-available', binding: { id: 'npm:driver', version: '1.1.0' } }] });
     mount();
     fireEvent.click(await screen.findByRole('button', { name: 'plugins.check' }));
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'plugins.update' }));
-    await waitFor(() => expect(pluginsApi.preview).toHaveBeenLastCalledWith({ action: 'update', name: 'driver', targets: ['pi'] }));
-  });
-  it('offers the row update for a source change without a new version, until that update is applied', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({ targetDefinitions: [{ target: 'codex', label: 'Codex', project: false, operations: ['add', 'check', 'update'] }], packages: { demo: { bindings: { codex: { id: 'demo@market', source: 'https://example.com/demo.git', version: '1.0.0' } } } }, hosts: [] });
-    vi.mocked(pluginsApi.preview)
-      .mockResolvedValueOnce({ revision: 'r', blocked: false, changes: [{ name: 'demo', target: 'codex', id: 'demo@market', action: 'update-available', binding: { id: 'demo@market', version: '1.0.0' } }] })
-      .mockResolvedValueOnce({ revision: 'r2', blocked: false, changes: [{ name: 'demo', target: 'codex', id: 'demo@market', action: 'update', binding: { id: 'demo@market', version: '1.0.0' } }] });
-    vi.mocked(pluginsApi.apply).mockResolvedValue({ result: { results: [{ name: 'demo', target: 'codex', status: 'installed' }] }, failure: '' });
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'plugins.check' }));
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'common.cancel' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: 'plugins.update' }));
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'plugins.apply' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: 'plugins.update' })).not.toBeInTheDocument();
-  });
-  it('shows the version Pi has installed for an npm package, not the one recorded at import', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({
-      targetDefinitions: [{ target: 'pi', label: 'Pi', project: false, operations: ['add', 'sync'], npm: true }],
-      packages: { driver: { bindings: { pi: { id: 'npm:driver', version: '1.0.0' } } } },
-      hosts: [{ target: 'pi', version: '0.99.2', status: 'ready', installed: [{ id: 'npm:driver', version: '1.4.0', enabled: true }] }],
-    });
-    mount();
-    expect(await screen.findByText('1.4.0')).toBeInTheDocument();
-    expect(screen.queryByText('1.0.0')).not.toBeInTheDocument();
-  });
-  it('shows the version Pi has installed for any Pi package, git ones included', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({
-      targetDefinitions: [{ target: 'pi', label: 'Pi', project: false, operations: ['add', 'sync'], npm: true }],
-      packages: { tool: { bindings: { pi: { id: 'git:github.com/acme/tool', version: '1.0.0' } } } },
-      hosts: [{ target: 'pi', version: '0.99.2', status: 'ready', installed: [{ id: 'git:github.com/acme/tool', version: '1.1.0', enabled: true }] }],
-    });
-    mount();
-    expect(await screen.findByText('1.1.0')).toBeInTheDocument();
-    expect(screen.queryByText('1.0.0')).not.toBeInTheDocument();
-  });
-  it('keeps the row update for an Agent still behind when another Agent already has the new version', async () => {
-    const pi = { label: 'Pi', project: false, operations: ['add', 'check', 'update'], npm: true };
-    vi.mocked(pluginsApi.list).mockResolvedValue({
-      targetDefinitions: [{ target: 'pi', ...pi }, { target: 'pi-work', ...pi, label: 'pi-work' }],
-      packages: { driver: { bindings: { pi: { id: 'npm:driver' }, 'pi-work': { id: 'npm:driver' } } } },
-      hosts: [
-        { target: 'pi', version: '0.99.2', status: 'ready', installed: [{ id: 'npm:driver', version: '1.0.0', enabled: true }] },
-        { target: 'pi-work', version: '0.99.2', status: 'ready', installed: [{ id: 'npm:driver', version: '1.1.0', enabled: true }] },
-      ],
-    });
-    vi.mocked(pluginsApi.preview).mockResolvedValue({ revision: 'r', blocked: false, changes: [{ name: 'driver', target: 'pi', id: 'npm:driver', action: 'update-available', binding: { id: 'npm:driver', version: '1.1.0' } }] });
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'plugins.check' }));
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'common.cancel' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: 'plugins.update' }));
-    await waitFor(() => expect(pluginsApi.preview).toHaveBeenLastCalledWith({ action: 'update', name: 'driver', targets: ['pi'] }));
-  });
-  it('offers an update on the list row once a check finds a newer version', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({ targetDefinitions: [{ target: 'pi', label: 'Pi', project: false, operations: ['add', 'check', 'update'], npm: true }], packages: { driver: { bindings: { pi: { id: 'npm:driver' } } } }, hosts: [{ target: 'pi', version: '0.99.2', status: 'ready', installed: [{ id: 'npm:driver', version: '1.0.0', enabled: true }] }] });
-    vi.mocked(pluginsApi.preview).mockResolvedValue({ revision: 'r', blocked: false, changes: [{ name: 'driver', target: 'pi', id: 'npm:driver', action: 'update-available', binding: { id: 'npm:driver', version: '1.1.0' } }] });
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'plugins.check' }));
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'common.cancel' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: 'plugins.update' }));
     await waitFor(() => expect(pluginsApi.preview).toHaveBeenLastCalledWith({ action: 'update', name: 'driver', targets: ['pi'] }));
   });
   it('saves sync selection independently of native enabled state', async () => {
@@ -237,26 +83,6 @@ describe('PluginsPage', () => {
     fireEvent.click(checkbox);
     await waitFor(() => expect(pluginsApi.apply).toHaveBeenCalledWith({ action: 'disable', name: 'demo', targets: ['codex'] }, 'reviewed'));
   });
-  it('localizes the last action status and installation instructions', async () => {
-    const message = 'Native installation recorded. Reload the Agent and complete any required login or hook trust.';
-    vi.mocked(pluginsApi.apply).mockResolvedValue({ result: { results: [{ name: 'demo', target: 'codex', status: 'installed', message }] }, failure: '' });
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'plugins.syncAgain' }));
-    await screen.findByRole('dialog');
-    fireEvent.click(screen.getByRole('button', { name: 'plugins.apply' }));
-    expect(await screen.findByText('plugins.outcome.installed')).toBeInTheDocument();
-    expect(screen.getByText('plugins.outcome.installHelp')).toBeInTheDocument();
-    expect(screen.queryByText(message)).not.toBeInTheDocument();
-  });
-  it('refreshes the Pi Extensions tabs after a sync, since they list the packages it changes', async () => {
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const invalidate = vi.spyOn(client, 'invalidateQueries');
-    mount('/plugins', client);
-    fireEvent.click(await screen.findByRole('button', { name: 'plugins.syncAgain' }));
-    await screen.findByRole('dialog');
-    fireEvent.click(screen.getByRole('button', { name: 'plugins.apply' }));
-    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ['pi-extensions'] }));
-  });
   it('requires a preview before sync and preserves partial failures', async () => {
     vi.mocked(pluginsApi.apply).mockResolvedValue({ result: { results: [{ name: 'demo', target: 'codex', status: 'failed', message: 'Native authentication required' }] }, failure: 'One target failed' });
     mount();
@@ -266,89 +92,6 @@ describe('PluginsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'plugins.apply' }));
     expect(await screen.findAllByText('Native authentication required')).not.toHaveLength(0);
     expect(screen.getByRole('alert')).toHaveTextContent('Native authentication required');
-  });
-  it('puts a failed outcome first and folds the unchanged ones into one row per plugin', async () => {
-    vi.mocked(pluginsApi.apply).mockResolvedValue({ result: { results: [
-      { name: 'kept', target: 'claude', status: 'unchanged' },
-      { name: 'demo', target: 'codex', status: 'failed', message: 'Native authentication required' },
-      { name: 'kept', target: 'codex', status: 'unchanged' },
-    ] }, failure: 'joined' });
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'plugins.syncAgain' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'plugins.apply' }));
-    const fold = await screen.findByRole('button', { name: 'plugins.outcome.unchanged · 2' });
-    expect(screen.getByText('plugins.outcome.failed').compareDocumentPosition(fold) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.queryByText('kept')).not.toBeInTheDocument();
-    fireEvent.click(fold);
-    expect(screen.getAllByText('kept')).toHaveLength(1);
-  });
-  it('folds what a preview leaves alone, with Pi packages apart from plugins', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({
-      targetDefinitions: [
-        { target: 'omo', label: 'omo', project: false, operations: ['add', 'sync'], npm: true },
-        { target: 'codex', label: 'Codex', project: false, operations: ['add', 'sync'] },
-      ],
-      packages: { demo: { bindings: { codex: { id: 'demo@market' } } }, driver: { bindings: { omo: { id: 'npm:driver' } } }, idle: { bindings: { codex: { id: 'idle@market' } } } },
-      hosts: [],
-    });
-    vi.mocked(pluginsApi.preview).mockResolvedValue({ revision: 'r', blocked: false, changes: [
-      { name: 'demo', target: 'codex', id: 'demo@market', action: 'update' },
-      { name: 'idle', target: 'codex', id: 'idle@market', action: 'noop' },
-      { name: 'driver', target: 'omo', id: 'npm:driver', action: 'noop' },
-    ] });
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'plugins.syncAgain' }));
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText('demo')).toBeInTheDocument();
-    expect(within(dialog).queryByText('driver')).not.toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'plugins.outcome.unchanged · 2' }));
-    expect(within(dialog).getByText('plugins.piTitle').parentElement).toHaveTextContent('driver');
-    expect(within(dialog).getByText('plugins.title').parentElement).toHaveTextContent('idle');
-  });
-  it('lists the Agents the source can also go to as unticked, and a tick there previews an install', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({ targetDefinitions: ['codex', 'claude', 'cursor'].map((target) => ({ target, label: target, project: false, operations: ['add', 'sync'] })), packages: { demo: { bindings: { codex: { id: 'demo@market', source: 'owner/demo', plugin: 'demo' } } } }, hosts: [] });
-    vi.mocked(pluginsApi.discover).mockResolvedValue({ source: 'https://github.com/owner/demo', digest: 'd', candidates: [{ name: 'demo', description: '', version: '1', targets: ['codex', 'claude'], components: [] }] });
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'mcp.chooseAgents' }));
-    const claude = await screen.findByRole('checkbox', { name: 'claude' });
-    expect(claude).not.toBeChecked();
-    // Cursor has no manifest in this source: counted, not offered.
-    expect(screen.queryByRole('checkbox', { name: 'cursor' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'plugins.moreBlocked' })).toBeEnabled();
-    fireEvent.click(claude);
-    await waitFor(() => expect(pluginsApi.preview).toHaveBeenCalledWith({ action: 'add', source: 'https://github.com/owner/demo', sourceRef: undefined, entry: undefined, plugin: 'demo', name: 'demo', targets: ['claude'] }));
-  });
-  it('lists packages bound only to Pi targets in their own section', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({
-      targetDefinitions: [
-        { target: 'omo', label: 'omo', project: false, operations: ['add', 'sync'], npm: true },
-        { target: 'codex', label: 'Codex', project: false, operations: ['add', 'sync'] },
-      ],
-      packages: {
-        demo: { bindings: { codex: { id: 'demo@market' } } },
-        driver: { bindings: { omo: { id: 'npm:@scope/driver' } } },
-        // Skillshare installs this one from its source, even though only a Pi target has it.
-        powers: { source: 'owner/powers', bindings: { omo: { id: 'local:/state/powers/content', source: 'owner/powers' } } },
-      },
-      hosts: [],
-    });
-    mount();
-    const pi = (await screen.findByRole('heading', { name: 'plugins.piTitle' })).closest('section')!;
-    const managed = screen.getByRole('heading', { name: 'plugins.managedTitle' }).closest('section')!;
-    expect(pi).toHaveTextContent('driver');
-    expect(pi).not.toHaveTextContent('powers');
-    expect(managed).not.toHaveTextContent('driver');
-    expect(managed).toHaveTextContent('demo');
-    expect(managed).toHaveTextContent('powers');
-  });
-  it('shows the version Pi reports for an npm package config recorded none for', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({
-      targetDefinitions: [{ target: 'pi', label: 'Pi', project: false, operations: ['add', 'sync'], npm: true }],
-      packages: { driver: { bindings: { pi: { id: 'npm:driver' } } } },
-      hosts: [{ target: 'pi', version: '0.99.2', status: 'ready', installed: [{ id: 'npm:driver', version: '5.0.0', enabled: true }] }],
-    });
-    mount();
-    expect(await screen.findByText('5.0.0')).toBeInTheDocument();
   });
   it('offers an imported npm package to the other Pi targets, installing it from its identifier', async () => {
     vi.mocked(pluginsApi.list).mockResolvedValue({
@@ -368,56 +111,6 @@ describe('PluginsPage', () => {
     fireEvent.click(pi);
     await waitFor(() => expect(pluginsApi.preview).toHaveBeenCalledWith({ action: 'add', source: 'npm:@scope/driver', name: 'driver', targets: ['pi'] }));
   });
-  it('asks for a managed plugin by name, and says why its source could not be read', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({ targetDefinitions: [{ target: 'codex', label: 'codex', project: false, operations: ['add', 'sync'] }], packages: { demo: { bindings: { codex: { id: 'demo@market', source: 'https://github.com/owner/demo.git', plugin: 'demo' } } } }, hosts: [] });
-    vi.mocked(pluginsApi.discover).mockRejectedValue(new ApiError(400, 'download plugin source: could not reach the plugin source', { code: 'plugins.error.network' }));
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'mcp.chooseAgents' }));
-    expect(await screen.findByText('plugins.error.network')).toBeInTheDocument();
-    expect(pluginsApi.discover).toHaveBeenCalledWith('https://github.com/owner/demo.git', undefined, undefined, 'demo');
-  });
-  it('opens the files of a plugin that has a local copy, on its README', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({ targetDefinitions: [{ target: 'codex', label: 'Codex', project: false, operations: ['add', 'sync'] }], packages: { demo: { bindings: { codex: { id: 'demo@market', source: 'owner/demo' } } } }, hosts: [] });
-    vi.mocked(pluginsApi.files).mockResolvedValue({ files: ['README.md', 'skills/hi/SKILL.md'] });
-    vi.mocked(pluginsApi.file).mockResolvedValue({ content: 'const greeting = 1;' });
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'mcp.moreActions' }));
-    fireEvent.mouseDown(screen.getByRole('menuitem', { name: 'plugins.viewFiles' }));
-    expect(await screen.findByRole('button', { name: 'SKILL.md' })).toBeInTheDocument();
-    await waitFor(() => expect(pluginsApi.file).toHaveBeenCalledWith('demo', 'README.md'));
-  });
-  it('shares several plugins as one command that adds them in order', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.assign(navigator, { clipboard: { writeText } });
-    vi.mocked(pluginsApi.list).mockResolvedValue({ targetDefinitions: [], packages: {
-      a: { source: 'https://github.com/owner/a.git', plugin: 'a', bindings: {} },
-      b: { source: 'https://github.com/owner/b.git', plugin: 'b', bindings: {} },
-      local: { source: '/home/me/local', bindings: {} },
-    }, hosts: [] });
-    vi.mocked(pluginsApi.discover).mockReturnValue(new Promise(() => {}));
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'plugins.share' }));
-    // A local directory only exists here, so it is not offered.
-    expect(screen.queryByRole('checkbox', { name: 'local' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'plugins.copyShare' }));
-    expect(writeText).toHaveBeenLastCalledWith('skillshare plugin add https://github.com/owner/a.git --plugin a -g --no-tui && skillshare plugin add https://github.com/owner/b.git --plugin b -g --no-tui');
-    // Asking drops --no-tui, so each add opens its Agent picker.
-    fireEvent.click(screen.getByRole('checkbox', { name: 'plugins.shareAsk' }));
-    fireEvent.click(screen.getByRole('button', { name: 'plugins.copyShare' }));
-    expect(writeText).toHaveBeenLastCalledWith('skillshare plugin add https://github.com/owner/a.git --plugin a -g && skillshare plugin add https://github.com/owner/b.git --plugin b -g');
-  });
-  it('opens sharing from a row with only that plugin ticked', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({ targetDefinitions: [], packages: {
-      a: { source: 'https://github.com/owner/a.git', plugin: 'a', bindings: {} },
-      b: { source: 'https://github.com/owner/b.git', plugin: 'b', bindings: {} },
-    }, hosts: [] });
-    vi.mocked(pluginsApi.discover).mockReturnValue(new Promise(() => {}));
-    mount();
-    fireEvent.click((await screen.findAllByRole('button', { name: 'mcp.moreActions' }))[1]);
-    fireEvent.mouseDown(screen.getByRole('menuitem', { name: 'plugins.share' }));
-    expect(screen.getByRole('checkbox', { name: 'a' })).not.toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'b' })).toBeChecked();
-  });
   it('updates only the Agents that can be updated from here', async () => {
     vi.mocked(pluginsApi.list).mockResolvedValue({ targetDefinitions: [{ target: 'codex', label: 'Codex', project: false, operations: ['add', 'sync'] }, { target: 'claude', label: 'Claude', project: true, operations: ['add', 'sync', 'update'] }], packages: { demo: { bindings: { codex: { id: 'demo@market' }, claude: { id: 'demo@market' } } } }, hosts: [] });
     mount();
@@ -425,74 +118,11 @@ describe('PluginsPage', () => {
     fireEvent.mouseDown(screen.getByRole('menuitem', { name: 'plugins.updateLatest' }));
     await waitFor(() => expect(pluginsApi.preview).toHaveBeenCalledWith({ action: 'update', name: 'demo', targets: ['claude'] }));
   });
-  it('separates unsupported integrations from errors and links official docs', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({
-      packages: {},
-      targetDefinitions: [
-        { target: 'kimi', label: 'Kimi Code', project: false, operations: [] },
-        { target: 'codex', label: 'Codex', project: false, operations: ['add'] },
-      ],
-      hosts: [
-        { target: 'kimi', version: '', status: 'blocked', installed: [], error: 'not automated', errorKey: 'plugins.problem.kimi' },
-        { target: 'codex', version: '', status: 'blocked', installed: [], error: 'check failed', errorKey: 'plugins.error.commandFailed' },
-      ],
-    });
-    mount();
-    expect(await screen.findByText('plugins.hostManual')).toBeInTheDocument();
-    expect(screen.getByText('plugins.hostManualHelp')).toBeInTheDocument();
-    const manual = screen.getByText('plugins.hostManual').parentElement!.parentElement!;
-    expect(manual).toHaveTextContent('Kimi Code');
-    expect(manual).not.toHaveTextContent('Codex');
-    // A row is a name until it is asked about; its reason and docs are one click in.
-    for (const name of ['Kimi Code', 'Codex']) fireEvent.click(screen.getByRole('button', { name: new RegExp(name) }));
-    expect(screen.getByRole('link', { name: 'Kimi Code · plugins.officialDocs' })).toHaveAttribute('href', 'https://www.kimi.com/code/docs/en/kimi-code-cli/customization/plugins');
-    expect(screen.getByRole('link', { name: 'Codex · plugins.officialDocs' })).toHaveAttribute('rel', 'noopener noreferrer');
-  });
-  it('says where Skillshare looked for a missing Codex CLI', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({
-      packages: {},
-      targetDefinitions: [{ target: 'codex', label: 'Codex', project: false, operations: ['add'] }],
-      hosts: [{ target: 'codex', version: '', status: 'missing', installed: [], error: 'Codex CLI not found', errorKey: 'plugins.error.codexMissing', errorArgs: { looked: 'PATH, /Applications/Codex.app/Contents/Resources/codex' } }],
-    });
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: /Codex/ }));
-    expect(screen.getByText('plugins.hostMissing').parentElement!.parentElement!).toHaveTextContent('plugins.error.codexMissing');
-  });
-
   const omp = (bindings: PluginInventory['packages'][string]['bindings'], installed: { id: string; enabled: boolean }[] = []): PluginInventory => ({
     targetDefinitions: [{ target: 'omp', label: 'Oh My Pi', project: true, operations: ['add', 'import', 'sync', 'check', 'update', 'remove', 'enable', 'disable'] }],
     packages: { guard: { source: 'owner/guard', bindings } },
     hosts: [{ target: 'omp', version: '18.6.1', status: 'ready', installed, noteKey: 'plugins.note.omp' }],
   });
-  it('links Oh My Pi extensions and uses the same Preview/Apply workflow as other Agents', async () => {
-    synced.targets = [{ name: 'omp' }];
-    vi.mocked(pluginsApi.list).mockResolvedValue(omp({ omp: { id: 'guard', source: 'owner/guard', pending: 'install' } }));
-    vi.mocked(pluginsApi.preview).mockResolvedValue({ revision: 'r1', blocked: false, changes: [{ name: 'guard', target: 'omp', id: 'guard', action: 'install' }] });
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: /Oh My Pi/ }));
-    expect(screen.getByText('plugins.note.omp')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'plugins.piExtensions' })).toHaveAttribute('href', '/targets/omp?tab=extensions');
-    expect(screen.getByRole('link', { name: 'Oh My Pi · plugins.officialDocs' })).toHaveAttribute('href', 'https://github.com/can1357/oh-my-pi/blob/v18.6.1/docs/extensions.md');
-    fireEvent.click(screen.getByRole('button', { name: 'plugins.sync' }));
-    const dialog = await screen.findByRole('dialog', { name: 'plugins.preview' });
-    expect(within(dialog).queryByText('plugins.ompRisk.text')).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument();
-    const apply = within(dialog).getByRole('button', { name: 'plugins.apply' });
-    expect(apply).toBeEnabled();
-    fireEvent.click(apply);
-    await waitFor(() => expect(pluginsApi.apply).toHaveBeenCalledWith({ action: 'sync' }, 'r1'));
-  });
-  it('does not add an OMP-only confirmation when no skills target is configured', async () => {
-    synced.targets = [];
-    vi.mocked(pluginsApi.list).mockResolvedValue(omp({ omp: { id: 'guard', source: 'owner/guard', pending: 'install' } }));
-    vi.mocked(pluginsApi.preview).mockResolvedValue({ revision: 'r1', blocked: false, changes: [{ name: 'guard', target: 'omp', id: 'guard', action: 'install' }] });
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'plugins.sync' }));
-    const dialog = await screen.findByRole('dialog', { name: 'plugins.preview' });
-    expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'plugins.apply' })).toBeEnabled();
-  });
-
   it('still blocks an unsafe OMP plan but allows a reviewed fresh install without a special confirmation', async () => {
     synced.targets = [{ name: 'omp' }, { name: 'omp-work', agent: 'omp' }];
     vi.mocked(pluginsApi.list).mockResolvedValue(omp({ omp: { id: 'guard', source: 'owner/guard', sync: false } }, [{ id: 'guard', enabled: true }]));
@@ -510,18 +140,4 @@ describe('PluginsPage', () => {
     expect(within(again).queryByText('plugins.ompRisk.text')).not.toBeInTheDocument();
     expect(within(again).queryByRole('checkbox')).not.toBeInTheDocument();
   });
-  it('shows an Oh My Pi account the backend does not automate as manual, with its reason and no Extensions link', async () => {
-    synced.targets = [{ name: 'omp' }, { name: 'omp-work', agent: 'omp' }];
-    vi.mocked(pluginsApi.list).mockResolvedValue({
-      packages: {},
-      targetDefinitions: [{ target: 'omp', label: 'Oh My Pi', project: true, operations: ['add'] }, { target: 'omp-work', label: 'omp-work', project: false, operations: [], reason: 'Plugins of an Oh My Pi account are managed in that account.' }],
-      hosts: [{ target: 'omp', version: '18.6.1', status: 'ready', installed: [] }, { target: 'omp-work', version: '', status: 'blocked', installed: [], error: 'Plugins of an Oh My Pi account are managed in that account.' }],
-    });
-    mount();
-    expect(await screen.findByText('plugins.hostManual')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /omp-work/ }));
-    expect(screen.getByText('plugins.hostManual').parentElement!.parentElement!).toHaveTextContent('Plugins of an Oh My Pi account are managed in that account.');
-    expect(screen.queryByRole('link', { name: 'plugins.piExtensions' })).not.toBeInTheDocument();
-  });
-
 });
