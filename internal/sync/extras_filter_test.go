@@ -42,6 +42,16 @@ func TestUnmatchedIncludes_ReportsPatternWithNoFile(t *testing.T) {
 	}
 }
 
+func TestDiscoverExtraTargetFiles_AppliesTargetFilters(t *testing.T) {
+	src, _ := setupExtrasTest(t, map[string]string{"index.md": "i", "draft.md": "d"})
+
+	files, warnings, err := DiscoverExtraTargetFiles(src, "", config.ExtraTargetConfig{Include: []string{"*.md", "*.txt"}, Exclude: []string{"draft*"}})
+
+	if err != nil || !slices.Equal(files, []string{"index.md"}) || !slices.Equal(warnings, []string{UnmatchedIncludeWarning("*.txt")}) {
+		t.Errorf("got files %v, warnings %v, err %v", files, warnings, err)
+	}
+}
+
 func filterTestExtra(tgt string, target config.ExtraTargetConfig) config.ExtraConfig {
 	target.Path = tgt
 	return config.ExtraConfig{Name: "docs", Targets: []config.ExtraTargetConfig{target}}

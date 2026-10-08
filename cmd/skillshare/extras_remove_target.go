@@ -191,11 +191,10 @@ func cmdExtrasRemoveTarget(args []string) error {
 }
 
 func managedExtraTargetFiles(target config.ExtraTargetConfig, sourceDir, extensionsDir string) (map[string]bool, error) {
-	files, err := sync.DiscoverExtraFiles(sourceDir)
+	files, _, err := sync.DiscoverExtraTargetFiles(sourceDir, "", target)
 	if err != nil {
 		return nil, err
 	}
-	files = sync.ExtraTargetFiles(files, target)
 
 	outputExt := ""
 	if target.Extension != "" {
