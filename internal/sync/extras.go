@@ -627,19 +627,17 @@ func ClearExtraTarget(file, sourceDir, targetPath, as, mode string, managedFiles
 // LinksTo reports whether link is a symlink to dir, comparing the link text
 // too, so a link whose folder has since moved or been deleted still counts.
 func LinksTo(link, dir string) bool {
-	dest, err := os.Readlink(link)
+	// ResolveLinkTarget also handles Windows junctions, which Readlink can't read.
+	dest, err := utils.ResolveLinkTarget(link)
 	if err != nil {
 		return false
 	}
-	if !filepath.IsAbs(dest) {
-		dest = filepath.Join(filepath.Dir(link), dest)
-	}
-	if filepath.Clean(dest) == filepath.Clean(dir) {
+	if abs, absErr := filepath.Abs(dir); absErr == nil && utils.PathsEqual(dest, filepath.Clean(abs)) {
 		return true
 	}
 	real, err := filepath.EvalSymlinks(link)
 	src, srcErr := filepath.EvalSymlinks(dir)
-	return err == nil && srcErr == nil && real == src
+	return err == nil && srcErr == nil && utils.PathsEqual(real, src)
 }
 
 func pruneExtraManagedFiles(targetPath string, managedFiles map[string]bool) (pruned int, errors []string) {
