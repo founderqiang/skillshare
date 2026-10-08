@@ -363,7 +363,6 @@ Thanks to everyone who helped shape skillshare.
 <a href="https://github.com/2BAB"><img src="https://github.com/2BAB.png" width="50" style="border-radius:50%" alt="2BAB"></a>
 <a href="https://github.com/zdlldz"><img src="https://github.com/zdlldz.png" width="50" style="border-radius:50%" alt="zdlldz"></a>
 <a href="https://github.com/elstiaan"><img src="https://github.com/elstiaan.png" width="50" style="border-radius:50%" alt="elstiaan"></a>
-<a href="https://github.com/EriaWalker"><img src="https://github.com/EriaWalker.png" width="50" style="border-radius:50%" alt="EriaWalker"></a>
 <a href="https://github.com/FaintFlower"><img src="https://github.com/FaintFlower.png" width="50" style="border-radius:50%" alt="FaintFlower"></a>
 <a href="https://github.com/yantinglin21"><img src="https://github.com/yantinglin21.png" width="50" style="border-radius:50%" alt="yantinglin21"></a>
 <a href="https://github.com/chung1912"><img src="https://github.com/chung1912.png" width="50" style="border-radius:50%" alt="chung1912"></a>
@@ -379,6 +378,8 @@ Thanks to everyone who helped shape skillshare.
 <a href="https://github.com/wuhaoyujerry"><img src="https://github.com/wuhaoyujerry.png" width="50" style="border-radius:50%" alt="wuhaoyujerry"></a>
 <a href="https://github.com/star-nebula"><img src="https://github.com/star-nebula.png" width="50" style="border-radius:50%" alt="star-nebula"></a>
 <a href="https://github.com/AdamMagued"><img src="https://github.com/AdamMagued.png" width="50" style="border-radius:50%" alt="AdamMagued"></a>
+<a href="https://github.com/mbury"><img src="https://github.com/mbury.png" width="50" style="border-radius:50%" alt="mbury"></a>
+<a href="https://github.com/483218131"><img src="https://github.com/483218131.png" width="50" style="border-radius:50%" alt="483218131"></a>
 
 ---
 
