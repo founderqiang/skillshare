@@ -21,7 +21,7 @@ skillshare target <name> --skills=false    # 停止同步 skills
 - 安裝新的 AI CLI 工具後新增 target
 - 移除不再使用的 target
 - 變更某個 target 的 sync 模式（merge、copy 或 symlink）
-- 變更某個 target 的命名方式（flat 或 standard）
+- 變更某個 target 的命名方式（flat、standard 或 prefixed）
 - 逐一調整各 target 的相容性，而非強制套用單一全域模式
 - 設定 include/exclude filters 以選擇性同步 skills
 - 某個工具已經會讀取另一個 target 的資料夾時，停止同步 skills 給它，但仍繼續管理它的 agents、MCP servers 與 instructions
@@ -192,8 +192,9 @@ skillshare sync  # 套用變更
 |--------|----------|
 | `flat` | 巢狀 skills 以 `__` 分隔符扁平化（例如 `frontend__dev`）。**預設。** |
 | `standard` | 直接使用 SKILL.md 的 `name` 欄位（例如 `dev`）。遵循 [Agent Skills spec](https://agentskills.io/specification)。 |
+| `prefixed` | 僅限 copy mode。與 `standard` 類似，但 tracked repo 內的 skill 會命名為 `<repo>-<name>`，資料夾名稱與複本的 `name:` 都是如此（例如 `mattpocock-skills-prototype`）。 |
 
-`target --target-naming` 控制 target 中 skill 目錄的命名方式。在 `standard` 模式下，名稱無效或衝突的 skills 會被警告並跳過。在 symlink 模式下會被忽略。
+`target --target-naming` 控制 target 中 skill 目錄的命名方式。在 `standard` 和 `prefixed` 模式下，名稱無效或衝突的 skills 會被警告並跳過。在 symlink 模式下會被忽略。除非 target 以 copy mode 同步 skills，否則 `--target-naming prefixed` 會被拒絕；當 target 使用 `prefixed` 時，`--mode` 也會拒絕離開 copy mode。見 [Target Naming](/docs/understand/sync-modes#target-naming)。
 
 ```bash
 # 將 target 設為 copy 模式（適合 Cursor、Copilot CLI 等）
@@ -316,7 +317,7 @@ skillshare target pi --skills=false
 |------|-------------|
 | `--mode, -m <mode>` | 設定 sync 模式（merge、copy 或 symlink） |
 | `--agent-mode <mode>` | 設定 agents 的 sync 模式（merge、copy 或 symlink） |
-| `--target-naming <naming>` | 設定 target 命名方式（flat 或 standard） |
+| `--target-naming <naming>` | 設定 target 命名方式（flat、standard 或 prefixed；prefixed 需要 copy mode） |
 | `--skills <true\|false>` | [開啟或關閉](#skills-off) skills 同步；也可寫成 `--skills=false` |
 | `--dry-run, -n` | 搭配 `--skills=false`，預覽會被移除的內容 |
 | `--add-include <pattern>` | 新增一個 include filter pattern |

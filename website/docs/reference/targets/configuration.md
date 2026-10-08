@@ -83,7 +83,7 @@ source: ~/.config/skillshare/skills
 # Default sync mode for new targets
 mode: merge
 
-# Default target naming (flat or standard)
+# Default target naming (flat, standard, or prefixed)
 # target_naming: flat
 
 # Targets (AI CLI skill directories)
@@ -294,8 +294,11 @@ target_naming: flat
 |-------|----------|
 | `flat` | Nested skills flattened with `__` separators (e.g. `frontend__dev`). **(default)** |
 | `standard` | Uses the SKILL.md `name` field directly (e.g. `dev`). Follows the [Agent Skills spec](https://agentskills.io/specification). |
+| `prefixed` | Copy mode only. Like `standard`, but a skill inside a tracked repo is named `<repo>-<name>`, both its folder and `name:` in the copy (e.g. `prototype` from `_mattpocock-skills` → `mattpocock-skills-prototype`). Other skills keep their name. See [Target Naming](/docs/understand/sync-modes#target-naming). |
 
-`include` / `exclude` keep matching the flat name (`frontend__dev`) in both modes, so under `standard` the filter differs from the folder `sync` creates — see [include / exclude](#include--exclude-target-filters).
+A target that resolves to `prefixed` in merge or symlink mode fails validation and is skipped by sync, because a link points at the source, where `name:` must not change.
+
+`include` / `exclude` keep matching the flat name (`frontend__dev`) in every naming, so under `standard` the filter differs from the folder `sync` creates — see [include / exclude](#include--exclude-target-filters).
 
 ### `targets`
 
@@ -647,7 +650,7 @@ projects:
     targets: [<target>, ...] # the tools used in this project
     skills:                  # present = sync skills; empty = all of them
       mode: <mode>
-      target_naming: <flat|standard>
+      target_naming: <flat|standard|prefixed>
       include: [<glob>, ...]
       exclude: [<glob>, ...]
     agents:                  # present = sync agents; empty = all of them

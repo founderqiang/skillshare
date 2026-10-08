@@ -231,7 +231,7 @@ targets:
 
 ---
 
-## Target の命名規則
+## Target の命名規則 {#target-naming}
 
 merge mode または copy mode を使うとき、target 内で Skill ディレクトリがどう命名されるかを制御します。
 
@@ -239,6 +239,7 @@ merge mode または copy mode を使うとき、target 内で Skill ディレ�
 |--------|------|
 | `flat`(デフォルト) | ネストした Skill は `__` 区切りでフラット化される: `frontend/dev` → `frontend__dev` |
 | `standard` | SKILL.md の `name` フィールドを使う: `frontend/dev` → `dev` |
+| `prefixed` | copy mode 専用。`standard` に tracked repo 名を前置する: `_mattpocock-skills/skills/prototype` → `mattpocock-skills-prototype` |
 
 グローバルまたは target ごとに設定します。
 
@@ -259,7 +260,26 @@ skillshare sync
 
 **Standard mode** は [Agent Skills specification](https://agentskills.io/specification) に従い、SKILL.md の `name` フィールドが親ディレクトリ名と一致することを要求します。有効な名前は最大 64 文字の小文字（どの文字体系でも可）、数字、単独のハイフンで構成され、`-` で始まったり終わったりしません。アンダースコアは使えません。名前が無効な Skill や名前の衝突は警告され、スキップされます。
 
-**移行**: `flat` から `standard` に切り替えると、既存の管理対象エントリはその場で自動的にリネームされます。ローカル Skill が既にそのベア名を占有している場合、レガシーの flat エントリは保持されます。
+**Prefixed mode** は、同じ名前の Skill を提供する tracked repo のためのものです。`standard` では、別々の repo にある 2 つの `prototype` Skill が衝突して両方ともスキップされますが、`prefixed` では tracked repo 内の各 Skill が `<repo>-<name>` になるため、両方がツールに届きます。`<repo>` は tracked repo フォルダー名から先頭の `_` を除き、小文字にし、それ以外の文字をすべて `-` に置き換えたものです。prefixed 名はフォルダー名として使われ、コピーされた `SKILL.md` の `name:` にも書き込まれます。source は変更されません。
+
+- 名前がすでに repo 名で始まっている場合は、再度プレフィックスを付けません: `_bmad/skills/bmad-ux` は `bmad-ux` のままです。
+- tracked repo の外にある Skill は名前をそのまま保ちます。
+- source の Skill は、まず `standard` のチェックを通過する必要があります。prefixed 名が 64 文字を超える場合は警告付きでスキップされ、それでも名前が衝突する場合は `standard` と同様にスキップされます。
+- より短いプレフィックスにしたい場合は、repo を短い名前で track します: `skillshare install <repo> --track --name mp` は `mp-prototype` になります。
+- 兄弟 Skill への相対リンク（`../other-skill/`）は書き換えられません。これは copy mode の `flat` と同じです。
+- この名前がツールに表示される名前になります。Claude Code ではスラッシュコマンドになります。例: `/mattpocock-skills-prototype`。
+
+`prefixed` は copy mode が必要です。merge のリンクは source を指しており、そこでは `name:` を変更できないためです。merge mode または symlink mode で `prefixed` に解決される Target は、バリデーションに失敗し、sync でスキップされます。
+
+```yaml
+targets:
+  universal:
+    skills:
+      mode: copy
+      target_naming: prefixed
+```
+
+**移行**: `flat`、`standard`、`prefixed` の間で切り替えると、既存の管理対象エントリはその場でリネームされます。copy mode では manifest が各コピーを作成した naming を記録しているため、source が変更されていなくても、リネームされたコピーは再度コピーされ、その `name:` は新しい naming に一致します。ローカル Skill が既に新しい名前を占有している場合、古い管理対象エントリは保持されます。
 
 **Symlink mode**: `target_naming` は無視されます — ディレクトリ全体がそのままリンクされます。
 

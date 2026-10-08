@@ -21,7 +21,7 @@ skillshare target <name> --skills=false    # Stop syncing skills
 - 새 AI CLI 도구를 설치한 후 새 target을 추가할 때
 - 더 이상 사용하지 않는 target을 제거할 때
 - target의 sync mode(merge, copy, symlink)를 변경할 때
-- target의 naming(flat 또는 standard)을 변경할 때
+- target의 naming(flat, standard 또는 prefixed)을 변경할 때
 - 하나의 global mode를 강제하는 대신 target별로 호환성을 조정할 때
 - 선택적 skill 동기화를 위한 include/exclude 필터를 설정할 때
 - 다른 target의 폴더를 이미 읽는 도구에 skill 동기화를 중지하면서, agents, MCP 서버, 지침은 계속 관리하고 싶을 때
@@ -192,8 +192,9 @@ skillshare sync  # Apply changes
 |--------|----------|
 | `flat` | 중첩된 skill이 `__` 구분자로 평탄화됩니다(예: `frontend__dev`). **기본값.** |
 | `standard` | SKILL.md의 `name` 필드를 그대로 사용합니다(예: `dev`). [Agent Skills spec](https://agentskills.io/specification)을 따릅니다. |
+| `prefixed` | Copy mode 전용. `standard`와 같지만 tracked repo 안의 skill은 폴더 이름과 복사본의 `name:` 모두 `<repo>-<name>`으로 이름이 지정됩니다(예: `mattpocock-skills-prototype`). |
 
-`target --target-naming`은 target에서 skill 디렉터리의 이름 지정 방식을 제어합니다. `standard` mode에서는 이름이 유효하지 않거나 충돌하는 skill에 대해 경고가 표시되고 건너뜁니다. symlink mode에서는 무시됩니다.
+`target --target-naming`은 target에서 skill 디렉터리의 이름 지정 방식을 제어합니다. `standard` 및 `prefixed` mode에서는 이름이 유효하지 않거나 충돌하는 skill에 대해 경고가 표시되고 건너뜁니다. symlink mode에서는 무시됩니다. target이 copy mode로 skills를 sync하지 않으면 `--target-naming prefixed`는 거부되며, target이 `prefixed`를 사용하는 동안 `--mode`로 copy mode를 벗어나는 것도 거부됩니다. [Target Naming](/docs/understand/sync-modes#target-naming) 참고.
 
 ```bash
 # Set target to copy mode (for Cursor, Copilot CLI, etc.)
@@ -316,7 +317,7 @@ skills를 끄면 config에 `skills.enabled: false`가 저장되고, 이어서 �
 |------|-------------|
 | `--mode, -m <mode>` | sync mode 설정(merge, copy, symlink) |
 | `--agent-mode <mode>` | agents sync mode 설정(merge, copy, symlink) |
-| `--target-naming <naming>` | target naming 설정(flat 또는 standard) |
+| `--target-naming <naming>` | target naming 설정(flat, standard 또는 prefixed; prefixed는 copy mode 필요) |
 | `--skills <true\|false>` | skills 동기화 [켜기 또는 끄기](#skills-off). `--skills=false` 형식도 가능 |
 | `--dry-run, -n` | `--skills=false`와 함께 사용 시 제거될 항목 미리보기 |
 | `--add-include <pattern>` | include 필터 패턴 추가 |

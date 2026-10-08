@@ -21,7 +21,7 @@ skillshare target <name> --skills=false    # Skill の同期を停止
 - 新しい AI CLI ツールをインストールした後に新しい Target を追加する
 - 使わなくなった Target を削除する
 - Target の sync モード（merge、copy、または symlink）を変更する
-- Target の命名方式（flat または standard）を変更する
+- Target の命名方式（flat、standard、または prefixed）を変更する
 - 1 つのグローバルモードを強制するのではなく、Target ごとに互換性を調整する
 - 選択的な Skill 同期のための include/exclude フィルタを設定する
 - 別の Target のフォルダーをすでに読んでいるツールへの Skill 同期を停止し、その agents、MCP サーバー、instructions は引き続き管理する
@@ -192,8 +192,9 @@ skillshare sync  # 変更を適用
 |--------|--------|
 | `flat` | ネストした Skill を `__` 区切りでフラット化する（例: `frontend__dev`）。**デフォルト。** |
 | `standard` | SKILL.md の `name` フィールドをそのまま使用する（例: `dev`）。[Agent Skills spec](https://agentskills.io/specification) に準拠する。 |
+| `prefixed` | copy mode 専用。`standard` と同じだが、tracked repo 内の Skill はフォルダー名とコピー先の `name:` の両方が `<repo>-<name>` になる（例: `mattpocock-skills-prototype`）。 |
 
-`target --target-naming` は Target 内で Skill ディレクトリがどのように命名されるかを制御します。`standard` モードでは、無効または衝突する名前を持つ Skill は警告付きでスキップされます。symlink モードでは無視されます。
+`target --target-naming` は Target 内で Skill ディレクトリがどのように命名されるかを制御します。`standard` および `prefixed` モードでは、無効または衝突する名前を持つ Skill は警告付きでスキップされます。symlink モードでは無視されます。`--target-naming prefixed` は、Target が copy mode で Skill を sync していない限り拒否され、Target が `prefixed` を使っている間は `--mode` で copy mode から外れることも拒否されます。[Target の命名規則](/docs/understand/sync-modes#target-naming) を参照してください。
 
 ```bash
 # Target を copy モードに設定する（Cursor、Copilot CLI などに向けて）
@@ -316,7 +317,7 @@ Web ダッシュボードでは、Target の Skills タブにある **Skills の
 |------|-------------|
 | `--mode, -m <mode>` | sync モードを設定（merge、copy、または symlink） |
 | `--agent-mode <mode>` | agent の sync モードを設定（merge、copy、または symlink） |
-| `--target-naming <naming>` | Target の命名方式を設定（flat または standard） |
+| `--target-naming <naming>` | Target の命名方式を設定（flat、standard、または prefixed。prefixed は copy mode が必要） |
 | `--skills <true\|false>` | Skill の同期を[オンまたはオフ](#skills-off)にする。`--skills=false` の形でも指定可能 |
 | `--dry-run, -n` | `--skills=false` と併用し、削除される内容をプレビュー |
 | `--add-include <pattern>` | include フィルタパターンを追加 |

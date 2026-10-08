@@ -230,7 +230,7 @@ targets:
 
 ---
 
-## Target 命名
+## Target 命名 {#target-naming}
 
 控制在使用 merge 或 copy 模式时，target 中的 skill 目录如何命名。
 
@@ -238,6 +238,7 @@ targets:
 |--------|------|
 | `flat`（默认） | 嵌套 skill 用 `__` 分隔符展平：`frontend/dev` → `frontend__dev` |
 | `standard` | 使用 SKILL.md 的 `name` 字段：`frontend/dev` → `dev` |
+| `prefixed` | 仅限 copy 模式。在 `standard` 基础上加上 tracked repo 名称作为前缀：`_mattpocock-skills/skills/prototype` → `mattpocock-skills-prototype` |
 
 可全局设置，也可按 target 设置：
 
@@ -258,7 +259,26 @@ skillshare sync
 
 **Standard 模式**遵循 [Agent Skills specification](https://agentskills.io/specification)，该规范要求 SKILL.md 的 `name` 字段与父目录名一致。有效名称最多 64 个字符，只能包含小写字母（任何文字系统）、数字和单个连字符，且不能以 `-` 开头或结尾；不允许使用下划线。名称无效或存在名称冲突的 skill 会收到警告并被跳过。
 
-**迁移**：从 `flat` 切换到 `standard` 会自动就地重命名现有受管理的条目。如果某个本地 skill 已经占用了对应的裸名称，旧的 flat 条目会被保留。
+**Prefixed 模式**适用于包含同名 skill 的 tracked repo。在 `standard` 下，来自不同 repo 的两个 `prototype` skill 会冲突并都被跳过；在 `prefixed` 下，tracked repo 内的每个 skill 都会变成 `<repo>-<name>`，因此两者都能到达工具。`<repo>` 是 tracked repo 文件夹名去掉开头的 `_`、转为小写，并把其他所有字符替换为 `-` 的结果。带前缀的名称既用作文件夹名，也会写入复制出的 `SKILL.md` 的 `name:`；source 不会被修改。
+
+- 名称已经以 repo 名开头时不会重复加前缀：`_bmad/skills/bmad-ux` 仍是 `bmad-ux`。
+- 不在 tracked repo 内的 skill 保持原名。
+- source skill 必须先通过 `standard` 检查。带前缀的名称超过 64 个字符时会收到警告并被跳过，仍然冲突的名称与 `standard` 一样被跳过。
+- 想要更短的前缀，可以用较短的名称 track repo：`skillshare install <repo> --track --name mp` 会得到 `mp-prototype`。
+- 指向同级 skill 的相对链接（`../other-skill/`）不会被改写，与 copy 模式下的 `flat` 相同。
+- 该名称就是工具中显示的名称；在 Claude Code 中它是 slash command，例如 `/mattpocock-skills-prototype`。
+
+`prefixed` 需要 copy 模式，因为 merge 链接指向 source，而 source 中的 `name:` 不能被修改。在 merge 或 symlink 模式下解析为 `prefixed` 的 target 会校验失败，并被 sync 跳过。
+
+```yaml
+targets:
+  universal:
+    skills:
+      mode: copy
+      target_naming: prefixed
+```
+
+**迁移**：在 `flat`、`standard` 和 `prefixed` 之间切换，会就地重命名现有受管理的条目。在 copy 模式下，manifest 会记录每个副本是由哪种命名方式生成的，因此即使 source 没有变化，被重命名的副本也会重新复制，使其 `name:` 与新的命名方式一致。如果某个本地 skill 已经占用了新名称，旧的受管理条目会被保留。
 
 **Symlink 模式**：`target_naming` 会被忽略 — 整个目录会按原样被链接。
 

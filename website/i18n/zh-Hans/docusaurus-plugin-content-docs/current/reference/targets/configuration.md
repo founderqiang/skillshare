@@ -83,7 +83,7 @@ source: ~/.config/skillshare/skills
 # 新 Target 的默认 Sync 模式
 mode: merge
 
-# 默认 Target 命名方式（flat 或 standard）
+# 默认 Target 命名方式（flat、standard 或 prefixed）
 # target_naming: flat
 
 # Targets（AI CLI Skill 目录）
@@ -294,8 +294,11 @@ target_naming: flat
 |-------|----------|
 | `flat` | 嵌套 Skill 用 `__` 分隔符扁平化（例如 `frontend__dev`）。**（默认）** |
 | `standard` | 直接使用 SKILL.md 的 `name` 字段（例如 `dev`）。遵循 [Agent Skills 规范](https://agentskills.io/specification)。 |
+| `prefixed` | 仅限 copy 模式。与 `standard` 类似，但 tracked repo 内的 Skill 会命名为 `<repo>-<name>`，副本的文件夹名和 `name:` 都是如此（例如 `_mattpocock-skills` 中的 `prototype` → `mattpocock-skills-prototype`）。其他 Skill 保持原名。见 [Target 命名](/docs/understand/sync-modes#target-naming)。 |
 
-两种模式下，`include` / `exclude` 都始终匹配扁平化名称（`frontend__dev`），所以在 `standard` 下 filter 用的名称和 `sync` 创建的目录名不同——见 [include / exclude](#include--exclude-target-filters)。
+在 merge 或 symlink 模式下解析为 `prefixed` 的 target 会校验失败，并被 sync 跳过，因为链接指向 source，而 source 中的 `name:` 不能被修改。
+
+无论哪种命名方式，`include` / `exclude` 都始终匹配扁平化名称（`frontend__dev`），所以在 `standard` 下 filter 用的名称和 `sync` 创建的目录名不同——见 [include / exclude](#include--exclude-target-filters)。
 
 ### `targets`
 
@@ -637,7 +640,7 @@ projects:
     targets: [<target>, ...] # 该项目所用的工具
     skills:                  # 存在即 sync Skill；留空则同步全部
       mode: <mode>
-      target_naming: <flat|standard>
+      target_naming: <flat|standard|prefixed>
       include: [<glob>, ...]
       exclude: [<glob>, ...]
     agents:                  # 存在即 sync Agent；留空则同步全部

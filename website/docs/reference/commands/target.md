@@ -21,7 +21,7 @@ skillshare target <name> --skills=false    # Stop syncing skills
 - Add a new AI CLI target after installing a new tool
 - Remove a target you no longer use
 - Change sync mode (merge, copy, or symlink) for a target
-- Change target naming (flat or standard) for a target
+- Change target naming (flat, standard, or prefixed) for a target
 - Tune compatibility target-by-target instead of forcing one global mode
 - Set up include/exclude filters for selective skill syncing
 - Stop syncing skills to a tool that already reads another target's folder, while keeping its agents, MCP servers and instructions managed
@@ -192,8 +192,9 @@ skillshare sync  # Apply changes
 |--------|----------|
 | `flat` | Nested skills flattened with `__` separators (e.g. `frontend__dev`). **Default.** |
 | `standard` | Uses SKILL.md `name` field directly (e.g. `dev`). Follows the [Agent Skills spec](https://agentskills.io/specification). |
+| `prefixed` | Copy mode only. Like `standard`, but a skill inside a tracked repo is named `<repo>-<name>`, in the folder and in the copy's `name:` (e.g. `mattpocock-skills-prototype`). |
 
-`target --target-naming` controls how skill directories are named in targets. In `standard` mode, skills with invalid or colliding names are warned and skipped. Ignored in symlink mode.
+`target --target-naming` controls how skill directories are named in targets. In `standard` and `prefixed` mode, skills with invalid or colliding names are warned and skipped. Ignored in symlink mode. `--target-naming prefixed` is refused unless the target syncs skills in copy mode, and `--mode` refuses to leave copy mode while the target uses `prefixed`. See [Target Naming](/docs/understand/sync-modes#target-naming).
 
 ```bash
 # Set target to copy mode (for Cursor, Copilot CLI, etc.)
@@ -316,7 +317,7 @@ In the web dashboard, use **Stop syncing skills** on the target's Skills tab. Be
 |------|-------------|
 | `--mode, -m <mode>` | Set sync mode (merge, copy, or symlink) |
 | `--agent-mode <mode>` | Set agents sync mode (merge, copy, or symlink) |
-| `--target-naming <naming>` | Set target naming (flat or standard) |
+| `--target-naming <naming>` | Set target naming (flat, standard, or prefixed; prefixed needs copy mode) |
 | `--skills <true\|false>` | Turn skills sync [on or off](#skills-off); also `--skills=false` |
 | `--dry-run, -n` | With `--skills=false`, preview what would be removed |
 | `--add-include <pattern>` | Add an include filter pattern |
