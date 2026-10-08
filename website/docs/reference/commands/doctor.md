@@ -151,7 +151,7 @@ Resolution: disable one of the overlapping targets, or set a distinct path with 
 When the targets sharing a path have different `include` or `exclude` filters, each sync adds what one target wants and prunes what another filters out, so the folder never settles and `sync` keeps showing the same pending changes. Doctor marks these and suggests turning skills off for all but one target (`universal` when it is one of them) instead of removing a target:
 
 ```text
-! Shared path ~/.agents/skills ← codex, universal (different filters, so they undo each other on every sync)
+! Shared path ~/.agents/skills ← codex, universal (different settings, so they undo each other on every sync)
   suggestion: Keep universal syncing skills to ~/.agents/skills and stop the rest with `skillshare target codex --skills=false`.
 ```
 

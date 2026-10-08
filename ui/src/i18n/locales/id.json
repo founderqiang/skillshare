@@ -1899,7 +1899,7 @@
   "sync.local.hint": "Sinkronisasi tidak menyentuhnya. Kumpulkan membawanya ke sumber Anda.",
   "sync.local.collect": "Kumpulkan",
   "sync.forceHint": "Ganti file yang diedit di dalam target",
-  "sync.folderConflict.text": "{names} menyinkronkan skill ke folder yang sama {path} dengan filter berbeda, sehingga setiap sinkronisasi membatalkan yang lain.",
+  "sync.folderConflict.text": "{names} menyinkronkan skill ke folder yang sama {path} dengan pengaturan berbeda, sehingga setiap sinkronisasi membatalkan yang lain.",
   "sync.folderConflict.stop": "Berhenti menyinkronkan skill ke {name}",
   "sync.error.showDetails": "Tampilkan diagnostik",
   "sync.error.hideDetails": "Sembunyikan diagnostik",

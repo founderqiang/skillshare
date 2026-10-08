@@ -151,7 +151,7 @@ Doctor 會在兩類重複 skill 風險到達 runtime picker 之前先標示出�
 若共用路徑的 targets 其 `include` 或 `exclude` 篩選不同，每次同步都會加入一個 target 要的內容、再刪掉另一個 target 過濾掉的內容，資料夾永遠不會穩定，`sync` 也會一直顯示同樣的待同步變更。Doctor 會標出這種情況，並建議只保留一個 target（若其中有 `universal` 就保留它）、其他的關閉 skills 同步，而不是移除 target：
 
 ```text
-! Shared path ~/.agents/skills ← codex, universal (different filters, so they undo each other on every sync)
+! Shared path ~/.agents/skills ← codex, universal (different settings, so they undo each other on every sync)
   suggestion: Keep universal syncing skills to ~/.agents/skills and stop the rest with `skillshare target codex --skills=false`.
 ```
 

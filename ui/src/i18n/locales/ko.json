@@ -1899,7 +1899,7 @@
   "sync.local.hint": "동기화는 이 항목을 건드리지 않습니다. 수집하면 소스로 가져옵니다.",
   "sync.local.collect": "수집",
   "sync.forceHint": "대상 안에서 수정된 파일을 교체합니다",
-  "sync.folderConflict.text": "{names}이(가) 같은 폴더 {path}에 서로 다른 필터로 Skills를 동기화해서, 동기화할 때마다 서로의 결과를 되돌립니다.",
+  "sync.folderConflict.text": "{names}이(가) 같은 폴더 {path}에 서로 다른 설정으로 Skills를 동기화해서, 동기화할 때마다 서로의 결과를 되돌립니다.",
   "sync.folderConflict.stop": "{name}의 Skills 동기화 중지",
   "sync.error.showDetails": "진단 표시",
   "sync.error.hideDetails": "진단 숨기기",

@@ -44,7 +44,7 @@ describe('Sync page folder conflicts', () => {
         <QueryClientProvider client={new QueryClient()}><I18nProvider><ToastProvider><SyncPage /></ToastProvider></I18nProvider></QueryClientProvider>
       </MemoryRouter>,
     );
-    expect(await screen.findByText(/codex and universal sync skills to the same folder .*\.agents\/skills with different filters, so each sync undoes the other\./)).toBeInTheDocument();
+    expect(await screen.findByText(/codex and universal sync skills to the same folder .*\.agents\/skills with different settings, so each sync undoes the other\./)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Stop syncing skills for codex' }));
     await user.click(await screen.findByRole('button', { name: 'Stop syncing' }));
     await waitFor(() => expect(api.updateTarget).toHaveBeenCalledWith('codex', { skills_enabled: false }));

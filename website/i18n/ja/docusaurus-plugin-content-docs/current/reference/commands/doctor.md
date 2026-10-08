@@ -151,7 +151,7 @@ Doctor は、ランタイムのピッカーに到達する前に、Skill 重複�
 パスを共有する Target 同士で `include`、`exclude` のフィルターが異なる場合、同期のたびに一方の Target が必要とするものが追加され、もう一方がフィルターで除外したものが削除されます。そのためフォルダが落ち着かず、`sync` には同じ保留中の変更が表示され続けます。Doctor はこのケースを示し、Target を削除する代わりに 1 つ（`universal` が含まれていればそれ）を残して残りの Skills 同期をオフにするよう提案します:
 
 ```text
-! Shared path ~/.agents/skills ← codex, universal (different filters, so they undo each other on every sync)
+! Shared path ~/.agents/skills ← codex, universal (different settings, so they undo each other on every sync)
   suggestion: Keep universal syncing skills to ~/.agents/skills and stop the rest with `skillshare target codex --skills=false`.
 ```
 

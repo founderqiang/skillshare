@@ -98,8 +98,8 @@ func SkillsPathKeptBy(targets map[string]TargetConfig, name string, leaving map[
 }
 
 // SkillsFolderConflict is a skills folder that two or more targets with skills
-// on sync into with different include or exclude filters, so each sync
-// undoes the others' links. Keep is the target to leave on; Stop the rest.
+// on sync into with different include or exclude filters, mode or target
+// naming, so each sync undoes the others' links. Keep is the target to leave on; Stop the rest.
 type SkillsFolderConflict struct {
 	Path    string   `json:"path"`
 	Targets []string `json:"targets"`
@@ -108,10 +108,11 @@ type SkillsFolderConflict struct {
 }
 
 // SkillsFolderConflicts returns the shared skills folders whose targets'
-// filters differ, sorted by path. Targets with identical settings agree on
-// the folder's contents and are not a conflict. universal is kept when it is
-// in the group, otherwise the alphabetically first target.
-func SkillsFolderConflicts(targets map[string]TargetConfig) []SkillsFolderConflict {
+// filters, mode or target naming differ, sorted by path. defaultMode is the
+// global mode a target without its own inherits. Targets with identical
+// settings agree on the folder's contents and are not a conflict. universal
+// is kept when it is in the group, otherwise the alphabetically first target.
+func SkillsFolderConflicts(targets map[string]TargetConfig, defaultMode string) []SkillsFolderConflict {
 	byFolder := make(map[string][]string)
 	for name, tc := range targets {
 		if !tc.SkillsConfig().IsEnabled() {
@@ -132,7 +133,7 @@ func SkillsFolderConflicts(targets map[string]TargetConfig) []SkillsFolderConfli
 		differ := false
 		for _, n := range names[1:] {
 			other := targets[n]
-			if !sameSkillsSettings(first.SkillsConfig(), other.SkillsConfig()) {
+			if !sameSkillsSettings(first.SkillsConfig(), other.SkillsConfig(), defaultMode) {
 				differ = true
 				break
 			}
@@ -156,8 +157,22 @@ func SkillsFolderConflicts(targets map[string]TargetConfig) []SkillsFolderConfli
 	return out
 }
 
-func sameSkillsSettings(a, b ResourceTargetConfig) bool {
-	return sameSet(a.Include, b.Include) && sameSet(a.Exclude, b.Exclude)
+func sameSkillsSettings(a, b ResourceTargetConfig, defaultMode string) bool {
+	return effectiveMode(a.Mode, defaultMode) == effectiveMode(b.Mode, defaultMode) &&
+		EffectiveTargetNaming(a.TargetNaming) == EffectiveTargetNaming(b.TargetNaming) &&
+		sameSet(a.Include, b.Include) && sameSet(a.Exclude, b.Exclude)
+}
+
+// effectiveMode mirrors the sync package's mode resolution: the target's own,
+// then the global default, then merge.
+func effectiveMode(mode, defaultMode string) string {
+	if mode != "" {
+		return mode
+	}
+	if defaultMode != "" {
+		return defaultMode
+	}
+	return "merge"
 }
 
 func sameSet(a, b []string) bool {

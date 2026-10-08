@@ -126,7 +126,7 @@ skillshare restore <target>
 **原因：** 两个 Target 以不同的 `include` 或 `exclude` 过滤器把 skills 同步到同一个文件夹。每次 sync 都会加入其中一个 Target 需要的内容，又移除另一个 Target 过滤掉的内容，所以这个文件夹永远无法稳定下来。`sync` 会指出是哪两个 Target：
 
 ```
-! codex and universal sync skills to ~/.agents/skills with different filters, so each sync undoes the other
+! codex and universal sync skills to ~/.agents/skills with different settings, so each sync undoes the other
   keep one: skillshare target codex --skills=false
 ```
 

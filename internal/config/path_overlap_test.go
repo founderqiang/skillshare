@@ -67,7 +67,7 @@ func TestSkillsFolderConflicts_DifferentFilters(t *testing.T) {
 		"universal": {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills", Exclude: []string{"feature-radar*"}}},
 		"codex":     {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills/"}},
 		"claude":    {Skills: &ResourceTargetConfig{Path: "/tmp/claude/skills"}},
-	})
+	}, "")
 	want := []SkillsFolderConflict{{Path: "/tmp/agents/skills", Targets: []string{"codex", "universal"}, Keep: "universal", Stop: []string{"codex"}}}
 	if !slices.EqualFunc(got, want, conflictEqual) {
 		t.Errorf("SkillsFolderConflicts = %+v, want %+v", got, want)
@@ -78,7 +78,7 @@ func TestSkillsFolderConflicts_SameSettingsNoConflict(t *testing.T) {
 	got := SkillsFolderConflicts(map[string]TargetConfig{
 		"universal": {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills", Include: []string{"a", "b"}}},
 		"codex":     {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills", Include: []string{"b", "a"}}},
-	})
+	}, "")
 	if len(got) != 0 {
 		t.Errorf("expected no conflict, got %+v", got)
 	}
@@ -89,10 +89,52 @@ func TestSkillsFolderConflicts_DifferentFiltersKeepsFirstName(t *testing.T) {
 		"warp":  {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills", Include: []string{"x*"}}},
 		"amp":   {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills"}},
 		"witsy": {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills"}},
-	})
+	}, "")
 	want := []SkillsFolderConflict{{Path: "/tmp/agents/skills", Targets: []string{"amp", "warp", "witsy"}, Keep: "amp", Stop: []string{"warp", "witsy"}}}
 	if !slices.EqualFunc(got, want, conflictEqual) {
 		t.Errorf("SkillsFolderConflicts = %+v, want %+v", got, want)
+	}
+}
+
+func TestSkillsFolderConflicts_DifferentTargetNaming(t *testing.T) {
+	got := SkillsFolderConflicts(map[string]TargetConfig{
+		"aflat": {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills", Mode: "merge", TargetNaming: "flat"}},
+		"bstd":  {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills", Mode: "merge", TargetNaming: "standard"}},
+	}, "")
+	want := []SkillsFolderConflict{{Path: "/tmp/agents/skills", Targets: []string{"aflat", "bstd"}, Keep: "aflat", Stop: []string{"bstd"}}}
+	if !slices.EqualFunc(got, want, conflictEqual) {
+		t.Errorf("SkillsFolderConflicts = %+v, want %+v", got, want)
+	}
+}
+
+func TestSkillsFolderConflicts_DifferentMode(t *testing.T) {
+	got := SkillsFolderConflicts(map[string]TargetConfig{
+		"amerge": {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills", Mode: "merge"}},
+		"bcopy":  {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills", Mode: "copy"}},
+	}, "")
+	want := []SkillsFolderConflict{{Path: "/tmp/agents/skills", Targets: []string{"amerge", "bcopy"}, Keep: "amerge", Stop: []string{"bcopy"}}}
+	if !slices.EqualFunc(got, want, conflictEqual) {
+		t.Errorf("SkillsFolderConflicts = %+v, want %+v", got, want)
+	}
+}
+
+func TestSkillsFolderConflicts_UnsetEqualsDefault(t *testing.T) {
+	got := SkillsFolderConflicts(map[string]TargetConfig{
+		"unset":    {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills"}},
+		"explicit": {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills", Mode: "merge", TargetNaming: "flat"}},
+	}, "")
+	if len(got) != 0 {
+		t.Errorf("expected no conflict, got %+v", got)
+	}
+}
+
+func TestSkillsFolderConflicts_UnsetModeInheritsDefault(t *testing.T) {
+	got := SkillsFolderConflicts(map[string]TargetConfig{
+		"unset":    {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills"}},
+		"explicit": {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills", Mode: "copy"}},
+	}, "copy")
+	if len(got) != 0 {
+		t.Errorf("expected no conflict, got %+v", got)
 	}
 }
 
@@ -100,7 +142,7 @@ func TestSkillsFolderConflicts_IgnoresSkillsOff(t *testing.T) {
 	got := SkillsFolderConflicts(map[string]TargetConfig{
 		"universal": {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills", Exclude: []string{"x"}}},
 		"codex":     disabledAt("/tmp/agents/skills"),
-	})
+	}, "")
 	if len(got) != 0 {
 		t.Errorf("expected no conflict with skills off, got %+v", got)
 	}

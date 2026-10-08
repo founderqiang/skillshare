@@ -280,7 +280,7 @@ targets:
 }
 
 // TestSync_SharedPath_DifferentFiltersWarns covers two targets sharing a
-// skills folder with different filters: each sync undoes the other, so sync
+// skills folder with different settings: each sync undoes the other, so sync
 // names them and says how to keep one.
 func TestSync_SharedPath_DifferentFiltersWarns(t *testing.T) {
 	sb := testutil.NewSandbox(t)
@@ -305,7 +305,7 @@ targets:
 
 	result := sb.RunCLI("sync")
 	result.AssertSuccess(t)
-	result.AssertOutputContains(t, "codex and universal sync skills to ~/.agents/skills with different filters, so each sync undoes the other")
+	result.AssertOutputContains(t, "codex and universal sync skills to ~/.agents/skills with different settings, so each sync undoes the other")
 	result.AssertOutputContains(t, "keep one: skillshare target codex --skills=false")
 	result.AssertOutputNotContains(t, "Skill path overlap")
 }

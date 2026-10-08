@@ -1899,7 +1899,7 @@
   "sync.local.hint": "同步不会动它们，收集可以将其纳入来源。",
   "sync.local.collect": "收集",
   "sync.forceHint": "替换在目标中修改过的文件",
-  "sync.folderConflict.text": "{names} 同步到同一个文件夹 {path}，但筛选不同，每次同步都会互相加回、删掉。",
+  "sync.folderConflict.text": "{names} 同步到同一个文件夹 {path}，但设置不同，每次同步都会互相加回、删掉。",
   "sync.folderConflict.stop": "停止同步 {name} 的 Skills",
   "sync.error.showDetails": "显示诊断信息",
   "sync.error.hideDetails": "隐藏诊断信息",

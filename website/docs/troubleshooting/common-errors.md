@@ -126,7 +126,7 @@ skillshare restore <target>
 **Cause:** Two targets sync skills into the same folder with different `include` or `exclude` filters. Each sync adds what one target wants and removes what the other filters out, so the folder never settles. `sync` names them:
 
 ```
-! codex and universal sync skills to ~/.agents/skills with different filters, so each sync undoes the other
+! codex and universal sync skills to ~/.agents/skills with different settings, so each sync undoes the other
   keep one: skillshare target codex --skills=false
 ```
 

@@ -1899,7 +1899,7 @@
   "sync.local.hint": "A sincronização não mexe neles. Coletar traz para a sua origem.",
   "sync.local.collect": "Coletar",
   "sync.forceHint": "Substituir arquivos editados dentro de um destino",
-  "sync.folderConflict.text": "{names} sincronizam skills na mesma pasta {path} com filtros diferentes, então cada sincronização desfaz a outra.",
+  "sync.folderConflict.text": "{names} sincronizam skills na mesma pasta {path} com configurações diferentes, então cada sincronização desfaz a outra.",
   "sync.folderConflict.stop": "Parar de sincronizar skills com {name}",
   "sync.error.showDetails": "Mostrar diagnóstico",
   "sync.error.hideDetails": "Ocultar diagnóstico",

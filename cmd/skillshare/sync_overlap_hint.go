@@ -20,8 +20,8 @@ func printSyncOverlapHint(targets map[string]config.TargetConfig, isProject, jso
 		return
 	}
 	explained := map[string]bool{}
-	for _, c := range config.SkillsFolderConflicts(targets) {
-		ui.Warning("%s sync skills to %s with different filters, so each sync undoes the other",
+	for _, c := range config.SkillsFolderConflicts(targets, defaultMode) {
+		ui.Warning("%s sync skills to %s with different settings, so each sync undoes the other",
 			joinAnd(c.Targets), shortenPath(c.Path))
 		for _, name := range c.Stop {
 			fmt.Println(ui.DimText("  keep one: " + skillsOffCommand(name, isProject)))
