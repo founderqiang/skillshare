@@ -67,6 +67,8 @@ export interface Target {
   skillsReadFrom?: string[];
   /** Targets with skills off that read this target's skills folder. */
   skillsAlsoReadBy?: string[];
+  /** Other targets with skills on that write to this target's skills folder. */
+  skillsSharedWith?: string[];
 }
 
 export interface SkillsDetach {

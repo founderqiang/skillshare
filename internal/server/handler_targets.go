@@ -49,6 +49,9 @@ type targetItem struct {
 	// skills off whose tool reads this target's folder.
 	SkillsReadFrom   []string `json:"skillsReadFrom,omitempty"`
 	SkillsAlsoReadBy []string `json:"skillsAlsoReadBy,omitempty"`
+	// SkillsSharedWith names the other targets with skills on that write to this
+	// target's skills folder, so the page can warn when their settings differ.
+	SkillsSharedWith []string `json:"skillsSharedWith,omitempty"`
 }
 
 var removeTargetPath = os.Remove
@@ -172,6 +175,7 @@ func (s *Server) handleListTargets(w http.ResponseWriter, r *http.Request) {
 			item.Status = status.String()
 		}
 		item.SkillsAlsoReadBy = config.SkillsAlsoReadBy(targets, name, projectRoot)
+		item.SkillsSharedWith = config.SkillsSharedWith(targets, name)
 
 		var agentSummary *targetsummary.AgentSummary
 		if isProjectMode {

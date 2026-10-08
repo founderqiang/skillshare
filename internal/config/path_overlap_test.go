@@ -171,3 +171,21 @@ func TestSkillsFolderConflicts_IgnoresSkillsOff(t *testing.T) {
 func conflictEqual(a, b SkillsFolderConflict) bool {
 	return filepath.ToSlash(a.Path) == filepath.ToSlash(b.Path) && a.Keep == b.Keep && slices.Equal(a.Targets, b.Targets) && slices.Equal(a.Stop, b.Stop)
 }
+
+func TestSkillsSharedWith(t *testing.T) {
+	targets := map[string]TargetConfig{
+		"universal": {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills"}},
+		"codex":     {Skills: &ResourceTargetConfig{Path: "/tmp/agents/skills/"}},
+		"off":       disabledAt("/tmp/agents/skills"),
+		"claude":    {Skills: &ResourceTargetConfig{Path: "/tmp/claude/skills"}},
+	}
+	if got := SkillsSharedWith(targets, "universal"); !slices.Equal(got, []string{"codex"}) {
+		t.Errorf("SkillsSharedWith(universal) = %v, want [codex]", got)
+	}
+	if got := SkillsSharedWith(targets, "off"); got != nil {
+		t.Errorf("SkillsSharedWith(off) = %v, want nil for a target with skills off", got)
+	}
+	if got := SkillsSharedWith(targets, "claude"); got != nil {
+		t.Errorf("SkillsSharedWith(claude) = %v, want nil", got)
+	}
+}
