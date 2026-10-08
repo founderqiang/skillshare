@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"skillshare/internal/backup"
@@ -48,6 +49,17 @@ type syncFailure struct {
 	Error    string `json:"error"`
 	Message  string `json:"message"`
 	Conflict bool   `json:"conflict,omitempty"` // a symlink points elsewhere; force replaces it
+}
+
+// unmatchedInclude is a target whose include filter selects no skill, so the
+// dashboard can explain it and link to where the filter is edited.
+type unmatchedInclude struct {
+	Target      string   `json:"target"`
+	Root        string   `json:"root,omitempty"` // the project folder of a project target
+	Patterns    []string `json:"patterns"`
+	Suggestions []string `json:"suggestions,omitempty"` // source path names the patterns likely meant
+	// All means no include pattern selects anything, so the target gets no skills.
+	All bool `json:"all"`
 }
 
 type syncTargetResult struct {
@@ -99,6 +111,7 @@ func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]any{
 		"results":          out.results,
 		"warnings":         out.warnings,
+		"unmatched":        out.unmatched,
 		"failed":           out.failed,
 		"folder_conflicts": out.folderConflicts,
 		"path_overlap":     out.pathOverlap,
@@ -116,6 +129,7 @@ func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
 type syncOutcome struct {
 	results         []syncTargetResult
 	warnings        []string
+	unmatched       []unmatchedInclude
 	failed          []syncFailure
 	folderConflicts []config.SkillsFolderConflict
 	pathOverlap     int // targets whose path overlap the folder conflicts don't explain
@@ -187,6 +201,7 @@ func (s *Server) syncResources(start time.Time, dryRun, force bool, kind, projec
 
 	results := make([]syncTargetResult, 0)
 	failed := make([]syncFailure, 0)
+	unmatched := make([]unmatchedInclude, 0)
 
 	// A target with invalid settings fails alone: it is skipped for skills and agents.
 	runTargets := maps.Clone(targets)
@@ -262,6 +277,14 @@ func (s *Server) syncResources(start time.Time, dryRun, force bool, kind, projec
 				continue
 			}
 			warnings = append(warnings, run.Warnings...)
+			if len(run.UnmatchedIncludes) > 0 {
+				u := unmatchedInclude{Target: name, Root: target.ProjectRoot(), Patterns: []string{}, All: len(run.UnmatchedIncludes) == len(sc.Include)}
+				for _, m := range run.UnmatchedIncludes {
+					u.Patterns = append(u.Patterns, m.Pattern)
+					u.Suggestions = append(u.Suggestions, m.Suggestions...)
+				}
+				unmatched = append(unmatched, u)
+			}
 			switch mode {
 			case "merge", "copy":
 				res.Linked, res.Updated, res.Skipped, res.DirCreated = run.Linked, run.Updated, run.Skipped, run.DirCreated
@@ -385,7 +408,9 @@ func (s *Server) syncResources(start time.Time, dryRun, force bool, kind, projec
 
 	conflicts, overlap := folderConflicts(s.cfg.Targets, s.IsProjectMode(),
 		ssync.HarmlessOverlap(s.cfg.Targets, globalMode, allSkills))
-	return &syncOutcome{results: results, warnings: warnings, failed: failed, folderConflicts: conflicts, pathOverlap: overlap, skills: allSkills, ignoreStats: ignoreStats}, 0, nil
+	// Targets sync from a map; a fixed order keeps the dashboard's notices still.
+	slices.SortFunc(unmatched, func(a, b unmatchedInclude) int { return strings.Compare(a.Target, b.Target) })
+	return &syncOutcome{results: results, warnings: warnings, unmatched: unmatched, failed: failed, folderConflicts: conflicts, pathOverlap: overlap, skills: allSkills, ignoreStats: ignoreStats}, 0, nil
 }
 
 // failedTargetNames returns the distinct targets in failed, sorted.

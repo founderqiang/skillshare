@@ -16,6 +16,7 @@ import MCPNotices from '../components/mcp/MCPNotices';
 import { describeMessage, mcpClient, targetLabel } from '../components/mcp/mcpView';
 import { changeSets, countChanges, countEdited, discardable, receivesSkill, tally, extraGroups, groupByFolder, groupInSync, HOOKS_CHANGED, hooksGroups, MCP_CHANGED, mcpGroups, otherWarnings, resourceGroups, runSync, type ChangeGroup, type Part, type RowIcon, type SyncFailure } from '../components/sync/syncView';
 import SyncResult from '../components/sync/SyncResult';
+import UnmatchedNotices from '../components/sync/UnmatchedNotices';
 import SyncError from '../components/sync/SyncError';
 import SkillsOffDialog from '../components/targets/SkillsOffDialog';
 import SegmentedControl from '../components/SegmentedControl';
@@ -324,6 +325,7 @@ export default function SyncPage() {
           {parts.has('hooks') && hooks.data?.previewError && <div className="ss-note bad"><AlertCircle size={16} /><SyncError error={hooks.data.previewError} /></div>}
           {parts.has('mcp') && mcp.data?.previewError && <div className="ss-note bad"><AlertCircle size={16} /><SyncError error={mcp.data.previewError} /></div>}
           <SyncResult failures={failures} warnings={otherWarnings(outcome)} synced={syncedTargets} force={force} onForce={() => setForce(true)} />
+          <UnmatchedNotices items={outcome?.unmatched} />
           {!!outcome?.path_overlap && (
             <div className="ss-note warn !items-center">
               <TriangleAlert size={16} />

@@ -482,7 +482,8 @@ type MergeResult struct {
 	Skipped    []string // Skills that already exist in target (kept local)
 	Updated    []string // Skills that had broken symlinks fixed
 	DirCreated string   // Non-empty if target directory was auto-created (or would be in dry-run)
-	Warnings   []string // include patterns that select no skill
+	// UnmatchedIncludes are the include patterns that select no skill.
+	UnmatchedIncludes []UnmatchedInclude
 }
 
 // isSymlinkToSource checks whether targetPath is a symlink pointing to sourcePath.
@@ -601,7 +602,7 @@ func SyncTargetMergeWithSkills(name string, target config.TargetConfig, allSkill
 	if n := len(resolution.Collisions); n > 0 {
 		fmt.Fprintf(DiagOutput, "  %d name collision(s) excluded\n", n)
 	}
-	result.Warnings = resolution.UnmatchedIncludeWarnings()
+	result.UnmatchedIncludes = resolution.UnmatchedIncludes
 
 	manifest, err := ReadManifest(sc.Path)
 	if err != nil {
