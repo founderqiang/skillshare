@@ -152,6 +152,26 @@ describe('Extras page in a project', () => {
     });
   });
 
+  // Issue #490: Edit target clears flatten on symlink, like Add target.
+  it('keeps flatten off after Edit target switches to symlink and back', async () => {
+    const user = userEvent.setup();
+    // jsdom has no scrollIntoView, which the dropdown calls on its focused option.
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'More actions for .claude/rules' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Edit target…' }));
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('switch', { name: 'Flatten' }));
+    const mode = within(dialog).getAllByRole('combobox')[1];
+    await user.click(mode);
+    await user.click(screen.getByRole('option', { name: /^symlink/ }));
+    await user.click(mode);
+    await user.click(screen.getByRole('option', { name: /^merge/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(api.editExtraTarget).toHaveBeenLastCalledWith('rules', '.claude/rules', expect.objectContaining({ mode: 'merge', flatten: false }));
+  });
+
   it('renames an extra in Edit extra', async () => {
     const user = userEvent.setup();
     renderPage();

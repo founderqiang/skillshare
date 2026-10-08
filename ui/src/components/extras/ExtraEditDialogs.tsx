@@ -23,6 +23,21 @@ export const MODES = ['merge', 'copy', 'symlink'] as const;
 // A single file can't be a directory symlink; import writes an @ line instead.
 export const FILE_MODES = ['merge', 'copy', 'import', 'prepend', 'append'] as const;
 
+/** The target fields whose rules Add target and Edit target share. */
+export interface TargetFields {
+  mode: string;
+  flatten: boolean;
+  extension: string;
+}
+
+/** Applies a field change with the rules that follow from it: an extension converts each file, so it always writes copies; symlink links the whole folder, so flatten turns off. */
+export function applyDraftChange<T extends TargetFields>(draft: T, patch: Partial<TargetFields>): T {
+  const next = { ...draft, ...patch };
+  if (patch.extension) next.mode = 'copy';
+  if (next.mode === 'symlink') next.flatten = false;
+  return next;
+}
+
 const Mono = ({ children }: { children: ReactNode }) => <span className="font-mono">{children}</span>;
 
 /** Reports a save: the sync it ran when files moved, else a plain saved toast. */
@@ -84,9 +99,9 @@ export function EditTargetDialog({ extra, target, extensions, markFor, onClose, 
   const report = useSaveToast();
   const single = Boolean(extra.file);
   const [path, setPath] = useState(target.path);
-  const [mode, setMode] = useState(target.mode);
-  const [flatten, setFlatten] = useState(target.flatten);
-  const [extension, setExtension] = useState(target.extension ?? '');
+  const [fields, setFields] = useState<TargetFields>({ mode: target.mode, flatten: target.flatten, extension: target.extension ?? '' });
+  const { mode, flatten, extension } = fields;
+  const change = (patch: Partial<TargetFields>) => setFields(applyDraftChange(fields, patch));
   const [as, setAs] = useState(target.as ?? '');
   const [filters, setFilters] = useState({ include: target.include ?? [], exclude: target.exclude ?? [] });
   const [saving, setSaving] = useState(false);
@@ -156,7 +171,7 @@ export function EditTargetDialog({ extra, target, extensions, markFor, onClose, 
             <span className="text-[13px] font-semibold">{t('extras.modal.colExtension')}</span>
             <Select
               value={extension}
-              onChange={(v) => { setExtension(v); if (v) setMode('copy'); }}
+              onChange={(v) => change({ extension: v })}
               options={[{ value: '', label: t('extras.noExtension') }, ...extensions.map((e) => ({ value: e, label: e }))]}
               disabled={saving || mode === 'symlink' || (extensions.length === 0 && !extension)}
             />
@@ -166,7 +181,7 @@ export function EditTargetDialog({ extra, target, extensions, markFor, onClose, 
           <span className="text-[13px] font-semibold">{t('extras.modal.colMode')}</span>
           <Select
             value={extension ? 'copy' : mode}
-            onChange={setMode}
+            onChange={(v) => change({ mode: v })}
             options={(single ? FILE_MODES : MODES).map((m) => ({ value: m, label: m, description: t(single ? `extras.fileModeDescription.${m}` : `extras.modeDescription.${m}`) }))}
             disabled={saving || Boolean(extension)}
           />
@@ -175,7 +190,7 @@ export function EditTargetDialog({ extra, target, extensions, markFor, onClose, 
           <div className="ss-fld w-[110px]">
             <span className="text-[13px] font-semibold">{t('extras.flatten')}</span>
             <span className="flex h-9 items-center gap-2">
-              <button type="button" role="switch" aria-checked={flat} aria-label={t('extras.flatten')} className={`ss-sw ${flat ? 'on' : ''} disabled:opacity-50`} onClick={() => setFlatten(!flatten)} disabled={saving || mode === 'symlink'}><i /></button>
+              <button type="button" role="switch" aria-checked={flat} aria-label={t('extras.flatten')} className={`ss-sw ${flat ? 'on' : ''} disabled:opacity-50`} onClick={() => change({ flatten: !flatten })} disabled={saving || mode === 'symlink'}><i /></button>
               <span className="text-xs text-ink-2">{t(flat ? 'extras.flattenOn' : 'extras.flattenOff')}</span>
             </span>
           </div>

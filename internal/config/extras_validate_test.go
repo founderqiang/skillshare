@@ -58,3 +58,19 @@ func TestValidateExtraName_CaseOnlyDifferenceIsDuplicate(t *testing.T) {
 		t.Error("ValidateExtraNameUnique(\"Rules\", [rules]) = nil, want error")
 	}
 }
+
+func TestExtraTargetNormalize_ExtensionForcesCopy(t *testing.T) {
+	target := ExtraTargetConfig{Mode: "symlink", Extension: "x", Include: []string{"*.md"}}
+	target.Normalize()
+	if target.Mode != "copy" || len(target.Include) != 1 {
+		t.Errorf("got mode %q include %v, want copy with include kept", target.Mode, target.Include)
+	}
+}
+
+func TestExtraTargetNormalize_SymlinkDropsFilters(t *testing.T) {
+	target := ExtraTargetConfig{Mode: "symlink", Include: []string{"*.md"}, Exclude: []string{"a"}}
+	target.Normalize()
+	if target.Include != nil || target.Exclude != nil {
+		t.Errorf("got include %v exclude %v, want both dropped", target.Include, target.Exclude)
+	}
+}
