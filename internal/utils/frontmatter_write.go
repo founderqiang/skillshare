@@ -114,53 +114,99 @@ func ToggleFrontmatterFlag(filePath, key string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	content := string(data)
-
-	cr := ""
-	if strings.Contains(content, "\r\n") {
-		cr = "\r"
+	fm := splitFrontmatterLines(string(data))
+	flagLine := key + ": true" + fm.cr
+	if fm.end < 0 {
+		return true, os.WriteFile(filePath, []byte(fm.prepend(flagLine)), 0644)
 	}
-	flagLine := key + ": true" + cr
-	isDelim := func(l string) bool { return strings.TrimRight(l, " \t\r") == "---" }
 
-	// Split on "\n" only, so CRLF files keep their "\r" on every untouched line.
-	lines := strings.Split(content, "\n")
-	open, end := -1, -1
-	for i, l := range lines {
-		if open < 0 {
+	lines := fm.lines
+	on := true
+	i := fm.keyLine(key)
+	switch {
+	case i < 0:
+		lines = append(lines[:fm.end], append([]string{flagLine}, lines[fm.end:]...)...)
+	case isTrueValue(lines[i][len(key)+1:]):
+		lines = append(lines[:i], lines[i+1:]...)
+		on = false
+	default:
+		lines[i] = flagLine
+	}
+	return on, os.WriteFile(filePath, []byte(strings.Join(lines, "\n")), 0644)
+}
+
+// SetFrontmatterValue sets a top-level frontmatter key to a plain scalar value,
+// adding the key (or the whole frontmatter block) when it is missing. Like
+// ToggleFrontmatterFlag it edits one line, so key order, comments, line endings
+// and the body are kept. value is written unquoted and must be a plain YAML scalar.
+func SetFrontmatterValue(filePath, key, value string) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return err
+	}
+	fm := splitFrontmatterLines(string(data))
+	line := key + ": " + value + fm.cr
+	if fm.end < 0 {
+		return os.WriteFile(filePath, []byte(fm.prepend(line)), 0644)
+	}
+
+	lines := fm.lines
+	if i := fm.keyLine(key); i >= 0 {
+		lines[i] = line
+	} else {
+		lines = append(lines[:fm.end], append([]string{line}, lines[fm.end:]...)...)
+	}
+	return os.WriteFile(filePath, []byte(strings.Join(lines, "\n")), 0644)
+}
+
+// frontmatterLines is a file split on "\n" only, so CRLF files keep their "\r"
+// on every untouched line; open and end index the "---" delimiters (end < 0
+// when there is no frontmatter block).
+type frontmatterLines struct {
+	content   string
+	cr        string
+	lines     []string
+	open, end int
+}
+
+func splitFrontmatterLines(content string) frontmatterLines {
+	fm := frontmatterLines{content: content, lines: strings.Split(content, "\n"), open: -1, end: -1}
+	if strings.Contains(content, "\r\n") {
+		fm.cr = "\r"
+	}
+	isDelim := func(l string) bool { return strings.TrimRight(l, " \t\r") == "---" }
+	for i, l := range fm.lines {
+		if fm.open < 0 {
 			if isDelim(l) {
-				open = i
+				fm.open = i
 			} else if strings.TrimSpace(l) != "" {
 				break // body starts before any delimiter: no frontmatter
 			}
 		} else if isDelim(l) {
-			end = i
+			fm.end = i
 			break
 		}
 	}
-	if end < 0 {
-		out := "---" + cr + "\n" + flagLine + "\n" + "---" + cr + "\n" + content
-		return true, os.WriteFile(filePath, []byte(out), 0644)
-	}
+	return fm
+}
 
-	on := true
-	found := false
-	for i := open + 1; i < end; i++ {
-		rest, ok := strings.CutPrefix(lines[i], key+":") // column 0 only: nested keys are not the flag
-		if !ok {
-			continue
+// keyLine returns the index of the line holding key at column 0 (nested keys
+// do not count), or -1.
+func (fm frontmatterLines) keyLine(key string) int {
+	for i := fm.open + 1; i < fm.end; i++ {
+		if strings.HasPrefix(fm.lines[i], key+":") {
+			return i
 		}
-		found = true
-		if v, _, _ := strings.Cut(rest, " #"); strings.EqualFold(strings.Trim(v, " \t\r\"'"), "true") {
-			lines = append(lines[:i], lines[i+1:]...)
-			on = false
-		} else {
-			lines[i] = flagLine
-		}
-		break
 	}
-	if !found {
-		lines = append(lines[:end], append([]string{flagLine}, lines[end:]...)...)
-	}
-	return on, os.WriteFile(filePath, []byte(strings.Join(lines, "\n")), 0644)
+	return -1
+}
+
+// prepend returns the content with a new frontmatter block holding line.
+func (fm frontmatterLines) prepend(line string) string {
+	return "---" + fm.cr + "\n" + line + "\n" + "---" + fm.cr + "\n" + fm.content
+}
+
+func isTrueValue(rest string) bool {
+	v, _, _ := strings.Cut(rest, " #")
+	return strings.EqualFold(strings.Trim(v, " \t\r\"'"), "true")
 }
