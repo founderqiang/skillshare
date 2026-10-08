@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"skillshare/internal/config"
 )
 
 // TestPruneExtraTarget_MergeRemovesSymlinksOnly verifies that merge-mode prune
@@ -79,7 +81,7 @@ func TestSyncExtra_MergeKeepsExternalLinks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := SyncExtra(src, tgt, "merge", false, false, false, "", nil)
+	result, err := syncExtraDir(src, tgt, "merge", config.ExtraTargetConfig{}, nil, ExtraSyncOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

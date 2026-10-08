@@ -97,6 +97,25 @@ func ValidateExtraNameUnique(name string, existing []ExtraConfig) error {
 	return nil
 }
 
+// Extras with these names get special handling: sync skips agent target
+// folders for the extra named agents, and the memory notes live in the extra
+// named memory.
+const (
+	AgentsExtraName = "agents"
+	MemoryExtraName = "memory"
+)
+
+// ValidateExtraRename rejects renaming an extra to or from a name with
+// special handling, ignoring case.
+func ValidateExtraRename(oldName, newName string) error {
+	for _, special := range []string{AgentsExtraName, MemoryExtraName} {
+		if strings.EqualFold(oldName, special) || strings.EqualFold(newName, special) {
+			return fmt.Errorf("an extra cannot be renamed to or from %s", special)
+		}
+	}
+	return nil
+}
+
 // ValidateExtraConfig checks an extra's single-file settings and target modes.
 // file and as must be plain filenames; as, import mode, and the absence of
 // flatten are tied to file; an extension cannot transform a single file.

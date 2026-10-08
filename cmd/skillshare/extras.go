@@ -1,6 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+
+	"skillshare/internal/config"
+)
 
 func cmdExtras(args []string) error {
 	if len(args) == 0 {
@@ -35,7 +39,7 @@ func cmdExtras(args []string) error {
 		return cmdExtrasCollect(rest)
 	case "source":
 		return cmdExtrasSource(rest)
-	case "memory":
+	case config.MemoryExtraName:
 		return cmdExtrasMemory(rest)
 	case "--help", "-h":
 		printExtrasHelp()

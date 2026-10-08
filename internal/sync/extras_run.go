@@ -65,8 +65,8 @@ func RunExtraTargets(extra config.ExtraConfig, sourceDir string, opts ExtraRunOp
 func runExtraTarget(extra config.ExtraConfig, t config.ExtraTargetConfig, sourceDir string, opts ExtraRunOptions) ExtraTargetRun {
 	tr := ExtraTargetRun{Target: t, Path: opts.ResolvePath(t.Path), Mode: EffectiveMode(t.Mode)}
 
-	if extra.Name == "agents" && opts.AgentTargetPaths[filepath.Clean(tr.Path)] {
-		tr.SkippedBy = "agents"
+	if extra.Name == config.AgentsExtraName && opts.AgentTargetPaths[filepath.Clean(tr.Path)] {
+		tr.SkippedBy = config.AgentsExtraName
 		return tr
 	}
 
@@ -83,19 +83,19 @@ func runExtraTarget(extra config.ExtraConfig, t config.ExtraTargetConfig, source
 		}
 	}
 
-	tr.Result, tr.Err = SyncExtraTarget(extra, t, sourceDir, tr.Path, tr.Mode, opts.DryRun, opts.Force, opts.ProjectRoot, spec)
+	tr.Result, tr.Err = SyncExtraTarget(extra, t, sourceDir, tr.Path, tr.Mode, spec, ExtraSyncOptions{DryRun: opts.DryRun, Force: opts.Force, ProjectRoot: opts.ProjectRoot})
 	tr.Mode = ExtraTargetMode(tr.Mode, extra.File != "")
 	return tr
 }
 
 // SyncExtraTarget syncs one target of an extra. Single-file extras (file:)
 // sync just that file to <target>/<as or file>; others sync the directory.
-func SyncExtraTarget(extra config.ExtraConfig, target config.ExtraTargetConfig, sourceDir, targetPath, mode string, dryRun, force bool, projectRoot string, spec *ExtensionSpec) (*ExtraResult, error) {
+func SyncExtraTarget(extra config.ExtraConfig, target config.ExtraTargetConfig, sourceDir, targetPath, mode string, spec *ExtensionSpec, opts ExtraSyncOptions) (*ExtraResult, error) {
 	if extra.File == "" {
-		return syncExtraDir(sourceDir, targetPath, mode, dryRun, force, target.Flatten, projectRoot, spec, target.Include, target.Exclude)
+		return syncExtraDir(sourceDir, targetPath, mode, target, spec, opts)
 	}
 	if spec != nil {
 		return nil, fmt.Errorf("extensions are not supported for single-file extras")
 	}
-	return SyncExtraFile(NewExtraFile(sourceDir, extra.File, targetPath, target.As, mode), dryRun, projectRoot)
+	return SyncExtraFile(NewExtraFile(sourceDir, extra.File, targetPath, target.As, mode), opts.DryRun, opts.ProjectRoot)
 }

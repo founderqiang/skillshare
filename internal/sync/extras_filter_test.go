@@ -42,6 +42,16 @@ func TestUnmatchedIncludes_ReportsPatternWithNoFile(t *testing.T) {
 	}
 }
 
+func TestDiscoverExtraTargetFiles_AppliesTargetFilters(t *testing.T) {
+	src, _ := setupExtrasTest(t, map[string]string{"index.md": "i", "draft.md": "d"})
+
+	files, warnings, err := DiscoverExtraTargetFiles(src, "", config.ExtraTargetConfig{Include: []string{"*.md", "*.txt"}, Exclude: []string{"draft*"}})
+
+	if err != nil || !slices.Equal(files, []string{"index.md"}) || !slices.Equal(warnings, []string{UnmatchedIncludeWarning("*.txt")}) {
+		t.Errorf("got files %v, warnings %v, err %v", files, warnings, err)
+	}
+}
+
 func filterTestExtra(tgt string, target config.ExtraTargetConfig) config.ExtraConfig {
 	target.Path = tgt
 	return config.ExtraConfig{Name: "docs", Targets: []config.ExtraTargetConfig{target}}
@@ -96,7 +106,7 @@ func TestCollectExtraFiles_SkipsFilteredOutFiles(t *testing.T) {
 	src, tgt := setupExtrasTest(t, nil)
 	os.WriteFile(filepath.Join(tgt, "draft.md"), []byte("d"), 0644)
 
-	result, err := CollectExtraFiles(src, tgt, "", false, false, false, "", nil, []string{"draft*"})
+	result, err := CollectExtraFiles(src, tgt, config.ExtraTargetConfig{Exclude: []string{"draft*"}}, ExtraSyncOptions{})
 
 	if err != nil || result.Collected != 0 {
 		t.Fatalf("expected nothing collected, got %+v, err %v", result, err)

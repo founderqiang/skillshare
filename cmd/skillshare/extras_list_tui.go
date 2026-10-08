@@ -1065,7 +1065,7 @@ func (m extrasListTUIModel) doSync(name, targetPath string) (string, error) {
 				return "", fmt.Errorf("sync %s: %w", t.Path, specErr)
 			}
 		}
-		_, err := sync.SyncExtraTarget(*extra, t, sourceDir, resolved, mode, false, false, projectRoot, spec)
+		_, err := sync.SyncExtraTarget(*extra, t, sourceDir, resolved, mode, spec, sync.ExtraSyncOptions{ProjectRoot: projectRoot})
 		if err != nil {
 			return "", fmt.Errorf("sync %s: %w", t.Path, err)
 		}
@@ -1087,7 +1087,7 @@ func (m extrasListTUIModel) doCollect(name, targetPath string) (string, error) {
 	collected := 0
 	for _, t := range targets {
 		resolved := config.ExpandPath(t.Path)
-		result, err := sync.CollectExtraFiles(sourceDir, resolved, t.Mode, false, false, t.Flatten, m.projectRoot(), t.Include, t.Exclude)
+		result, err := sync.CollectExtraFiles(sourceDir, resolved, t, sync.ExtraSyncOptions{ProjectRoot: m.projectRoot()})
 		if err != nil {
 			return "", fmt.Errorf("collect from %s: %w", t.Path, err)
 		}

@@ -55,11 +55,6 @@ func UnmatchedIncludes(files, include []string) []string {
 	return unmatched
 }
 
-// ExtraTargetFiles narrows an extra's source files to the ones target syncs.
-func ExtraTargetFiles(files []string, target config.ExtraTargetConfig) []string {
-	return FilterExtraFiles(files, target.Include, target.Exclude)
-}
-
 // ExtraFilterEntry is one source file in a filter preview. Status is
 // "synced", "not_included", or "excluded"; Reason names the exclude pattern
 // that dropped an excluded file.
@@ -111,15 +106,17 @@ func matchesAnyFile(m *skillignore.Matcher, files []string) bool {
 	return false
 }
 
-// discoverExtraTargetFiles lists the source files one target syncs, with a
+// DiscoverExtraTargetFiles lists the source files target syncs, relative to
+// sourceDir: the single file when file is set, otherwise the files under
+// sourceDir that pass the target's include and exclude. It also returns a
 // warning for each include pattern that selects nothing.
-func discoverExtraTargetFiles(sourcePath string, include, exclude []string) ([]string, []string, error) {
-	files, err := DiscoverExtraFiles(sourcePath)
+func DiscoverExtraTargetFiles(sourceDir, file string, target config.ExtraTargetConfig) ([]string, []string, error) {
+	files, err := DiscoverExtraSource(sourceDir, file)
 	if err != nil {
 		return nil, nil, err
 	}
-	kept := FilterExtraFiles(files, include, exclude)
-	unmatched := UnmatchedIncludes(files, include)
+	kept := FilterExtraFiles(files, target.Include, target.Exclude)
+	unmatched := UnmatchedIncludes(files, target.Include)
 	warnings := make([]string, 0, len(unmatched))
 	for _, p := range unmatched {
 		warnings = append(warnings, UnmatchedIncludeWarning(p))

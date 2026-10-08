@@ -149,7 +149,7 @@ func resolveCollectExtra(extras []config.ExtraConfig, name, fromPath string, mod
 }
 
 func runCollect(sourceDir, targetPath, name string, target config.ExtraTargetConfig, dryRun, force bool, scope, cfgPath string, start time.Time, projectRoot string) error {
-	result, err := sync.CollectExtraFiles(sourceDir, targetPath, target.Mode, dryRun, force, target.Flatten, projectRoot, target.Include, target.Exclude)
+	result, err := sync.CollectExtraFiles(sourceDir, targetPath, target, sync.ExtraSyncOptions{DryRun: dryRun, Force: force, ProjectRoot: projectRoot})
 	if err != nil {
 		return err
 	}

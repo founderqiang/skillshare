@@ -149,7 +149,8 @@ func (s *Server) handleExtras(w http.ResponseWriter, r *http.Request) {
 				Include:   t.Include,
 				Exclude:   t.Exclude,
 			}
-			targetFiles := syncpkg.ExtraTargetFiles(files, t)
+			// A missing source leaves targetFiles empty; entry.SourceExists reports it.
+			targetFiles, _, _ := syncpkg.DiscoverExtraTargetFiles(sourceDir, extra.File, t)
 			ti.FileCount = len(targetFiles)
 
 			if extra.File != "" {
@@ -270,10 +271,10 @@ func (s *Server) handleExtrasDiff(w http.ResponseWriter, r *http.Request) {
 			out = append(out, extraFileDiffEntries(extra, sourceDir, projectRoot)...)
 			continue
 		}
-		files, err := syncpkg.DiscoverExtraFiles(sourceDir)
-		if err != nil {
-			// Source doesn't exist — report every target as needing creation
-			for _, t := range extra.Targets {
+		for _, t := range extra.Targets {
+			files, _, err := syncpkg.DiscoverExtraTargetFiles(sourceDir, "", t)
+			if err != nil {
+				// Source doesn't exist — report the target as needing creation
 				m := t.Mode
 				if m == "" {
 					m = "merge"
@@ -285,11 +286,9 @@ func (s *Server) handleExtrasDiff(w http.ResponseWriter, r *http.Request) {
 					Synced: false,
 					Items:  []extrasDiffItem{{Action: "create", File: "*", Reason: "no source directory"}},
 				})
+				continue
 			}
-			continue
-		}
 
-		for _, t := range extra.Targets {
 			m := syncpkg.ExtraTargetMode(t.Mode, extra.File != "")
 			// Transform extensions use copy semantics; resolve through the shared
 			// resolver so the diff isn't computed against the merge default. On an
@@ -309,7 +308,7 @@ func (s *Server) handleExtrasDiff(w http.ResponseWriter, r *http.Request) {
 			}
 
 			targetPath := resolveExtrasTargetPath(projectRoot, t.Path)
-			items := buildExtrasDiffItems(syncpkg.ExtraTargetFiles(files, t), sourceDir, targetPath, m, t.Flatten, outputExt)
+			items := buildExtrasDiffItems(files, sourceDir, targetPath, m, t.Flatten, outputExt)
 			synced := len(items) == 0
 
 			out = append(out, extrasDiffEntry{
@@ -690,7 +689,7 @@ func (s *Server) syncExtras(name string, dryRun, force bool) []extraSyncResult {
 		ResolveExtension: s.resolveExtensionSpec,
 	}
 	for _, extra := range s.extrasConfig() {
-		if extra.Name == "agents" {
+		if extra.Name == config.AgentsExtraName {
 			opts.AgentTargetPaths = s.extrasAgentTargetPaths()
 			break
 		}

@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"time"
 
 	"skillshare/internal/config"
@@ -192,13 +191,9 @@ func (s *Server) handleExtrasEdit(w http.ResponseWriter, r *http.Request) {
 	next := extra
 
 	if body.Name != "" && body.Name != name {
-		// Sync skips agent target folders for the extra named agents, and the
-		// memory notes live in the extra named memory.
-		for _, special := range []string{"agents", "memory"} {
-			if strings.EqualFold(name, special) || strings.EqualFold(body.Name, special) {
-				writeError(w, http.StatusBadRequest, "an extra cannot be renamed to or from "+special)
-				return
-			}
+		if err := config.ValidateExtraRename(name, body.Name); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
 		}
 		if err := config.ValidateExtraName(body.Name); err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
