@@ -121,7 +121,9 @@ Real-shell completion tests (`TestCompletion_{Zsh,Fish}_Completes*`) skip when z
 ## Test Value
 
 - Name the concrete failure a new test catches before adding it. Prefer the smallest existing check that already proves the change; test count is not a completion criterion.
-- Do not add duplicate coverage, assertions that merely repeat implementation literals, or mocked translation tests that cannot detect the real rendering failure.
+- Test a rule once, in the package that owns it (e.g. `internal/uninstall`, `RemoveByNames`); put a fix's regression test there, not in every entry point.
+- Handler and CLI tests cover translation only: status/error code and response fields per outcome, flag wiring, exit code, mode selection.
+- `tests/integration` is for cross-package flows and real-binary behavior. Assert `--json` or files over wording.
 - For copy, translations and straightforward visual changes, reuse locale/placeholder checks, builds and rendered inspection. Do not create a new test solely because a file changed.
 - Add regression coverage when there is meaningful behavior to protect, especially data loss, permissions, input validation or state transitions. Do not weaken existing validation to reduce cost, and respect explicit user instructions about adding tests.
 

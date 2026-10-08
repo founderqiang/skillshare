@@ -53,6 +53,12 @@ Git Sync shows both local and remote commit counts when histories diverge and of
 - Inspect representative populated states in the requested locale, including read-only/managed rows. A translated heading or a successful build does not establish that backend guidance is translated.
 - Copy/translation-only changes normally need existing locale/placeholder checks and rendered verification, not new tests repeating dictionary values or mocked translations. Add coverage only for a concrete behavioral failure that existing checks cannot detect; follow the `testing` topic's test-value rules.
 
+## Dashboard Tests
+
+- Put logic in a plain `.ts` module and test it there with inputs and outputs.
+- A rendered `.test.tsx` test must protect user data: the payload a write or delete sends, a confirmation before deleting or overwriting, a draft kept after an error or unsaved-edit prompt, or a stale/conflicting version refused. Security checks (sanitizing, secrets as env references) count too.
+- Do not write rendered tests for layout, icons, collapse/expand, remembered widths or filters, hover, display order, text being shown, toasts, focus or navigation. Check those with screenshots while working on them.
+
 ## Website Boundary
 
 This topic also loads `website/AGENTS.md` for website-specific commands, structure, and deployment rules. Additional boundaries:
