@@ -83,7 +83,7 @@ func extrasCollectGlobal(name, fromPath string, dryRun, force bool, start time.T
 	}
 
 	sourceDir := config.ResolveExtrasSourceDir(*extra, cfg.EffectiveExtrasSource(), cfg.EffectiveSkillsSource())
-	return runCollect(sourceDir, targetPath, extra.Name, target.Mode, dryRun, force, target.Flatten, "global", config.ConfigPath(), start, "")
+	return runCollect(sourceDir, targetPath, extra.Name, target, dryRun, force, "global", config.ConfigPath(), start, "")
 }
 
 func extrasCollectProject(cwd, name, fromPath string, dryRun, force bool, start time.Time) error {
@@ -109,7 +109,7 @@ func extrasCollectProject(cwd, name, fromPath string, dryRun, force bool, start 
 	}
 
 	sourceDir := config.ResolveExtrasSourceDirProject(*extra, projCfg.EffectiveExtrasSource(cwd), cwd)
-	return runCollect(sourceDir, expandedPath, extra.Name, target.Mode, dryRun, force, target.Flatten, "project", config.ProjectConfigPath(cwd), start, cwd)
+	return runCollect(sourceDir, expandedPath, extra.Name, target, dryRun, force, "project", config.ProjectConfigPath(cwd), start, cwd)
 }
 
 // errSingleFileCollect: collect walks a whole target directory, which for a
@@ -148,8 +148,8 @@ func resolveCollectExtra(extras []config.ExtraConfig, name, fromPath string, mod
 	return found, config.ExtraTargetConfig{Path: fromPath}, nil
 }
 
-func runCollect(sourceDir, targetPath, name, mode string, dryRun, force, flatten bool, scope, cfgPath string, start time.Time, projectRoot string) error {
-	result, err := sync.CollectExtraFiles(sourceDir, targetPath, mode, dryRun, force, flatten, projectRoot)
+func runCollect(sourceDir, targetPath, name string, target config.ExtraTargetConfig, dryRun, force bool, scope, cfgPath string, start time.Time, projectRoot string) error {
+	result, err := sync.CollectExtraFiles(sourceDir, targetPath, target.Mode, dryRun, force, target.Flatten, projectRoot, target.Include, target.Exclude)
 	if err != nil {
 		return err
 	}

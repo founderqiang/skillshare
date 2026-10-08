@@ -912,12 +912,21 @@ func (m extrasListTUIModel) renderModePicker() string {
 }
 
 func (m extrasListTUIModel) doSetMode(name, targetPath, newMode string) (string, error) {
+	// Validate before saving so a mode the target's filters rule out (symlink)
+	// is refused instead of breaking every later sync.
+	setMode := func(extras []config.ExtraConfig) error {
+		if err := applyExtraTarget(extras, name, targetPath, func(t *config.ExtraTargetConfig) { t.Mode = newMode }); err != nil {
+			return err
+		}
+		_, extra := findExtraByName(extras, name)
+		return config.ValidateExtraConfig(extra)
+	}
 	if m.projCfg != nil {
 		projCfg, err := config.LoadProject(m.cwd)
 		if err != nil {
 			return "", err
 		}
-		if err := applyExtraTarget(projCfg.Extras, name, targetPath, func(t *config.ExtraTargetConfig) { t.Mode = newMode }); err != nil {
+		if err := setMode(projCfg.Extras); err != nil {
 			return "", err
 		}
 		if err := projCfg.Save(m.cwd); err != nil {
@@ -928,7 +937,7 @@ func (m extrasListTUIModel) doSetMode(name, targetPath, newMode string) (string,
 		if err != nil {
 			return "", err
 		}
-		if err := applyExtraTarget(cfg.Extras, name, targetPath, func(t *config.ExtraTargetConfig) { t.Mode = newMode }); err != nil {
+		if err := setMode(cfg.Extras); err != nil {
 			return "", err
 		}
 		if err := cfg.Save(); err != nil {
@@ -1078,7 +1087,7 @@ func (m extrasListTUIModel) doCollect(name, targetPath string) (string, error) {
 	collected := 0
 	for _, t := range targets {
 		resolved := config.ExpandPath(t.Path)
-		result, err := sync.CollectExtraFiles(sourceDir, resolved, t.Mode, false, false, t.Flatten, m.projectRoot())
+		result, err := sync.CollectExtraFiles(sourceDir, resolved, t.Mode, false, false, t.Flatten, m.projectRoot(), t.Include, t.Exclude)
 		if err != nil {
 			return "", fmt.Errorf("collect from %s: %w", t.Path, err)
 		}

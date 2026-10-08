@@ -431,7 +431,7 @@ func TestCollectExtraFiles(t *testing.T) {
 	os.MkdirAll(targetDir, 0755)
 	os.WriteFile(filepath.Join(targetDir, "rule1.md"), []byte("# Rule 1"), 0644)
 
-	result, err := CollectExtraFiles(sourceDir, targetDir, "", false, false, false, "")
+	result, err := CollectExtraFiles(sourceDir, targetDir, "", false, false, false, "", nil, nil)
 	if err != nil {
 		t.Fatalf("CollectExtraFiles: %v", err)
 	}
@@ -466,7 +466,7 @@ func TestCollectExtraFiles_DryRun(t *testing.T) {
 	os.MkdirAll(targetDir, 0755)
 	os.WriteFile(filepath.Join(targetDir, "rule1.md"), []byte("# Rule 1"), 0644)
 
-	result, err := CollectExtraFiles(sourceDir, targetDir, "", true, false, false, "")
+	result, err := CollectExtraFiles(sourceDir, targetDir, "", true, false, false, "", nil, nil)
 	if err != nil {
 		t.Fatalf("CollectExtraFiles dry run: %v", err)
 	}
@@ -500,7 +500,7 @@ func TestCollectExtraFiles_SkipsExisting(t *testing.T) {
 	os.WriteFile(filepath.Join(sourceDir, "rule1.md"), []byte("source version"), 0644)
 	os.WriteFile(filepath.Join(targetDir, "rule1.md"), []byte("target version"), 0644)
 
-	result, err := CollectExtraFiles(sourceDir, targetDir, "", false, false, false, "")
+	result, err := CollectExtraFiles(sourceDir, targetDir, "", false, false, false, "", nil, nil)
 	if err != nil {
 		t.Fatalf("CollectExtraFiles: %v", err)
 	}
@@ -521,7 +521,7 @@ func TestCollectExtraFiles_ForceOverwritesExisting(t *testing.T) {
 	os.WriteFile(filepath.Join(sourceDir, "rule1.md"), []byte("source version"), 0644)
 	os.WriteFile(filepath.Join(targetDir, "rule1.md"), []byte("target version"), 0644)
 
-	if _, err := CollectExtraFiles(sourceDir, targetDir, "", false, true, false, ""); err != nil {
+	if _, err := CollectExtraFiles(sourceDir, targetDir, "", false, true, false, "", nil, nil); err != nil {
 		t.Fatalf("CollectExtraFiles: %v", err)
 	}
 
@@ -539,7 +539,7 @@ func TestCollectExtraFiles_ForceSkipsIdentical(t *testing.T) {
 	os.WriteFile(filepath.Join(sourceDir, "rule1.md"), []byte("same"), 0644)
 	os.WriteFile(filepath.Join(targetDir, "rule1.md"), []byte("same"), 0644)
 
-	result, err := CollectExtraFiles(sourceDir, targetDir, "copy", false, true, false, "")
+	result, err := CollectExtraFiles(sourceDir, targetDir, "copy", false, true, false, "", nil, nil)
 	if err != nil {
 		t.Fatalf("CollectExtraFiles: %v", err)
 	}
@@ -555,7 +555,7 @@ func TestCollectExtraFiles_CopyModeKeepsTargetFile(t *testing.T) {
 	os.MkdirAll(targetDir, 0755)
 	os.WriteFile(filepath.Join(targetDir, "rule1.md"), []byte("# Rule 1"), 0644)
 
-	if _, err := CollectExtraFiles(sourceDir, targetDir, "copy", false, false, false, ""); err != nil {
+	if _, err := CollectExtraFiles(sourceDir, targetDir, "copy", false, false, false, "", nil, nil); err != nil {
 		t.Fatalf("CollectExtraFiles: %v", err)
 	}
 
@@ -799,7 +799,7 @@ func TestCollectExtraFiles_Flatten(t *testing.T) {
 	// New local file in target (not from source)
 	os.WriteFile(filepath.Join(targetDir, "new-agent.md"), []byte("# New Agent"), 0644)
 
-	result, err := CollectExtraFiles(sourceDir, targetDir, "", false, false, true, "")
+	result, err := CollectExtraFiles(sourceDir, targetDir, "", false, false, true, "", nil, nil)
 	if err != nil {
 		t.Fatalf("CollectExtraFiles: %v", err)
 	}
@@ -830,7 +830,7 @@ func TestCollectExtraFiles_FlattenSkipsExisting(t *testing.T) {
 	os.WriteFile(filepath.Join(sourceDir, "conflict.md"), []byte("source version"), 0644)
 	os.WriteFile(filepath.Join(targetDir, "conflict.md"), []byte("target version"), 0644)
 
-	result, err := CollectExtraFiles(sourceDir, targetDir, "", false, false, true, "")
+	result, err := CollectExtraFiles(sourceDir, targetDir, "", false, false, true, "", nil, nil)
 	if err != nil {
 		t.Fatalf("CollectExtraFiles: %v", err)
 	}
@@ -851,7 +851,7 @@ func TestCollectExtraFiles_ForceFlattenCollisionKeepsFirst(t *testing.T) {
 	os.WriteFile(filepath.Join(targetDir, "a", "x.md"), []byte("A"), 0644)
 	os.WriteFile(filepath.Join(targetDir, "b", "x.md"), []byte("B"), 0644)
 
-	result, err := CollectExtraFiles(sourceDir, targetDir, "", false, true, true, "")
+	result, err := CollectExtraFiles(sourceDir, targetDir, "", false, true, true, "", nil, nil)
 	if err != nil {
 		t.Fatalf("CollectExtraFiles: %v", err)
 	}

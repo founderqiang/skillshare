@@ -271,7 +271,7 @@ func printExtrasStatus(extras []config.ExtraConfig, sourceDirFn func(config.Extr
 				continue
 			}
 			mode := sync.ExtraTargetMode(t.Mode, extra.File != "")
-			ui.Row(ui.MarkNone, extra.Name, pad(shortenPath(t.Path), pathW)+"  "+theme.Dim().Render(plural(len(files), "file")+" · "+mode), width)
+			ui.Row(ui.MarkNone, extra.Name, pad(shortenPath(t.Path), pathW)+"  "+theme.Dim().Render(plural(len(sync.ExtraTargetFiles(files, t)), "file")+" · "+mode), width)
 		}
 	}
 }

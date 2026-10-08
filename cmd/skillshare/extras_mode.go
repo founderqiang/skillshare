@@ -14,10 +14,18 @@ import (
 func cmdExtrasMode(args []string) error {
 	start := time.Now()
 
-	mode, rest, err := parseModeArgs(args, "--target", "--mode")
+	mode, rest, err := parseModeArgs(args, "--target", "--mode", "--add-include", "--add-exclude", "--remove-include", "--remove-exclude")
 	if err != nil {
 		return err
 	}
+	parsedFilters, rest, err := parseFilterFlags(rest)
+	if err != nil {
+		return err
+	}
+	if parsedFilters.Agents.hasUpdates() {
+		return fmt.Errorf("agent filter flags are not supported for extras; use --add-include/--add-exclude/--remove-include/--remove-exclude")
+	}
+	filters := parsedFilters.Skills
 
 	cwd, _ := os.Getwd()
 	mode = resolveAutoMode(mode, cwd)
@@ -62,8 +70,8 @@ func cmdExtrasMode(args []string) error {
 	if name == "" {
 		return fmt.Errorf("extras name is required: skillshare extras <name> --mode <mode> [--target <path>]")
 	}
-	if syncMode == "" && !flattenSet {
-		return fmt.Errorf("--mode or --flatten/--no-flatten is required")
+	if syncMode == "" && !flattenSet && !filters.hasUpdates() {
+		return fmt.Errorf("--mode, --flatten/--no-flatten, or an include/exclude flag is required")
 	}
 
 	if syncMode != "" {
@@ -109,7 +117,7 @@ func cmdExtrasMode(args []string) error {
 					targetPath = extra.Targets[0].Path
 				default:
 					// flatten-only changes apply to all targets when --target is omitted
-					if flattenSet && syncMode == "" {
+					if flattenSet && syncMode == "" && !filters.hasUpdates() {
 						return applyFlattenAll(extras, name, flattenVal, saveFn, configPath, start)
 					}
 					return fmt.Errorf("extra %q has %d targets — use --target to specify which one", name, len(extra.Targets))
@@ -161,7 +169,21 @@ func cmdExtrasMode(args []string) error {
 			return err
 		}
 	}
-	if _, updated := findExtraByName(extras, name); updated.File != "" || config.ManagedExtraMode(syncMode) {
+	var filterChanges []string
+	if filters.hasUpdates() {
+		var filterErr error
+		if err := applyExtraTarget(extras, name, targetPath, func(t *config.ExtraTargetConfig) {
+			filterChanges, filterErr = applyFilterUpdates(&t.Include, &t.Exclude, filters)
+		}); err != nil {
+			return err
+		}
+		if filterErr != nil {
+			return filterErr
+		}
+	}
+	// Filters rule out single files and symlink mode, so check them whenever
+	// either side changes.
+	if _, updated := findExtraByName(extras, name); updated.File != "" || config.ManagedExtraMode(syncMode) || syncMode == "symlink" || filters.hasUpdates() {
 		if err := config.ValidateExtraConfig(updated); err != nil {
 			return err
 		}
@@ -182,10 +204,17 @@ func cmdExtrasMode(args []string) error {
 	if flattenSet {
 		parts = append(parts, fmt.Sprintf("flatten=%v", flattenVal))
 	}
+	parts = append(parts, filterChanges...)
+	if len(parts) == 0 {
+		parts = append(parts, "no changes")
+	}
 	ui.Done(ui.MarkOK, fmt.Sprintf("Updated %s target %s: %s", name, shortenPath(targetPath), strings.Join(parts, ", ")), 0)
 
 	e := oplog.NewEntry("extras-mode", "ok", time.Since(start))
 	e.Args = map[string]any{"name": name, "target": targetPath, "mode": syncMode, "flatten": flattenVal}
+	if len(filterChanges) > 0 {
+		e.Args["filters"] = filterChanges
+	}
 	oplog.WriteWithLimit(configPath, oplog.OpsFile, e, logMaxEntries()) //nolint:errcheck
 
 	return nil
@@ -248,7 +277,7 @@ func applyExtraTarget(extras []config.ExtraConfig, name, targetPath string, appl
 }
 
 func printExtrasModeHelp() {
-	printHelp("skillshare extras <name> --mode <mode> [--target <path>]", "Change the sync mode or flatten setting of an extra's target.",
+	printHelp("skillshare extras <name> --mode <mode> [--target <path>]", "Change the sync mode, flatten setting, or file filters of an extra's target.\nFilters use .gitignore patterns on paths inside the source: draft* matches\nat any depth, images/ covers a folder. Files that stop matching are pruned\non the next sync in merge mode; copy mode leaves them in place.",
 		helpGroup{title: "Arguments", rows: []helpRow{
 			{"name", "Extra name (e.g., rules, commands)"},
 		}},
@@ -256,6 +285,10 @@ func printExtrasModeHelp() {
 			{"--mode <mode>", "New sync mode: merge, copy, or symlink"},
 			{"--flatten", "Enable flatten (sync subdirectory files into target root)"},
 			{"--no-flatten", "Disable flatten"},
+			{"--add-include <pattern>", "Sync only files matching this pattern (repeatable)"},
+			{"--add-exclude <pattern>", "Skip files matching this pattern (repeatable)"},
+			{"--remove-include <pattern>", "Remove an include pattern"},
+			{"--remove-exclude <pattern>", "Remove an exclude pattern"},
 			{"--target <path>", "Target directory path (optional if extra has only one target)"},
 			{"-p, --project", "Use project mode (.skillshare/)"},
 			{"-g, --global", "Use global mode (~/.config/skillshare/)"},
@@ -263,6 +296,8 @@ func printExtrasModeHelp() {
 		helpExamples(
 			helpRow{"skillshare extras rules --mode copy", ""},
 			helpRow{"skillshare extras agents --flatten", ""},
+			helpRow{"skillshare extras docs --target ~/.claude/docs --add-include index.md --add-include learning.md", ""},
+			helpRow{"skillshare extras docs --add-exclude \"draft*\" --add-exclude images/", ""},
 		),
 	)
 }

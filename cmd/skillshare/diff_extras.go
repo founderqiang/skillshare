@@ -70,6 +70,7 @@ func collectExtrasDiff(extras []config.ExtraConfig, sourceResolver func(config.E
 		}
 
 		for _, t := range extra.Targets {
+			files := sync.ExtraTargetFiles(files, t)
 			mode := sync.ExtraTargetMode(t.Mode, extra.File != "")
 			r := extraDiffResult{
 				extraName:  extra.Name,

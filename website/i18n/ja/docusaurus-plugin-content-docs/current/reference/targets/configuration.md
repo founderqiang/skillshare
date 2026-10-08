@@ -732,6 +732,8 @@ extras:
 | `targets[].mode` | いいえ | `merge`（デフォルト）、`copy`、または `symlink`。`import` は単一ファイルの Extras でのみ使用可 |
 | `targets[].as` | いいえ | 単一ファイルの Extra における Target 内のファイル名（デフォルト: `file` の名前） |
 | `targets[].flatten` | いいえ | `true` の場合、サブディレクトリのファイルを Target のルートに直接 Sync する（`symlink` または `file` とは併用不可） |
+| `targets[].include` | いいえ | これらの `.gitignore` 形式のパターンに一致する Source ファイルだけを Sync する（`symlink` または `file` とは併用不可）。[ファイルを選ぶ](../commands/extras.md#choosing-files)を参照 |
+| `targets[].exclude` | いいえ | これらのパターンに一致する Source ファイルをスキップする。`include` の後に適用（`symlink` または `file` とは併用不可） |
 
 `extras_source` は `skillshare init` または最初の `extras init` 実行時に、デフォルトのパス
 （`~/.config/skillshare/extras/`）に自動的に設定されます。すべての Extra に対してカスタムの場所を

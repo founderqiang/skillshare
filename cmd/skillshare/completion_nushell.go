@@ -689,6 +689,12 @@ export extern "skillshare extras" [
     --as: string             # Target filename
     --flatten                # Flatten subdirectory files
     --no-flatten             # Disable flatten
+    --include: string        # init: sync only matching files
+    --exclude: string        # init: skip matching files
+    --add-include: string    # Add an include pattern
+    --add-exclude: string    # Add an exclude pattern
+    --remove-include: string # Remove an include pattern
+    --remove-exclude: string # Remove an exclude pattern
     --add-target: string     # Add a target
     --remove-target: string  # Detach a target
     --prune                  # With --remove-target: delete managed files

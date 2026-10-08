@@ -29,6 +29,10 @@ func TestValidateExtraConfig_SingleFile(t *testing.T) {
 		{"extension with single-file copy", ExtraConfig{Name: "i", File: "AGENTS.md", Targets: []ExtraTargetConfig{{Path: "/t", Mode: "copy", Extension: "x"}}}, "extension cannot be used with a single-file extra"},
 		{"extension on directory extra", ExtraConfig{Name: "rules", Targets: []ExtraTargetConfig{{Path: "/t", Mode: "copy", Extension: "x"}}}, ""},
 		{"unknown mode", ExtraConfig{Name: "i", Targets: []ExtraTargetConfig{{Path: "/t", Mode: "bogus"}}}, "invalid mode"},
+		{"filters on directory extra", ExtraConfig{Name: "docs", Targets: []ExtraTargetConfig{{Path: "/t", Include: []string{"*.md"}, Exclude: []string{"draft*"}}}}, ""},
+		{"filters with symlink", ExtraConfig{Name: "docs", Targets: []ExtraTargetConfig{{Path: "/t", Mode: "symlink", Include: []string{"*.md"}}}}, "symlink"},
+		{"filters with file", ExtraConfig{Name: "i", File: "AGENTS.md", Targets: []ExtraTargetConfig{{Path: "/t", Exclude: []string{"x"}}}}, "single-file"},
+		{"invalid filter pattern", ExtraConfig{Name: "docs", Targets: []ExtraTargetConfig{{Path: "/t", Include: []string{"guides/[a"}}}}, "invalid include pattern"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -98,5 +102,17 @@ func TestValidSyncModes_SkillsRejectImport(t *testing.T) {
 	}
 	if err := ValidateExtraMode("import"); err != nil {
 		t.Errorf("extras mode import rejected: %v", err)
+	}
+}
+
+// A malformed pattern written by hand in the config must stop sync before it
+// matches nothing and merge prunes every link.
+func TestValidateExtraConnections_RejectsBadFilterOnFolderExtra(t *testing.T) {
+	err := ValidateExtraConnections([]ExtraConfig{
+		{Name: "docs", Targets: []ExtraTargetConfig{{Path: "/tgt", Include: []string{"["}}}},
+	}, func(e ExtraConfig) string { return "/src/" + e.Name }, func(p string) string { return p })
+
+	if err == nil {
+		t.Fatal("expected an error for the malformed include pattern")
 	}
 }

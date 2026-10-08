@@ -708,6 +708,8 @@ extras:
 | `targets[].mode` | No | `merge` (기본값), `copy`, 또는 `symlink`. `import`는 single-file extra 전용 |
 | `targets[].as` | No | single-file extra에서 target 쪽 파일 이름 (기본값: `file` 이름) |
 | `targets[].flatten` | No | `true`이면 하위 디렉터리 파일을 Target 루트로 직접 동기화 (`symlink` 또는 `file`과 함께 사용 불가) |
+| `targets[].include` | 아니요 | 이 `.gitignore` 스타일 pattern과 일치하는 source 파일만 동기화 (`symlink` 또는 `file`과 함께 사용 불가). [파일 고르기](../commands/extras.md#choosing-files) 참고 |
+| `targets[].exclude` | 아니요 | 이 pattern과 일치하는 source 파일을 건너뜀. `include` 다음에 적용 (`symlink` 또는 `file`과 함께 사용 불가) |
 
 `extras_source`는 `skillshare init` 또는 첫 `extras init` 시 기본 경로(`~/.config/skillshare/extras/`)로 자동 채워집니다. 모든 extra에 custom 위치를 사용하려면 이 값을 재정의하세요.
 

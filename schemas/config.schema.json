@@ -520,6 +520,18 @@
           "description": "When true, files from subdirectories are synced directly into the target root instead of preserving directory structure.",
           "default": false
         },
+        "include": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Sync only source files that match one of these .gitignore-style patterns (path inside the source). A pattern without '/' matches at any depth; 'dir/' covers a folder. Not allowed with symlink mode or a single-file extra.",
+          "examples": [["index.md", "learning.md"], ["guides/", "**/*.md"]]
+        },
+        "exclude": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Skip source files that match one of these .gitignore-style patterns. Applied after include. Not allowed with symlink mode or a single-file extra.",
+          "examples": [["draft*", "images/"]]
+        },
         "extension": {
           "type": "string",
           "description": "Transform each file through an extension before writing it to this target (copy mode only). A bare name resolves under the extensions directory; a path (containing a separator or starting with '.') is used directly.",
