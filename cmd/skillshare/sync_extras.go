@@ -14,9 +14,6 @@ import (
 	"skillshare/internal/ui"
 )
 
-// extrasAgentsName is the extras entry name that may overlap with the agents sync system.
-const extrasAgentsName = "agents"
-
 type syncExtrasJSONOutput struct {
 	Extras   []syncExtrasJSONEntry `json:"extras"`
 	Duration string                `json:"duration"`
@@ -110,7 +107,7 @@ func cmdSyncExtrasGlobal(dryRun, force, jsonOutput, partOfAll bool, start time.T
 	// Detect overlap between extras "agents" and the agents sync system
 	var agentTargetPaths map[string]bool
 	for _, extra := range cfg.Extras {
-		if extra.Name == extrasAgentsName {
+		if extra.Name == config.AgentsExtraName {
 			agentTargetPaths = collectAgentTargetPathsGlobal(cfg)
 			break
 		}
@@ -220,7 +217,7 @@ func cmdSyncExtrasProject(cwd string, dryRun, force, jsonOutput, partOfAll bool,
 	// Detect overlap between extras "agents" and the agents sync system
 	var agentTargetPaths map[string]bool
 	for _, extra := range projCfg.Extras {
-		if extra.Name == extrasAgentsName {
+		if extra.Name == config.AgentsExtraName {
 			agentTargetPaths = collectAgentTargetPathsProject(cwd)
 			break
 		}
