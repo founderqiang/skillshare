@@ -138,7 +138,7 @@ func (s *Server) handleExtrasEditTarget(w http.ResponseWriter, r *http.Request) 
 		sourceDir := s.extrasSourceDir(extra)
 		oldMode := syncpkg.ExtraTargetMode(old.Mode, extra.File != "")
 		var errs []string
-		resp["pruned"], errs = clearExtraTarget(extra.File, sourceDir, oldPath, old.As, oldMode)
+		resp["pruned"], _, errs = syncpkg.ClearExtraTarget(extra.File, sourceDir, oldPath, old.As, oldMode, nil)
 		results := s.syncExtras(name, false, false)
 		resp["extras"] = results
 		if len(errs) > 0 {
@@ -265,7 +265,7 @@ func (s *Server) handleExtrasEdit(w http.ResponseWriter, r *http.Request) {
 	if relink {
 		for _, t := range extra.Targets {
 			mode := syncpkg.ExtraTargetMode(t.Mode, extra.File != "")
-			_, errs := clearExtraTarget(extra.File, oldSource, resolveExtrasTargetPath(s.projectRoot, t.Path), t.As, mode)
+			_, _, errs := syncpkg.ClearExtraTarget(extra.File, oldSource, resolveExtrasTargetPath(s.projectRoot, t.Path), t.As, mode, nil)
 			pruneErrs = append(pruneErrs, errs...)
 		}
 	}
@@ -288,27 +288,6 @@ func (s *Server) handleExtrasEdit(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, resp)
 }
 
-// clearExtraTarget removes what skillshare put at one target: links into
-// sourceDir in merge mode, the folder link in symlink mode, and a single-file
-// target goes back to how it was. Copies stay, since nothing records which
-// copied files are skillshare's.
-func clearExtraTarget(file, sourceDir, targetPath, as, mode string) (int, []string) {
-	if file != "" {
-		changed, err := syncpkg.RestoreExtraTarget(syncpkg.NewExtraFile(sourceDir, file, targetPath, as, mode))
-		if err != nil {
-			return 0, []string{err.Error()}
-		}
-		if changed {
-			return 1, nil
-		}
-		return 0, nil
-	}
-	if mode == "symlink" && !linksTo(targetPath, sourceDir) {
-		return 0, nil
-	}
-	return syncpkg.PruneExtraTargetFiles(targetPath, sourceDir, mode, nil)
-}
-
 // storedExtraSource is dir as an extra's source field: absolute in global
 // mode, relative to the project root in project mode.
 func (s *Server) storedExtraSource(dir string) (string, error) {
@@ -329,22 +308,4 @@ func (s *Server) validateExtra(name string) error {
 		return s.projectCfg.ValidateExtras(s.projectRoot, name)
 	}
 	return s.cfg.ValidateExtras(name)
-}
-
-// linksTo reports whether link is a symlink to dir, comparing the link text
-// too, so a link whose folder has since moved or been deleted still counts.
-func linksTo(link, dir string) bool {
-	dest, err := os.Readlink(link)
-	if err != nil {
-		return false
-	}
-	if !filepath.IsAbs(dest) {
-		dest = filepath.Join(filepath.Dir(link), dest)
-	}
-	if filepath.Clean(dest) == filepath.Clean(dir) {
-		return true
-	}
-	real, err := filepath.EvalSymlinks(link)
-	src, srcErr := filepath.EvalSymlinks(dir)
-	return err == nil && srcErr == nil && real == src
 }

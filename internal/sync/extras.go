@@ -600,6 +600,56 @@ func PruneExtraTargetFiles(targetPath, sourcePath, mode string, managedFiles map
 	}
 }
 
+// ClearExtraTarget removes what skillshare put at one target: a single-file
+// target goes back to how it was, links into sourceDir go in merge mode, the
+// managedFiles go in copy mode, and in symlink mode the target goes only when
+// it is a link to sourceDir. kept reports a symlink-mode target left in place
+// because it is something else.
+func ClearExtraTarget(file, sourceDir, targetPath, as, mode string, managedFiles map[string]bool) (pruned int, kept bool, errors []string) {
+	if file != "" {
+		changed, err := RestoreExtraTarget(NewExtraFile(sourceDir, file, targetPath, as, mode))
+		if err != nil {
+			return 0, false, []string{err.Error()}
+		}
+		if changed {
+			return 1, false, nil
+		}
+		return 0, false, nil
+	}
+	if mode == "symlink" && !LinksTo(targetPath, sourceDir) {
+		// Only a missing target is safe to forget; any other error must stop
+		// the caller before it drops the target from the config.
+		if _, err := os.Lstat(targetPath); err == nil {
+			return 0, true, nil
+		} else if !os.IsNotExist(err) {
+			return 0, false, []string{err.Error()}
+		}
+		return 0, false, nil
+	}
+	pruned, errors = PruneExtraTargetFiles(targetPath, sourceDir, mode, managedFiles)
+	return pruned, false, errors
+}
+
+// LinksTo reports whether link is a symlink to dir, comparing the link text
+// too, so a link whose folder has since moved or been deleted still counts.
+func LinksTo(link, dir string) bool {
+	// ResolveLinkTarget also resolves a real directory, so check the link itself
+	// first; it handles Windows junctions, which Readlink can't read.
+	if !utils.IsSymlinkOrJunction(link) {
+		return false
+	}
+	dest, err := utils.ResolveLinkTarget(link)
+	if err != nil {
+		return false
+	}
+	if abs, absErr := filepath.Abs(dir); absErr == nil && utils.PathsEqual(dest, filepath.Clean(abs)) {
+		return true
+	}
+	real, err := filepath.EvalSymlinks(link)
+	src, srcErr := filepath.EvalSymlinks(dir)
+	return err == nil && srcErr == nil && utils.PathsEqual(real, src)
+}
+
 func pruneExtraManagedFiles(targetPath string, managedFiles map[string]bool) (pruned int, errors []string) {
 	if len(managedFiles) == 0 {
 		return 0, nil

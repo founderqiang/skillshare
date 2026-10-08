@@ -134,26 +134,20 @@ func cmdExtrasRemoveTarget(args []string) error {
 	resolved := canonicalExtraTargetPath(mode, cwd, target.Path)
 
 	var pruned int
-	if prune && extras[idx].File != "" {
-		changed, restoreErr := sync.RestoreExtraTarget(sync.NewExtraFile(sourceDirForExtra(extras[idx]), extras[idx].File, resolved, target.As, targetMode))
-		if restoreErr != nil {
-			return fmt.Errorf("failed to prune target %s: %w", shortenPath(rmPath), restoreErr)
-		}
-		if changed {
-			pruned = 1
-		}
-	} else if prune {
+	var kept bool
+	if prune {
+		sourceDir := sourceDirForExtra(extras[idx])
 		var managedFiles map[string]bool
-		if targetMode == "copy" {
+		if extras[idx].File == "" && targetMode == "copy" {
 			var managedErr error
-			managedFiles, managedErr = managedExtraTargetFiles(target, sourceDirForExtra(extras[idx]), extensionsDir)
+			managedFiles, managedErr = managedExtraTargetFiles(target, sourceDir, extensionsDir)
 			if managedErr != nil {
 				return managedErr
 			}
 		}
 
 		var errs []string
-		pruned, errs = sync.PruneExtraTargetFiles(resolved, sourceDirForExtra(extras[idx]), targetMode, managedFiles)
+		pruned, kept, errs = sync.ClearExtraTarget(extras[idx].File, sourceDir, resolved, target.As, targetMode, managedFiles)
 		if len(errs) > 0 {
 			for _, msg := range errs {
 				ui.Warning("%s", msg)
@@ -174,7 +168,9 @@ func cmdExtrasRemoveTarget(args []string) error {
 
 	ui.Done(ui.MarkOK, fmt.Sprintf("Removed target %s from %s", shortenPath(rmPath), name), 0)
 
-	if prune {
+	if kept {
+		ui.Warning("%s is not a link to %s's source; left in place", shortenPath(rmPath), name)
+	} else if prune {
 		ui.Note(fmt.Sprintf("Pruned %s from %s", plural(pruned, "file"), shortenPath(rmPath)))
 	} else if extras[idx].File != "" {
 		ui.Note("Target file left in place and no longer managed. Sync will not remove it.")
