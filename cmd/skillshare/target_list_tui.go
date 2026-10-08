@@ -1078,7 +1078,7 @@ func (m targetListTUIModel) renderNamingPicker() string {
 	var b strings.Builder
 	b.WriteString(theme.Primary().Bold(true).Render("Skills naming") + theme.Dim().Render(" · "+m.namingPickerTarget) + "\n\n")
 	for i, naming := range config.ValidTargetNamings {
-		desc := map[string]string{"flat": "flattened __ names", "standard": "SKILL.md name"}[naming]
+		desc := map[string]string{"flat": "flattened __ names", "standard": "SKILL.md name", "prefixed": "<repo>-<name>, copy mode only"}[naming]
 		b.WriteString(renderPickerRow(naming, desc, i == m.namingCursor))
 	}
 	return b.String()
