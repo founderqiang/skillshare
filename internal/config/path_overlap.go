@@ -1,6 +1,7 @@
 package config
 
 import (
+	"cmp"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -98,8 +99,8 @@ func SkillsPathKeptBy(targets map[string]TargetConfig, name string, leaving map[
 }
 
 // SkillsFolderConflict is a skills folder that two or more targets with skills
-// on sync into with different include or exclude filters, mode or target
-// naming, so each sync undoes the others' links. Keep is the target to leave on; Stop the rest.
+// on sync into with different settings, so each sync undoes the others'
+// links. Keep is the target to leave on; Stop the rest.
 type SkillsFolderConflict struct {
 	Path    string   `json:"path"`
 	Targets []string `json:"targets"`
@@ -108,10 +109,10 @@ type SkillsFolderConflict struct {
 }
 
 // SkillsFolderConflicts returns the shared skills folders whose targets'
-// filters, mode or (outside symlink mode) target naming differ, sorted by path. defaultMode is the
-// global mode a target without its own inherits. Targets with identical
-// settings agree on the folder's contents and are not a conflict. universal
-// is kept when it is in the group, otherwise the alphabetically first target.
+// settings differ, sorted by path. defaultMode is the global mode a target
+// without its own inherits. Targets with identical settings agree on the
+// folder's contents and are not a conflict. universal is kept when it is in
+// the group, otherwise the alphabetically first target.
 func SkillsFolderConflicts(targets map[string]TargetConfig, defaultMode string) []SkillsFolderConflict {
 	byFolder := make(map[string][]string)
 	for name, tc := range targets {
@@ -158,27 +159,16 @@ func SkillsFolderConflicts(targets map[string]TargetConfig, defaultMode string) 
 }
 
 func sameSkillsSettings(a, b ResourceTargetConfig, defaultMode string) bool {
-	mode := effectiveMode(a.Mode, defaultMode)
-	if mode != effectiveMode(b.Mode, defaultMode) {
+	mode := cmp.Or(a.Mode, defaultMode, "merge")
+	if mode != cmp.Or(b.Mode, defaultMode, "merge") {
 		return false
 	}
-	// symlink mode links the whole folder to the source, so skill names never apply.
-	if mode != "symlink" && EffectiveTargetNaming(a.TargetNaming) != EffectiveTargetNaming(b.TargetNaming) {
-		return false
+	// symlink mode links the whole folder to the source, so no per-skill setting applies.
+	if mode == "symlink" {
+		return true
 	}
-	return sameSet(a.Include, b.Include) && sameSet(a.Exclude, b.Exclude)
-}
-
-// effectiveMode mirrors the sync package's mode resolution: the target's own,
-// then the global default, then merge.
-func effectiveMode(mode, defaultMode string) string {
-	if mode != "" {
-		return mode
-	}
-	if defaultMode != "" {
-		return defaultMode
-	}
-	return "merge"
+	return EffectiveTargetNaming(a.TargetNaming) == EffectiveTargetNaming(b.TargetNaming) &&
+		sameSet(a.Include, b.Include) && sameSet(a.Exclude, b.Exclude)
 }
 
 func sameSet(a, b []string) bool {

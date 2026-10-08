@@ -123,7 +123,7 @@ skillshare restore <target>
 
 ### `sync` keeps showing the same changes {#sync-keeps-showing-the-same-changes}
 
-**原因：** 两个 Target 以不同的 `include`/`exclude` 过滤器、`mode` 或 `target_naming` 设置（命名只在 `symlink` 以外的模式有影响，`symlink` 会直接链接整个文件夹）把 skills 同步到同一个文件夹。每次 sync 都会按其中一个 Target 的设置重写文件夹，抵消另一个 Target 的结果（加入或移除被过滤的 skills、改名，或在链接与副本之间切换），所以这个文件夹永远无法稳定下来。`sync` 会指出是哪两个 Target：
+**原因：** 两个 Target 以不同的 `include`/`exclude` 过滤器、`mode` 或 `target_naming` 设置（`symlink` 模式会直接链接整个文件夹，这些设置都不影响）把 skills 同步到同一个文件夹。每次 sync 都会按其中一个 Target 的设置重写文件夹，抵消另一个 Target 的结果（加入或移除被过滤的 skills、改名，或在链接与副本之间切换），所以这个文件夹永远无法稳定下来。`sync` 会指出是哪两个 Target：
 
 ```
 ! codex and universal sync skills to ~/.agents/skills with different settings, so each sync undoes the other

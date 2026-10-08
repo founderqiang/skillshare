@@ -148,7 +148,7 @@ Doctor는 런타임 피커에 도달하기 전에 두 가지 종류의 중복 sk
 
 해결 방법: 중복된 target 중 하나를 비활성화하거나, `skillshare target <name> --path <dir>`로 별도의 경로를 설정하십시오.
 
-경로를 공유하는 target들의 `include`, `exclude` 필터, `mode`, `target_naming`이 서로 다르면 (이름 규칙은 `symlink` 모드가 아닐 때만 영향을 줍니다. `symlink`는 폴더 전체를 링크하기 때문입니다), 동기화할 때마다 한 target의 설정대로 폴더를 다시 쓰고 다른 target의 결과를 되돌립니다. 그래서 폴더가 안정되지 않고 `sync`에 같은 대기 중 변경이 계속 표시됩니다. Doctor는 이 경우를 표시하고, target을 제거하는 대신 하나(`universal`이 포함되어 있으면 그것)만 남기고 나머지는 Skills 동기화를 끄도록 제안합니다:
+경로를 공유하는 target들의 `include`, `exclude` 필터, `mode`, `target_naming`이 서로 다르면 (`symlink` 모드는 폴더 전체를 링크하므로 이 설정들은 영향을 주지 않습니다), 동기화할 때마다 한 target의 설정대로 폴더를 다시 쓰고 다른 target의 결과를 되돌립니다. 그래서 폴더가 안정되지 않고 `sync`에 같은 대기 중 변경이 계속 표시됩니다. Doctor는 이 경우를 표시하고, target을 제거하는 대신 하나(`universal`이 포함되어 있으면 그것)만 남기고 나머지는 Skills 동기화를 끄도록 제안합니다:
 
 ```text
 ! Shared path ~/.agents/skills ← codex, universal (different settings, so they undo each other on every sync)

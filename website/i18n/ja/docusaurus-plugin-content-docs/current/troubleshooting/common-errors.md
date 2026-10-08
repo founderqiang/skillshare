@@ -132,7 +132,7 @@ skillshare restore <target>
 
 ### `sync` が同じ変更を表示し続ける {#sync-keeps-showing-the-same-changes}
 
-**原因:** 2 つの Target が、`include` / `exclude` フィルター、`mode`、`target_naming` のいずれかが異なる状態で（命名は `symlink` 以外のモードでのみ影響します。`symlink` はフォルダ全体をリンクするためです）同じフォルダに Skill を Sync している。各 Sync が一方の Target の設定どおりにフォルダを書き直し、もう一方の結果を打ち消す（フィルター対象の Skill の追加や削除、名前の変更、リンクとコピーの切り替え）ため、フォルダの状態が安定しません。`sync` は該当する Target を表示します:
+**原因:** 2 つの Target が、`include` / `exclude` フィルター、`mode`、`target_naming` のいずれかが異なる状態で（`symlink` モードはフォルダ全体をリンクするため、これらの設定は影響しません）同じフォルダに Skill を Sync している。各 Sync が一方の Target の設定どおりにフォルダを書き直し、もう一方の結果を打ち消す（フィルター対象の Skill の追加や削除、名前の変更、リンクとコピーの切り替え）ため、フォルダの状態が安定しません。`sync` は該当する Target を表示します:
 
 ```
 ! codex and universal sync skills to ~/.agents/skills with different settings, so each sync undoes the other
