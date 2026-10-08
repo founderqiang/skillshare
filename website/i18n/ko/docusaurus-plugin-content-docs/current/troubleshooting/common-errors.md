@@ -123,7 +123,7 @@ skillshare restore <target>
 
 ### `sync` keeps showing the same changes {#sync-keeps-showing-the-same-changes}
 
-**Cause:** 두 target이 서로 다른 `include`/`exclude` filter, `mode` 또는 `target_naming`으로 (이름 규칙은 `symlink` 모드가 아닐 때만 영향을 줍니다. `symlink`는 폴더 전체를 링크하기 때문입니다) 같은 폴더에 skill을 sync합니다. 매번 sync할 때마다 한 target이 원하는 것은 추가되고 다른 target이 걸러내는 것은 제거되므로, 폴더가 안정되지 않습니다. `sync`가 해당 target을 알려줍니다:
+**Cause:** 두 target이 서로 다른 `include`/`exclude` filter, `mode` 또는 `target_naming`으로 (이름 규칙은 `symlink` 모드가 아닐 때만 영향을 줍니다. `symlink`는 폴더 전체를 링크하기 때문입니다) 같은 폴더에 skill을 sync합니다. 매번 sync할 때마다 한 target의 설정대로 폴더를 다시 쓰고 다른 target의 결과를 되돌리므로(필터된 skill 추가나 제거, 이름 변경, 링크와 복사본 전환), 폴더가 안정되지 않습니다. `sync`가 해당 target을 알려줍니다:
 
 ```
 ! codex and universal sync skills to ~/.agents/skills with different settings, so each sync undoes the other
@@ -137,7 +137,7 @@ skillshare target codex --skills=false --dry-run
 skillshare target codex --skills=false
 ```
 
-대시보드의 **Sync** 페이지에도 같은 경고가 표시되며, 해당 target의 skill 동기화를 중지하는 버튼이 함께 제공됩니다. 두 target에 같은 filter를 지정해도 해결됩니다.
+대시보드의 **Sync** 페이지에도 같은 경고가 표시되며, 해당 target의 skill 동기화를 중지하는 버튼이 함께 제공됩니다. 두 target에 같은 filter, mode, target naming을 지정해도 해결됩니다.
 
 ### `sync seems stuck or slow`
 

@@ -149,7 +149,7 @@ Doctor 会在两类重复 skill 风险到达运行时选择器之前将其标记
 
 解决方法：禁用其中一个重叠的 target，或用 `skillshare target <name> --path <dir>` 设置一个独立的路径。
 
-如果共用路径的 targets 的 `include` 或 `exclude` 筛选、`mode` 或 `target_naming` 不同（命名只在 `symlink` 以外的模式有影响，`symlink` 会直接链接整个文件夹），每次同步都会加入一个 target 需要的内容、再删掉另一个 target 过滤掉的内容，文件夹永远不会稳定，`sync` 也会一直显示同样的待同步变更。Doctor 会标出这种情况，并建议只保留一个 target（如果其中有 `universal` 就保留它）、其余的关闭 skills 同步，而不是移除 target：
+如果共用路径的 targets 的 `include` 或 `exclude` 筛选、`mode` 或 `target_naming` 不同（命名只在 `symlink` 以外的模式有影响，`symlink` 会直接链接整个文件夹），每次同步都会按其中一个 target 的设置重写文件夹、抵消另一个 target 的结果，文件夹永远不会稳定，`sync` 也会一直显示同样的待同步变更。Doctor 会标出这种情况，并建议只保留一个 target（如果其中有 `universal` 就保留它）、其余的关闭 skills 同步，而不是移除 target：
 
 ```text
 ! Shared path ~/.agents/skills ← codex, universal (different settings, so they undo each other on every sync)

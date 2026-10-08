@@ -148,7 +148,7 @@ Doctor flags two classes of duplicate-skill risk before they reach the runtime p
 
 Resolution: disable one of the overlapping targets, or set a distinct path with `skillshare target <name> --path <dir>`.
 
-When the targets sharing a path have different `include` or `exclude` filters, `mode`, or `target_naming` (naming only matters outside `symlink` mode, which links the whole folder), each sync adds what one target wants and prunes what another filters out, so the folder never settles and `sync` keeps showing the same pending changes. Doctor marks these and suggests turning skills off for all but one target (`universal` when it is one of them) instead of removing a target:
+When the targets sharing a path have different `include` or `exclude` filters, `mode`, or `target_naming` (naming only matters outside `symlink` mode, which links the whole folder), each sync redoes the folder the way one target wants and undoes the other's work, so the folder never settles and `sync` keeps showing the same pending changes. Doctor marks these and suggests turning skills off for all but one target (`universal` when it is one of them) instead of removing a target:
 
 ```text
 ! Shared path ~/.agents/skills ← codex, universal (different settings, so they undo each other on every sync)

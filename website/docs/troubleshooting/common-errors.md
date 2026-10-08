@@ -123,7 +123,7 @@ skillshare restore <target>
 
 ### `sync` keeps showing the same changes {#sync-keeps-showing-the-same-changes}
 
-**Cause:** Two targets sync skills into the same folder with different `include` or `exclude` filters, `mode`, or `target_naming` (naming only matters outside `symlink` mode, which links the whole folder). Each sync adds what one target wants and removes what the other filters out, so the folder never settles. `sync` names them:
+**Cause:** Two targets sync skills into the same folder with different `include` or `exclude` filters, `mode`, or `target_naming` (naming only matters outside `symlink` mode, which links the whole folder). Each sync redoes the folder the way one target wants and undoes the other's work (adding or removing filtered skills, renaming entries, or switching links and copies), so the folder never settles. `sync` names them:
 
 ```
 ! codex and universal sync skills to ~/.agents/skills with different settings, so each sync undoes the other
@@ -137,7 +137,7 @@ skillshare target codex --skills=false --dry-run
 skillshare target codex --skills=false
 ```
 
-In the dashboard, the **Sync** page shows the same warning with a button that stops syncing skills for that target. Giving both targets the same filters also works.
+In the dashboard, the **Sync** page shows the same warning with a button that stops syncing skills for that target. Giving both targets the same filters, mode and target naming also works.
 
 ### `sync seems stuck or slow`
 

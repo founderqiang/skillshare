@@ -148,7 +148,7 @@ Doctor 會在兩類重複 skill 風險到達 runtime picker 之前先標示出�
 
 解決方式：停用其中一個重疊的 target，或使用 `skillshare target <name> --path <dir>` 設定不同的路徑。
 
-若共用路徑的 targets 其 `include` 或 `exclude` 篩選、`mode` 或 `target_naming` 不同（命名只在 `symlink` 以外的模式有影響，`symlink` 會直接連結整個資料夾），每次同步都會加入一個 target 要的內容、再刪掉另一個 target 過濾掉的內容，資料夾永遠不會穩定，`sync` 也會一直顯示同樣的待同步變更。Doctor 會標出這種情況，並建議只保留一個 target（若其中有 `universal` 就保留它）、其他的關閉 skills 同步，而不是移除 target：
+若共用路徑的 targets 其 `include` 或 `exclude` 篩選、`mode` 或 `target_naming` 不同（命名只在 `symlink` 以外的模式有影響，`symlink` 會直接連結整個資料夾），每次同步都會照其中一個 target 的設定重寫資料夾、抵銷另一個 target 的結果，資料夾永遠不會穩定，`sync` 也會一直顯示同樣的待同步變更。Doctor 會標出這種情況，並建議只保留一個 target（若其中有 `universal` 就保留它）、其他的關閉 skills 同步，而不是移除 target：
 
 ```text
 ! Shared path ~/.agents/skills ← codex, universal (different settings, so they undo each other on every sync)
