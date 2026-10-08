@@ -123,7 +123,7 @@ skillshare restore <target>
 
 ### `sync` 一直顯示相同的變更 {#sync-keeps-showing-the-same-changes}
 
-**原因：** 兩個 Target 把 Skill 同步到同一個資料夾，但 `include` 或 `exclude` filters 不同。每次同步都會加入其中一個 Target 要的 Skill，同時移除另一個 Target 過濾掉的 Skill，所以資料夾永遠不會穩定下來。`sync` 會指出是哪兩個 Target：
+**原因：** 兩個 Target 把 Skill 同步到同一個資料夾，但 `include` 或 `exclude` filters、`mode` 或 `target_naming` 不同。每次同步都會加入其中一個 Target 要的 Skill，同時移除另一個 Target 過濾掉的 Skill，所以資料夾永遠不會穩定下來。`sync` 會指出是哪兩個 Target：
 
 ```
 ! codex and universal sync skills to ~/.agents/skills with different settings, so each sync undoes the other

@@ -123,7 +123,7 @@ skillshare restore <target>
 
 ### `sync` keeps showing the same changes {#sync-keeps-showing-the-same-changes}
 
-**Cause:** 두 target이 서로 다른 `include` 또는 `exclude` filter로 같은 폴더에 skill을 sync합니다. 매번 sync할 때마다 한 target이 원하는 것은 추가되고 다른 target이 걸러내는 것은 제거되므로, 폴더가 안정되지 않습니다. `sync`가 해당 target을 알려줍니다:
+**Cause:** 두 target이 서로 다른 `include`/`exclude` filter, `mode` 또는 `target_naming`으로 같은 폴더에 skill을 sync합니다. 매번 sync할 때마다 한 target이 원하는 것은 추가되고 다른 target이 걸러내는 것은 제거되므로, 폴더가 안정되지 않습니다. `sync`가 해당 target을 알려줍니다:
 
 ```
 ! codex and universal sync skills to ~/.agents/skills with different settings, so each sync undoes the other
