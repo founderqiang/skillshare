@@ -352,6 +352,7 @@ internal/sync/copy.go	PruneOrphanCopiesWithSkills	os.RemoveAll	entryPath	target
 internal/sync/copy.go	SyncTargetCopyWithSkillsOptions	os.Remove	targetSkillPath	target
 internal/sync/copy.go	SyncTargetCopyWithSkillsOptions	os.RemoveAll	targetSkillPath	target
 internal/sync/copy.go	SyncTargetCopyWithSkillsOptions	os.RemoveAll	targetSkillPath	target
+internal/sync/copy.go	copySkillToTarget	os.RemoveAll	dst	target
 internal/sync/extension.go	runExtensionFile	os.MkdirAll	filepath.Dir(tgtFile)	target
 internal/sync/extension.go	runExtensionFile	os.WriteFile	tgtFile	target
 internal/sync/extras.go	CollectExtraFiles	os.MkdirAll	filepath.Dir(destPath)	extras

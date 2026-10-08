@@ -274,6 +274,9 @@ func copySkillToTarget(src, dst, newName string, ignorePatterns []string) error 
 		return nil
 	}
 	if err := utils.SetFrontmatterValue(filepath.Join(dst, "SKILL.md"), "name", newName); err != nil {
+		// dst was just created by this copy; left behind without a manifest
+		// entry, it would pass for a user's folder and never be refreshed.
+		os.RemoveAll(dst)
 		return fmt.Errorf("failed to set prefixed name: %w", err)
 	}
 	return nil

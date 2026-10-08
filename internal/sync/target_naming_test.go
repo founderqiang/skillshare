@@ -1,6 +1,8 @@
 package sync
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -78,5 +80,22 @@ func TestResolveTargetSkillsForTarget_PrefixedNamingSkipsRemainingCollisions(t *
 	}
 	if len(resolution.Skills) != 0 || len(resolution.Collisions) != 1 || resolution.Collisions[0].Name != "a-b-c" {
 		t.Fatalf("Skills = %v, Collisions = %v; want both excluded under a-b-c", resolution.Skills, resolution.Collisions)
+	}
+}
+
+func TestCopySkillToTarget_RemovesCopyWhenNameRewriteFails(t *testing.T) {
+	src := t.TempDir() // no SKILL.md, so the name rewrite cannot read it
+	if err := os.WriteFile(filepath.Join(src, "notes.md"), []byte("x"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(t.TempDir(), "repo-skill")
+
+	if err := copySkillToTarget(src, dst, "repo-skill", nil); err == nil {
+		t.Fatal("expected the rewrite error")
+	}
+	// A copy left behind without a manifest entry would look user-owned and
+	// never be refreshed again.
+	if _, err := os.Lstat(dst); !os.IsNotExist(err) {
+		t.Fatalf("copy left behind: %v", err)
 	}
 }
