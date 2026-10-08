@@ -617,8 +617,14 @@ func ClearExtraTarget(file, sourceDir, targetPath, as, mode string, managedFiles
 		return 0, false, nil
 	}
 	if mode == "symlink" && !LinksTo(targetPath, sourceDir) {
-		_, err := os.Lstat(targetPath)
-		return 0, err == nil, nil
+		// Only a missing target is safe to forget; any other error must stop
+		// the caller before it drops the target from the config.
+		if _, err := os.Lstat(targetPath); err == nil {
+			return 0, true, nil
+		} else if !os.IsNotExist(err) {
+			return 0, false, []string{err.Error()}
+		}
+		return 0, false, nil
 	}
 	pruned, errors = PruneExtraTargetFiles(targetPath, sourceDir, mode, managedFiles)
 	return pruned, false, errors

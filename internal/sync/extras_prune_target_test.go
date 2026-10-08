@@ -138,3 +138,14 @@ func TestPruneExtraTargetFiles_SymlinkRequiresSymlink(t *testing.T) {
 		t.Errorf("local file must be preserved, stat err = %v", err)
 	}
 }
+
+func TestClearExtraTarget_SymlinkTargetThatCannotBeInspectedReportsError(t *testing.T) {
+	notDir := filepath.Join(t.TempDir(), "file")
+	os.WriteFile(notDir, []byte("x"), 0644)
+
+	_, kept, errs := ClearExtraTarget("", t.TempDir(), filepath.Join(notDir, "docs"), "", "symlink", nil)
+
+	if kept || len(errs) == 0 {
+		t.Errorf("kept = %v, errs = %v; want an error", kept, errs)
+	}
+}
