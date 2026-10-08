@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDownToLine, CirclePause, Folder, Plus, Target as TargetIcon } from 'lucide-react';
+import { ArrowDownToLine, CirclePause, Folder, Plus, Target as TargetIcon, TriangleAlert } from 'lucide-react';
 import { api, type Target } from '../api/client';
 import Button from '../components/Button';
 import CollectDialog from '../components/CollectDialog';
@@ -164,6 +164,25 @@ function TargetEditor({ target, targets }: { target: Target; targets: Target[] }
   const setFiltersFor = (next: { include: string[]; exclude: string[] }) =>
     setDraft(agent ? { ...draft, agentInclude: next.include, agentExclude: next.exclude } : { ...draft, ...next });
   const local = agent ? target.agentLocalCount ?? 0 : target.localCount;
+  // Another target writing this folder with other settings than the draft: each sync would undo the other's.
+  const sharing = (target.skillsSharedWith ?? []).map((n) => targets.find((x) => x.name === n)).filter((x): x is Target => !!x);
+  const modeClash = agent ? undefined : sharing.find((o) => o.mode !== draft.mode);
+  // Symlink links the whole folder, so naming only matters once the modes agree on something else.
+  const namingClash = modeClash ? undefined : sharing.find((o) => o.targetNaming !== draft.naming);
+  const sharedNote = (o: Target, field: 'mode' | 'naming') => {
+    const theirs = field === 'mode' ? o.mode : o.targetNaming;
+    return (
+      <div className="ss-note warn">
+        <TriangleAlert size={16} />
+        <div className="flex min-w-0 flex-col gap-2">
+          <span>{t(`targetDetail.shared.${field}`, { other: o.name, path: shortenHome(target.path), theirs, mine: draft[field] })}</span>
+          <Button variant="secondary" size="sm" className="self-start" onClick={() => setDraft({ ...draft, [field]: theirs })} disabled={saving}>
+            {t('targetDetail.shared.use', { value: theirs, other: o.name })}
+          </Button>
+        </div>
+      </div>
+    );
+  };
 
   const tabCount = (k: (typeof tabs)[number]) =>
     k === 'skill' && !skillsOn ? null : (k === 'mcp' ? mcp.data && serverCount(mcp.data, client)
@@ -312,6 +331,7 @@ function TargetEditor({ target, targets }: { target: Target; targets: Target[] }
             <div className="flex flex-col gap-3">
               <h2 className="ss-h2">{t('targetDetail.syncMode')}</h2>
               <ModePicker kind={kind} mode={mode} onChange={(m) => setDraft(agent ? { ...draft, agentMode: m } : { ...draft, mode: m })} disabled={saving || (agent && draft.agentExtension !== '')} />
+              {modeClash && sharedNote(modeClash, 'mode')}
             </div>
 
             {!agent && draft.mode !== 'symlink' && (
@@ -323,6 +343,7 @@ function TargetEditor({ target, targets }: { target: Target; targets: Target[] }
                   </div>
                   <SegmentedControl value={draft.naming} onChange={(naming) => setDraft({ ...draft, naming })} options={[{ value: 'flat', label: 'flat' }, { value: 'standard', label: 'standard' }]} />
                 </div>
+                {namingClash && sharedNote(namingClash, 'naming')}
                 {saved.naming === 'standard' && (target.skippedSkillCount ?? 0) > 0 && (
                   <span className="text-[13px] text-warn">{t(plural('targetDetail.skipped', target.skippedSkillCount), { count: target.skippedSkillCount })}</span>
                 )}
