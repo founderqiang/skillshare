@@ -1791,6 +1791,8 @@
   "targetDetail.shared.mode": "{other} 也把 Skills 同步到 {path}，使用 {theirs}。改用 {mine} 后，每次同步都会抵消对方的结果。",
   "targetDetail.shared.naming": "{other} 也把 Skills 同步到 {path}，命名为 {theirs}。改用 {mine} 后，每次同步都会抵消对方的结果。",
   "targetDetail.shared.use": "和 {other} 一样使用 {value}",
+  "targetDetail.shared.filters": "{other} 也把 Skills 同步到 {path}，但筛选不同。每次同步都会把对方筛掉的内容加回来或删掉。",
+  "targetDetail.shared.useFilters": "使用和 {other} 相同的筛选",
   "targetDetail.skipped.one": "{count} 个 Skill 无法使用 standard 命名而被跳过。试试 flat。",
   "targetDetail.skipped.other": "{count} 个 Skill 无法使用 standard 命名而被跳过。试试 flat。",
   "targetDetail.collect": "收集",

@@ -1791,6 +1791,8 @@
   "targetDetail.shared.mode": "{other} also syncs skills to {path}, with {theirs}. With {mine}, each sync would undo the other.",
   "targetDetail.shared.naming": "{other} also syncs skills to {path}, with {theirs} naming. With {mine}, each sync would undo the other.",
   "targetDetail.shared.use": "Use {value} like {other}",
+  "targetDetail.shared.filters": "{other} also syncs skills to {path}, with different filters. Each sync would add back or remove what the other filters out.",
+  "targetDetail.shared.useFilters": "Use the same filters as {other}",
   "targetDetail.skipped.one": "{count} skill can't use standard naming and is skipped. Try flat.",
   "targetDetail.skipped.other": "{count} skills can't use standard naming and are skipped. Try flat.",
   "targetDetail.collect": "Collect",

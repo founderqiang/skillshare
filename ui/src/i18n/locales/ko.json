@@ -1791,6 +1791,8 @@
   "targetDetail.shared.mode": "{other}도 {path}에 Skills를 동기화하며 {theirs}를 사용합니다. {mine}을(를) 쓰면 동기화할 때마다 서로의 결과를 되돌립니다.",
   "targetDetail.shared.naming": "{other}도 {path}에 Skills를 동기화하며 이름 규칙은 {theirs}입니다. {mine}을(를) 쓰면 동기화할 때마다 서로의 결과를 되돌립니다.",
   "targetDetail.shared.use": "{other}처럼 {value} 사용",
+  "targetDetail.shared.filters": "{other}도 {path}에 Skills를 동기화하며 필터가 다릅니다. 동기화할 때마다 다른 target이 걸러낸 항목을 다시 추가하거나 제거합니다.",
+  "targetDetail.shared.useFilters": "{other}와 같은 필터 사용",
   "targetDetail.skipped.one": "skill {count}개는 standard 이름을 쓸 수 없어 건너뜁니다. flat을 사용해 보세요.",
   "targetDetail.skipped.other": "skill {count}개는 standard 이름을 쓸 수 없어 건너뜁니다. flat을 사용해 보세요.",
   "targetDetail.collect": "수집",

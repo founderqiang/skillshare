@@ -1791,6 +1791,8 @@
   "targetDetail.shared.mode": "{other} も {path} に Skills を同期していて、{theirs} を使っています。{mine} にすると、同期のたびに互いの結果を打ち消します。",
   "targetDetail.shared.naming": "{other} も {path} に Skills を同期していて、命名は {theirs} です。{mine} にすると、同期のたびに互いの結果を打ち消します。",
   "targetDetail.shared.use": "{other} に合わせて {value} にする",
+  "targetDetail.shared.filters": "{other} も {path} に Skills を同期していて、フィルターが異なります。同期のたびに、もう一方が除外したものを追加し直したり削除したりします。",
+  "targetDetail.shared.useFilters": "{other} と同じフィルターにする",
   "targetDetail.skipped.one": "{count} 件のスキルは standard 命名を使えないためスキップされます。flat を試してください。",
   "targetDetail.skipped.other": "{count} 件のスキルは standard 命名を使えないためスキップされます。flat を試してください。",
   "targetDetail.collect": "収集",

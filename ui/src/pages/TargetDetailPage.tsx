@@ -169,6 +169,8 @@ function TargetEditor({ target, targets }: { target: Target; targets: Target[] }
   const modeClash = agent ? undefined : sharing.find((o) => o.mode !== draft.mode);
   // Symlink links the whole folder, so naming only matters once the modes agree on something else.
   const namingClash = modeClash ? undefined : sharing.find((o) => o.targetNaming !== draft.naming);
+  const sameList = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join('\n') === [...b].sort().join('\n');
+  const filtersClash = modeClash || draft.mode === 'symlink' ? undefined : sharing.find((o) => !sameList(o.include, draft.include) || !sameList(o.exclude, draft.exclude));
   const sharedNote = (o: Target, field: 'mode' | 'naming') => {
     const theirs = field === 'mode' ? o.mode : o.targetNaming;
     return (
@@ -299,6 +301,17 @@ function TargetEditor({ target, targets }: { target: Target; targets: Target[] }
               )}
             </div>
             <FilterSection kind={kind} mode={mode} name={target.name} include={include} exclude={exclude} onChange={setFiltersFor} entries={entries} loaded={Boolean(preview.data)} loading={preview.isPending} error={preview.error} disabled={saving} alsoReadBy={agent ? undefined : target.skillsAlsoReadBy} readsFrom={agent ? undefined : readsFrom} />
+            {!agent && filtersClash && (
+              <div className="ss-note warn">
+                <TriangleAlert size={16} />
+                <div className="flex min-w-0 flex-col gap-2">
+                  <span>{t('targetDetail.shared.filters', { other: filtersClash.name, path: shortenHome(target.path) })}</span>
+                  <Button variant="secondary" size="sm" className="self-start" onClick={() => setDraft({ ...draft, include: filtersClash.include, exclude: filtersClash.exclude })} disabled={saving}>
+                    {t('targetDetail.shared.useFilters', { other: filtersClash.name })}
+                  </Button>
+                </div>
+              </div>
+            )}
           </section>
 
           <aside className="flex flex-col gap-7">

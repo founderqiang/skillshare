@@ -57,6 +57,14 @@ describe('Target page shared skills folder', () => {
     expect(screen.queryByText(/each sync would undo the other/)).toBeNull();
   });
 
+  it('warns under the filters when only they differ, and copies the other target\'s filters', async () => {
+    const user = userEvent.setup();
+    renderPage({ exclude: ['feature-radar*'] });
+    expect(await screen.findByText(/universal also syncs skills to .*\.agents\/skills, with different filters\. Each sync would add back or remove what the other filters out\./)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Use the same filters as universal' }));
+    expect(screen.queryByText(/with different filters/)).toBeNull();
+  });
+
   it('stays quiet when both resolve to symlink, whatever the naming', async () => {
     renderPage({ mode: 'symlink', targetNaming: 'standard' }, { mode: 'symlink' });
     await screen.findByText('Sync mode');

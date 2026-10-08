@@ -1791,6 +1791,8 @@
   "targetDetail.shared.mode": "{other} também sincroniza skills em {path}, com {theirs}. Com {mine}, cada sincronização desfaria a outra.",
   "targetDetail.shared.naming": "{other} também sincroniza skills em {path}, com nomes {theirs}. Com {mine}, cada sincronização desfaria a outra.",
   "targetDetail.shared.use": "Usar {value} como {other}",
+  "targetDetail.shared.filters": "{other} também sincroniza skills em {path}, com outros filtros. Cada sincronização adicionaria de volta ou removeria o que a outra filtra.",
+  "targetDetail.shared.useFilters": "Usar os mesmos filtros que {other}",
   "targetDetail.skipped.one": "{count} skill não pode usar nomes standard e é ignorada. Tente flat.",
   "targetDetail.skipped.other": "{count} skills não podem usar nomes standard e são ignoradas. Tente flat.",
   "targetDetail.collect": "Coletar",

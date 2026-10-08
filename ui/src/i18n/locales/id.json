@@ -1791,6 +1791,8 @@
   "targetDetail.shared.mode": "{other} juga menyinkronkan skill ke {path}, dengan {theirs}. Dengan {mine}, setiap sinkronisasi akan membatalkan yang lain.",
   "targetDetail.shared.naming": "{other} juga menyinkronkan skill ke {path}, dengan penamaan {theirs}. Dengan {mine}, setiap sinkronisasi akan membatalkan yang lain.",
   "targetDetail.shared.use": "Pakai {value} seperti {other}",
+  "targetDetail.shared.filters": "{other} juga menyinkronkan skill ke {path}, dengan filter yang berbeda. Setiap sinkronisasi akan menambahkan kembali atau menghapus apa yang disaring yang lain.",
+  "targetDetail.shared.useFilters": "Pakai filter yang sama dengan {other}",
   "targetDetail.skipped.one": "{count} skill tidak bisa memakai penamaan standard dan dilewati. Coba flat.",
   "targetDetail.skipped.other": "{count} skill tidak bisa memakai penamaan standard dan dilewati. Coba flat.",
   "targetDetail.collect": "Kumpulkan",
