@@ -126,7 +126,8 @@ export function SkillContextMenu({
                 item={item}
                 expanded={expandedKey === item.key}
                 onExpand={() => setExpandedKey(item.key)}
-                onCollapse={() => setExpandedKey(null)}
+                // A late timer from a submenu left earlier must not close the one open now
+                onCollapse={() => setExpandedKey((k) => (k === item.key ? null : k))}
                 onClose={onClose}
                 parentMenuRef={menuRef}
               />
