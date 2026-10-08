@@ -15,7 +15,8 @@ type serverInstallContext struct{ s *Server }
 
 var _ install.InstallContext = serverInstallContext{}
 
-func (c serverInstallContext) SourcePath() string { return c.s.cfg.EffectiveSkillsSource() }
+// SourcePath is the project's skills folder in project mode, else the global one.
+func (c serverInstallContext) SourcePath() string { return c.s.skillsSource() }
 
 func (c serverInstallContext) ConfigSkills() []install.SkillEntryDTO {
 	if !c.s.IsProjectMode() {
@@ -25,7 +26,10 @@ func (c serverInstallContext) ConfigSkills() []install.SkillEntryDTO {
 }
 
 func (c serverInstallContext) Reconcile() error {
-	c.s.reloadSkillsStore()
+	// Reload from the same folder the install wrote to; reloadSkillsStore reads the global one.
+	if st, err := install.LoadMetadataWithMigration(c.SourcePath(), ""); err == nil && st != nil {
+		c.s.skillsStore = st
+	}
 	c.s.reconcileSkillsConfig(c.SourcePath())
 	return nil
 }
