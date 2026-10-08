@@ -1788,6 +1788,7 @@
   "targetDetail.naming": "Naming",
   "targetDetail.namingFlat": "Nested skills get flat names joined with __.",
   "targetDetail.namingStandard": "Skills use the name from SKILL.md.",
+  "targetDetail.namingPrefixed": "Skills in a tracked repo are named <repo>-<name>. Copy mode only.",
   "targetDetail.skipped.one": "{count} skill can't use standard naming and is skipped. Try flat.",
   "targetDetail.skipped.other": "{count} skills can't use standard naming and are skipped. Try flat.",
   "targetDetail.collect": "Collect",

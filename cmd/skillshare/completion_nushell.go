@@ -500,7 +500,7 @@ export extern "skillshare target" [
     --no-tui                 # Skip interactive TUI
     --mode(-m): string@"nu-complete skillshare sync-mode"
     --agent-mode: string@"nu-complete skillshare sync-mode"
-    --target-naming: string  # Set naming (flat or standard)
+    --target-naming: string  # Set naming (flat, standard, or prefixed)
     --add-include: string    # Add include filter
     --add-exclude: string    # Add exclude filter
     --remove-include: string # Remove include filter

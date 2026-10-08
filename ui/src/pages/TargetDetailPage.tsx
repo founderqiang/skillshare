@@ -319,11 +319,11 @@ function TargetEditor({ target, targets }: { target: Target; targets: Target[] }
                 <div className="flex items-center gap-4">
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="text-[13px] font-semibold">{t('targetDetail.naming')}</span>
-                    <span className="text-[13px] text-ink-2">{t(draft.naming === 'standard' ? 'targetDetail.namingStandard' : 'targetDetail.namingFlat')}</span>
+                    <span className="text-[13px] text-ink-2">{t(draft.naming === 'standard' ? 'targetDetail.namingStandard' : draft.naming === 'prefixed' ? 'targetDetail.namingPrefixed' : 'targetDetail.namingFlat')}</span>
                   </div>
-                  <SegmentedControl value={draft.naming} onChange={(naming) => setDraft({ ...draft, naming })} options={[{ value: 'flat', label: 'flat' }, { value: 'standard', label: 'standard' }]} />
+                  <SegmentedControl value={draft.naming} onChange={(naming) => setDraft({ ...draft, naming })} options={[{ value: 'flat', label: 'flat' }, { value: 'standard', label: 'standard' }, ...(draft.mode === 'copy' || draft.naming === 'prefixed' ? [{ value: 'prefixed', label: 'prefixed' }] : [])]} />
                 </div>
-                {saved.naming === 'standard' && (target.skippedSkillCount ?? 0) > 0 && (
+                {saved.naming !== 'flat' && (target.skippedSkillCount ?? 0) > 0 && (
                   <span className="text-[13px] text-warn">{t(plural('targetDetail.skipped', target.skippedSkillCount), { count: target.skippedSkillCount })}</span>
                 )}
               </div>

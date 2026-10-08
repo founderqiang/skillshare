@@ -1788,6 +1788,7 @@
   "targetDetail.naming": "이름 지정",
   "targetDetail.namingFlat": "중첩된 skill은 __로 이은 평면 이름을 받습니다.",
   "targetDetail.namingStandard": "skill은 SKILL.md의 이름을 사용합니다.",
+  "targetDetail.namingPrefixed": "추적 저장소의 skill은 <repo>-<name> 이름을 받습니다. copy 모드 전용입니다.",
   "targetDetail.skipped.one": "skill {count}개는 standard 이름을 쓸 수 없어 건너뜁니다. flat을 사용해 보세요.",
   "targetDetail.skipped.other": "skill {count}개는 standard 이름을 쓸 수 없어 건너뜁니다. flat을 사용해 보세요.",
   "targetDetail.collect": "수집",

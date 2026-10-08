@@ -1788,6 +1788,7 @@
   "targetDetail.naming": "Penamaan",
   "targetDetail.namingFlat": "Skill bertingkat mendapat nama datar yang digabung dengan __.",
   "targetDetail.namingStandard": "Skill memakai nama dari SKILL.md.",
+  "targetDetail.namingPrefixed": "Skill dari repo yang dilacak bernama <repo>-<name>. Hanya mode copy.",
   "targetDetail.skipped.one": "{count} skill tidak bisa memakai penamaan standard dan dilewati. Coba flat.",
   "targetDetail.skipped.other": "{count} skill tidak bisa memakai penamaan standard dan dilewati. Coba flat.",
   "targetDetail.collect": "Kumpulkan",

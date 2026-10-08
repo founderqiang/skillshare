@@ -1788,6 +1788,7 @@
   "targetDetail.naming": "نام‌گذاری",
   "targetDetail.namingFlat": "اسکیل‌های تودرتو نام تخت با __ می‌گیرند.",
   "targetDetail.namingStandard": "اسکیل‌ها از نام داخل SKILL.md استفاده می‌کنند.",
+  "targetDetail.namingPrefixed": "اسکیل‌های یک مخزن ردیابی‌شده نام <repo>-<name> می‌گیرند. فقط در حالت copy.",
   "targetDetail.skipped.one": "{count} اسکیل نمی‌تواند از نام‌گذاری standard استفاده کند و نادیده گرفته می‌شود. flat را امتحان کنید.",
   "targetDetail.skipped.other": "{count} اسکیل نمی‌توانند از نام‌گذاری standard استفاده کنند و نادیده گرفته می‌شوند. flat را امتحان کنید.",
   "targetDetail.collect": "جمع‌آوری",

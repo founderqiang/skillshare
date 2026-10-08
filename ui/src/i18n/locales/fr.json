@@ -1788,6 +1788,7 @@
   "targetDetail.naming": "Nommage",
   "targetDetail.namingFlat": "Les skills imbriqués reçoivent des noms à plat joints par __.",
   "targetDetail.namingStandard": "Les skills utilisent le nom de SKILL.md.",
+  "targetDetail.namingPrefixed": "Les skills d'un dépôt suivi s'appellent <repo>-<name>. Mode copie uniquement.",
   "targetDetail.skipped.one": "{count} skill ne peut pas utiliser le nommage standard et est ignoré. Essayez flat.",
   "targetDetail.skipped.other": "{count} skills ne peuvent pas utiliser le nommage standard et sont ignorés. Essayez flat.",
   "targetDetail.collect": "Collecter",

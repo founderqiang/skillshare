@@ -201,3 +201,19 @@ func filterVisible(names []string) []string {
 	}
 	return out
 }
+
+func TestTarget_SetPrefixedNamingNeedsCopyMode(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	targetPath := prefixedFixture(t, sb)
+	writeNamingConfig(sb, targetPath, "flat", "merge")
+
+	rejected := sb.RunCLI("target", "claude", "--target-naming", "prefixed")
+	rejected.AssertFailure(t)
+	rejected.AssertAnyOutputContains(t, "set --mode copy first")
+
+	sb.RunCLI("target", "claude", "--mode", "copy").AssertSuccess(t)
+	sb.RunCLI("target", "claude", "--target-naming", "prefixed").AssertSuccess(t)
+	sb.RunCLI("sync").AssertSuccess(t)
+	assertEntries(t, sb, targetPath, "emil-design-prototype", "mattpocock-skills-prototype", "my-skill")
+}

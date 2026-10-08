@@ -1788,6 +1788,7 @@
   "targetDetail.naming": "命名",
   "targetDetail.namingFlat": "巢狀 Skill 使用以 __ 串接的扁平名稱。",
   "targetDetail.namingStandard": "Skill 使用 SKILL.md 裡的名稱。",
+  "targetDetail.namingPrefixed": "追蹤儲存庫中的 Skill 命名為 <repo>-<name>。僅限 copy 模式。",
   "targetDetail.skipped.one": "{count} 個 Skill 無法使用 standard 命名而被略過。試試 flat。",
   "targetDetail.skipped.other": "{count} 個 Skills 無法使用 standard 命名而被略過。試試 flat。",
   "targetDetail.collect": "收集",

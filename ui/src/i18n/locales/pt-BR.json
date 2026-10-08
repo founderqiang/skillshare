@@ -1788,6 +1788,7 @@
   "targetDetail.naming": "Nomes",
   "targetDetail.namingFlat": "Skills aninhadas recebem nomes planos unidos por __.",
   "targetDetail.namingStandard": "Skills usam o nome do SKILL.md.",
+  "targetDetail.namingPrefixed": "Skills de um repo rastreado se chamam <repo>-<name>. Só no modo cópia.",
   "targetDetail.skipped.one": "{count} skill não pode usar nomes standard e é ignorada. Tente flat.",
   "targetDetail.skipped.other": "{count} skills não podem usar nomes standard e são ignoradas. Tente flat.",
   "targetDetail.collect": "Coletar",

@@ -389,7 +389,7 @@ _skillshare() {
                         '--mode[Set sync mode]:mode:(merge copy symlink)' \
                         '-m[Set sync mode]:mode:(merge copy symlink)' \
                         '--agent-mode[Set agents sync mode]:mode:(merge copy symlink)' \
-                        '--target-naming[Set naming]:naming:(flat standard)' \
+                        '--target-naming[Set naming]:naming:(flat standard prefixed)' \
                         '--add-include[Add include filter]:pattern:' \
                         '--add-exclude[Add exclude filter]:pattern:' \
                         '--remove-include[Remove include filter]:pattern:' \

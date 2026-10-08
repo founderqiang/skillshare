@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
@@ -479,10 +480,16 @@ func (s *Server) handleUpdateTarget(w http.ResponseWriter, r *http.Request) {
 
 	if body.TargetNaming != nil {
 		if !config.IsValidTargetNaming(*body.TargetNaming) {
-			writeError(w, http.StatusBadRequest, "invalid target_naming: "+*body.TargetNaming+"; must be flat or standard")
+			writeError(w, http.StatusBadRequest, "invalid target_naming: "+*body.TargetNaming+"; must be flat, standard, or prefixed")
 			return
 		}
 		target.Skills.TargetNaming = *body.TargetNaming
+	}
+	if body.Mode != nil || body.TargetNaming != nil {
+		if err := config.TargetNamingModeError(target.SkillsConfig().TargetNaming, cmp.Or(target.Skills.Mode, s.cfg.Mode)); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 	}
 
 	if body.AgentMode != nil {

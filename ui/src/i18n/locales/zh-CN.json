@@ -1788,6 +1788,7 @@
   "targetDetail.naming": "命名",
   "targetDetail.namingFlat": "嵌套 Skill 使用以 __ 连接的扁平名称。",
   "targetDetail.namingStandard": "Skill 使用 SKILL.md 中的名称。",
+  "targetDetail.namingPrefixed": "追踪仓库中的 Skill 命名为 <repo>-<name>。仅限 copy 模式。",
   "targetDetail.skipped.one": "{count} 个 Skill 无法使用 standard 命名而被跳过。试试 flat。",
   "targetDetail.skipped.other": "{count} 个 Skill 无法使用 standard 命名而被跳过。试试 flat。",
   "targetDetail.collect": "收集",

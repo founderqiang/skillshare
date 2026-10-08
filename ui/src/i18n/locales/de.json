@@ -1788,6 +1788,7 @@
   "targetDetail.naming": "Benennung",
   "targetDetail.namingFlat": "Verschachtelte Skills bekommen flache, mit __ verbundene Namen.",
   "targetDetail.namingStandard": "Skills verwenden den Namen aus SKILL.md.",
+  "targetDetail.namingPrefixed": "Skills aus einem getrackten Repo heißen <repo>-<name>. Nur im Kopiermodus.",
   "targetDetail.skipped.one": "{count} Skill kann die Standardbenennung nicht nutzen und wird übersprungen. Probiere flat.",
   "targetDetail.skipped.other": "{count} Skills können die Standardbenennung nicht nutzen und werden übersprungen. Probiere flat.",
   "targetDetail.collect": "Sammeln",

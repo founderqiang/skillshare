@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -117,7 +118,7 @@ func printTargetHelp() {
 		helpGroup{title: "Target settings", rows: []helpRow{
 			{"<name> --mode <mode>", "Set sync mode (merge, symlink, or copy)"},
 			{"<name> --agent-mode <mode>", "Set agents sync mode (merge, symlink, or copy)"},
-			{"<name> --target-naming <naming>", "Set target naming (flat or standard)"},
+			{"<name> --target-naming <naming>", "Set target naming (flat, standard, or prefixed; prefixed needs copy mode)"},
 			{"<name> --skills=false [--dry-run]", "Stop syncing skills; removes only links into the source"},
 			{"<name> --skills=true", "Sync skills again (on the next 'skillshare sync')"},
 			{"<name> --add-include <pattern>", "Add an include filter pattern"},
@@ -740,6 +741,10 @@ func updateTargetMode(cfg *config.Config, name string, target config.TargetConfi
 		}
 	}
 
+	if err := config.TargetNamingModeError(sc.TargetNaming, newMode); err != nil {
+		return fmt.Errorf("%w; change the target naming first", err)
+	}
+
 	target.EnsureSkills().Mode = newMode
 	cfg.Targets[name] = target
 	if err := cfg.Save(); err != nil {
@@ -785,7 +790,10 @@ func updateTargetAgentMode(cfg *config.Config, name string, target config.Target
 
 func updateTargetNaming(cfg *config.Config, name string, target config.TargetConfig, newNaming string) error {
 	if !config.IsValidTargetNaming(newNaming) {
-		return fmt.Errorf("invalid target naming '%s'. Use 'flat' or 'standard'", newNaming)
+		return fmt.Errorf("invalid target naming '%s'. Use 'flat', 'standard', or 'prefixed'", newNaming)
+	}
+	if err := config.TargetNamingModeError(newNaming, cmp.Or(target.SkillsConfig().Mode, cfg.Mode)); err != nil {
+		return fmt.Errorf("%w; set --mode copy first", err)
 	}
 
 	oldNaming := config.EffectiveTargetNaming(target.SkillsConfig().TargetNaming)

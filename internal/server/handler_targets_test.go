@@ -261,6 +261,27 @@ func TestHandleUpdateTarget_Mode(t *testing.T) {
 	}
 }
 
+func TestHandleUpdateTarget_PrefixedNamingNeedsCopyMode(t *testing.T) {
+	tgtPath := filepath.Join(t.TempDir(), "claude-skills")
+	s, _ := newTestServerWithTargets(t, map[string]string{"claude": tgtPath})
+
+	for _, tc := range []struct {
+		body string
+		want int
+	}{
+		{`{"target_naming":"prefixed"}`, http.StatusBadRequest}, // inherits merge
+		{`{"mode":"copy","target_naming":"prefixed"}`, http.StatusOK},
+		{`{"mode":"merge"}`, http.StatusBadRequest}, // would leave prefixed on merge
+	} {
+		req := httptest.NewRequest(http.MethodPatch, "/api/targets/claude", strings.NewReader(tc.body))
+		rr := httptest.NewRecorder()
+		s.handler.ServeHTTP(rr, req)
+		if rr.Code != tc.want {
+			t.Fatalf("%s: expected %d, got %d: %s", tc.body, tc.want, rr.Code, rr.Body.String())
+		}
+	}
+}
+
 func TestHandleUpdateTarget_NotFound(t *testing.T) {
 	s, _ := newTestServer(t)
 	body := `{"mode":"merge"}`

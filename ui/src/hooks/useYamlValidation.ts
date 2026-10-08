@@ -9,7 +9,7 @@ export interface ValidationError {
 }
 
 const VALID_SYNC_MODES = ['merge', 'symlink', 'copy'];
-const VALID_TARGET_NAMINGS = ['flat', 'standard'];
+const VALID_TARGET_NAMINGS = ['flat', 'standard', 'prefixed'];
 const VALID_GIT_ROOTS = ['skills', 'agents', 'extras', 'root'];
 const VALID_BLOCK_THRESHOLDS = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'];
 const VALID_AUDIT_PROFILES = ['default', 'strict', 'permissive'];

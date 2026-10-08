@@ -1788,6 +1788,7 @@
   "targetDetail.naming": "命名",
   "targetDetail.namingFlat": "ネストしたスキルは __ でつないだフラット名になります。",
   "targetDetail.namingStandard": "スキルは SKILL.md の名前を使います。",
+  "targetDetail.namingPrefixed": "追跡リポジトリのスキルは <repo>-<name> という名前になります。copy モードのみ。",
   "targetDetail.skipped.one": "{count} 件のスキルは standard 命名を使えないためスキップされます。flat を試してください。",
   "targetDetail.skipped.other": "{count} 件のスキルは standard 命名を使えないためスキップされます。flat を試してください。",
   "targetDetail.collect": "収集",
