@@ -86,11 +86,11 @@ func TestInstall_GitHubSubdirViaAPI(t *testing.T) {
 targets: {}
 `)
 
-	source := "majiayu000/claude-skill-registry/skills/documents/atlassian-search"
+	source := "runkids/skillshare/skills/skillshare"
 	result := sb.RunCLI("install", source)
 	result.AssertSuccess(t)
 
-	skillDir := filepath.Join(sb.SourcePath, "atlassian-search")
+	skillDir := filepath.Join(sb.SourcePath, "skillshare")
 	if !sb.FileExists(skillDir) {
 		t.Fatalf("expected skill directory %s to exist", skillDir)
 	}
@@ -106,14 +106,14 @@ targets: {}
 	if storeErr != nil {
 		t.Fatalf("failed to load metadata store: %v", storeErr)
 	}
-	entry := store.Get("atlassian-search")
+	entry := store.Get("skillshare")
 	if entry == nil {
-		t.Fatal("expected metadata entry for atlassian-search in centralized store")
+		t.Fatal("expected metadata entry for skillshare in centralized store")
 	}
-	if entry.Source != "github.com/majiayu000/claude-skill-registry/skills/documents/atlassian-search" {
+	if entry.Source != "github.com/runkids/skillshare/skills/skillshare" {
 		t.Fatalf("expected source to preserve subdir, got: %s", entry.Source)
 	}
-	if entry.Subdir != "skills/documents/atlassian-search" {
+	if entry.Subdir != "skills/skillshare" {
 		t.Fatalf("expected subdir to match install path, got: %s", entry.Subdir)
 	}
 }
