@@ -17,13 +17,16 @@ func installTrackedRepoImpl(source *Source, sourceDir string, opts InstallOption
 		return nil, err
 	}
 
-	// Determine repo name: opts.Name > source.Name (from config) > TrackName (derived from URL)
+	// Determine repo name: opts.Name (--name or the name recorded in config) >
+	// TrackName (owner-repo, so two repos both called "skills" don't collide) >
+	// source.Name. ParseSource always fills source.Name with the URL basename,
+	// so it must not win over TrackName.
 	repoName := opts.Name
 	if repoName == "" {
-		repoName = source.Name
+		repoName = source.TrackName()
 	}
 	if repoName == "" {
-		repoName = source.TrackName()
+		repoName = source.Name
 	}
 
 	// Prefix with _ to indicate tracked repo (avoid double prefix if user already added _)

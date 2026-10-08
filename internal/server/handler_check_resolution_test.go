@@ -41,14 +41,13 @@ func decodeCheckPayload(t *testing.T, raw string) checkPayload {
 }
 
 // wantDashboardSkills is what the dashboard reports for checktest.Seed. Unlike
-// the CLI it reports a skill removed upstream as update_available, and gives
-// only name, status and message for a skill without a remote.
+// the CLI it gives only name, status and message for a skill without a remote.
 func wantDashboardSkills(versions map[string]string) []skillCheckResult {
 	statuses := map[string]string{
 		"broken":  "error",
 		"changed": "update_available",
 		"current": "up_to_date",
-		"doomed":  "update_available",
+		"doomed":  "stale",
 		"notree":  "update_available",
 		"same":    "up_to_date",
 		"slash":   "up_to_date",

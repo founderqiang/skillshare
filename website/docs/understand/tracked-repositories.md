@@ -46,7 +46,7 @@ skillshare sync
 ```
 
 **What happens:**
-1. Repo is cloned to `~/.config/skillshare/skills/_team-skills/`
+1. Repo is cloned to `~/.config/skillshare/skills/_team-shared-skills/`
 2. `.git` directory is preserved
 3. The clone directory is added to the managed `.gitignore` block so it stays machine-local and is not committed as a nested git repository
 4. Entire repo is security-audited using active install threshold (`audit.block_threshold` or `--threshold`)
@@ -66,6 +66,8 @@ Tracked repos are prefixed with `_` to distinguish them from regular skills:
 ├── code-review/        # Regular skill
 └── _team-skills/       # Tracked repo (underscore prefix)
 ```
+
+The directory name comes from the owner and repo (`_<owner>-<repo>`), so `alice/skills` and `bob/skills` install as `_alice-skills` and `_bob-skills` instead of colliding. Use `--name` to pick a different name. Repos you installed earlier keep their current names.
 
 A tracked repo installed with `--into` sits inside a folder, such as `devops/_team-skills/`. It is still treated as one repo: its skills are grouped under it, `status` counts them, and you update or uninstall it as `devops/_team-skills`. Below the top level, an `_` folder counts as a tracked repo only when it is a git clone, so a plain folder like `devops/_drafts/` stays a regular folder.
 

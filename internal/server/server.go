@@ -563,6 +563,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/discover", s.handleDiscover)
 	s.mux.HandleFunc("POST /api/install", s.handleInstall)
 	s.mux.HandleFunc("POST /api/install/batch", s.handleInstallBatch)
+	s.mux.HandleFunc("GET /api/install/missing", s.handleMissingConfigEntries)
+	s.mux.HandleFunc("POST /api/install/from-config", s.handleInstallFromConfig)
 	s.mux.HandleFunc("POST /api/uninstall/batch", s.handleBatchUninstall)
 	s.mux.HandleFunc("POST /api/source-links", s.handleCreateSourceLink)
 	s.mux.HandleFunc("DELETE /api/source-links/{name}", s.handleRemoveSourceLink)
@@ -570,8 +572,6 @@ func (s *Server) registerRoutes() {
 	// Update & Check
 	s.mux.HandleFunc("POST /api/update", s.handleUpdate)
 	s.mux.HandleFunc("GET /api/update/stream", s.handleUpdateStream)
-	s.mux.HandleFunc("GET /api/update/missing-tracked-repos", s.handleMissingTrackedRepos)
-	s.mux.HandleFunc("POST /api/update/rehydrate", s.handleRehydrateTrackedRepos)
 	s.mux.HandleFunc("GET /api/check/stream", s.handleCheckStream)
 	s.mux.HandleFunc("GET /api/check", s.handleCheck)
 

@@ -250,3 +250,13 @@ func ReconcileProjectAgents(projectRoot string, store *install.MetadataStore, ag
 
 	return nil
 }
+
+// ProjectSkillEntries lists a project's config skills as install entries, the
+// project counterpart of install.MetadataSkillEntries.
+func ProjectSkillEntries(skills []SkillEntry) []install.SkillEntryDTO {
+	dtos := make([]install.SkillEntryDTO, 0, len(skills))
+	for _, s := range skills {
+		dtos = append(dtos, install.SkillEntryDTO{Name: s.Name, Source: s.Source, Tracked: s.Tracked, Group: s.Group, Branch: s.Branch})
+	}
+	return dtos
+}

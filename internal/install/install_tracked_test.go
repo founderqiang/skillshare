@@ -57,9 +57,25 @@ func fileURL(p string) string {
 	return "file://" + p
 }
 
-// TestRehydrateMissingTrackedRepos_ReclonesAbsent verifies that a tracked repo
-// declared in metadata but absent on disk is re-cloned (issue #212).
-func TestRehydrateMissingTrackedRepos_ReclonesAbsent(t *testing.T) {
+// metadataInstallContext is a global-mode InstallContext over a metadata file.
+type metadataInstallContext struct{ dir string }
+
+func (c metadataInstallContext) SourcePath() string { return c.dir }
+func (c metadataInstallContext) ConfigSkills() []SkillEntryDTO {
+	return MetadataSkillEntries(LoadMetadataOrNew(c.dir))
+}
+func (metadataInstallContext) Reconcile() error              { return nil }
+func (metadataInstallContext) PostInstallSkill(string) error { return nil }
+func (metadataInstallContext) Mode() string                  { return "global" }
+func (metadataInstallContext) GitLabHosts() []string         { return nil }
+func (metadataInstallContext) AzureHosts() []string          { return nil }
+func (metadataInstallContext) CNBHosts() []string            { return nil }
+func (metadataInstallContext) GiteaHosts() []string          { return nil }
+
+// TestInstallFromConfig_ReclonesMissingTrackedRepo verifies that a tracked repo
+// declared in metadata but absent on disk is listed as missing and re-cloned
+// under its recorded name (issue #212).
+func TestInstallFromConfig_ReclonesMissingTrackedRepo(t *testing.T) {
 	remoteURL := makeRemote(t, "")
 	sourceDir := t.TempDir()
 
@@ -69,27 +85,30 @@ func TestRehydrateMissingTrackedRepos_ReclonesAbsent(t *testing.T) {
 	if err := store.Save(sourceDir); err != nil {
 		t.Fatalf("save metadata: %v", err)
 	}
-
-	results, err := RehydrateMissingTrackedRepos(sourceDir, ParseOptions{}, InstallOptions{SkipAudit: true})
-	if err != nil {
-		t.Fatalf("RehydrateMissingTrackedRepos() error = %v", err)
+	ctx := metadataInstallContext{sourceDir}
+	if missing := MissingFromConfig(ctx); len(missing) != 1 || !missing[0].Tracked {
+		t.Fatalf("expected the tracked repo to be missing, got %+v", missing)
 	}
-	if len(results) != 1 || results[0].Action != "rehydrated" {
-		t.Fatalf("unexpected results: %+v", results)
+
+	result, err := InstallFromConfig(ctx, InstallOptions{SkipAudit: true, Quiet: true})
+	if err != nil {
+		t.Fatalf("InstallFromConfig() error = %v", err)
+	}
+	if result.InstalledRepos != 1 || len(result.FailedSkills) != 0 {
+		t.Fatalf("unexpected result: %+v", result)
 	}
 	if _, err := os.Stat(filepath.Join(sourceDir, "_team-skills", ".git")); err != nil {
 		t.Fatalf("expected cloned repo at _team-skills: %v", err)
 	}
-	// After rehydration nothing should remain missing.
-	if missing, _ := GetMissingTrackedRepos(sourceDir); len(missing) != 0 {
-		t.Fatalf("expected no missing repos after rehydrate, got %+v", missing)
+	if missing := MissingFromConfig(ctx); len(missing) != 0 {
+		t.Fatalf("expected nothing missing after install, got %+v", missing)
 	}
 }
 
-// TestInstallTrackedRepo_NameFromSource verifies that when opts.Name is empty,
-// the directory name is taken from source.Name rather than being derived from
-// the remote URL via TrackName().
-func TestInstallTrackedRepo_NameFromSource(t *testing.T) {
+// TestInstallTrackedRepo_NameFromOptions verifies that a name passed in
+// opts.Name (--name, or the name recorded in config) wins over the
+// URL-derived TrackName().
+func TestInstallTrackedRepo_NameFromOptions(t *testing.T) {
 	remoteURL := makeRemote(t, "")
 	sourceDir := t.TempDir()
 
@@ -97,10 +116,9 @@ func TestInstallTrackedRepo_NameFromSource(t *testing.T) {
 		Type:     SourceTypeGitHTTPS,
 		Raw:      remoteURL,
 		CloneURL: remoteURL,
-		Name:     "my-custom-name", // explicit name; should win over TrackName()
 	}
 
-	result, err := InstallTrackedRepo(source, sourceDir, InstallOptions{})
+	result, err := InstallTrackedRepo(source, sourceDir, InstallOptions{Name: "my-custom-name"})
 	if err != nil {
 		t.Fatalf("InstallTrackedRepo() error = %v", err)
 	}
@@ -119,6 +137,32 @@ func TestInstallTrackedRepo_NameFromSource(t *testing.T) {
 	}
 }
 
+// TestInstallTrackedRepo_SameBasenameDoesNotCollide verifies that two repos
+// whose URLs end in the same basename get distinct owner-repo directories,
+// even though ParseSource fills source.Name with that shared basename.
+func TestInstallTrackedRepo_SameBasenameDoesNotCollide(t *testing.T) {
+	remoteURL := makeRemote(t, "")
+	sourceDir := t.TempDir()
+	seen := map[string]bool{}
+	for _, owner := range []string{"alice", "bob"} {
+		// Raw names the owner (TrackName reads it); the clone uses the local remote.
+		source := &Source{
+			Type:     SourceTypeGitSSH,
+			Raw:      "git@example.com:" + owner + "/skills.git",
+			CloneURL: remoteURL,
+			Name:     "skills", // what ParseSource fills in from the basename
+		}
+		result, err := InstallTrackedRepo(source, sourceDir, InstallOptions{SkipAudit: true})
+		if err != nil {
+			t.Fatalf("install %s: %v", owner, err)
+		}
+		if result.RepoName == "_skills" || seen[result.RepoName] {
+			t.Fatalf("repo %s got colliding name %q", owner, result.RepoName)
+		}
+		seen[result.RepoName] = true
+	}
+}
+
 // TestInstallTrackedRepo_BranchFromSource verifies that when opts.Branch is
 // empty, the repo is cloned onto source.Branch rather than the remote default.
 func TestInstallTrackedRepo_BranchFromSource(t *testing.T) {
@@ -130,11 +174,10 @@ func TestInstallTrackedRepo_BranchFromSource(t *testing.T) {
 		Type:     SourceTypeGitHTTPS,
 		Raw:      remoteURL,
 		CloneURL: remoteURL,
-		Name:     "mybranch-skill",
 		Branch:   featureBranch, // should be used; opts.Branch is empty
 	}
 
-	result, err := InstallTrackedRepo(source, sourceDir, InstallOptions{})
+	result, err := InstallTrackedRepo(source, sourceDir, InstallOptions{Name: "mybranch-skill"})
 	if err != nil {
 		t.Fatalf("InstallTrackedRepo() error = %v", err)
 	}
@@ -173,8 +216,7 @@ func TestMissingTrackedReposFollowPolicy(t *testing.T) {
 	if err != nil || len(missing) != 0 {
 		t.Fatalf("present followed checkout reported missing: %+v %v", missing, err)
 	}
-	results, err := RehydrateMissingTrackedRepos(source, ParseOptions{}, InstallOptions{SourceFollow: walk.Follow})
-	if err != nil || len(results) != 0 {
-		t.Fatalf("present followed checkout rehydrated: %+v %v", results, err)
+	if got := MissingFromConfig(metadataInstallContext{source}); len(got) != 0 {
+		t.Fatalf("present followed checkout listed for install: %+v", got)
 	}
 }

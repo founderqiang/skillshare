@@ -43,8 +43,7 @@ func (s *Server) planSkillCheck(sourceDir, projectRoot string, walk sourcewalk.O
 
 // dashboardSkillResults converts resolved statuses to the dashboard payload,
 // which is narrower than the CLI's: a skill without a remote carries only its
-// name, status and message, and a skill removed upstream is reported as
-// update_available because the dashboard has no "stale" state.
+// name, status and message.
 func dashboardSkillResults(results []check.SkillResult) []skillCheckResult {
 	out := make([]skillCheckResult, 0, len(results))
 	for _, r := range results {
@@ -52,15 +51,11 @@ func dashboardSkillResults(results []check.SkillResult) []skillCheckResult {
 			out = append(out, skillCheckResult{Name: r.Name, Status: r.Status, Message: r.Message})
 			continue
 		}
-		status := r.Status
-		if status == "stale" {
-			status = "update_available"
-		}
 		out = append(out, skillCheckResult{
 			Name:        r.Name,
 			Source:      r.Source,
 			Version:     r.Version,
-			Status:      status,
+			Status:      r.Status,
 			InstalledAt: r.InstalledAt,
 		})
 	}

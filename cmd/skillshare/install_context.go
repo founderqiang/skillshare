@@ -1,8 +1,6 @@
 package main
 
 import (
-	"strings"
-
 	"skillshare/internal/config"
 	"skillshare/internal/install"
 )
@@ -12,37 +10,6 @@ var (
 	_ install.InstallContext = (*globalInstallContext)(nil)
 	_ install.InstallContext = (*projectInstallContext)(nil)
 )
-
-// storeToSkillEntryDTOs converts MetadataStore entries to []install.SkillEntryDTO.
-func storeToSkillEntryDTOs(store *install.MetadataStore) []install.SkillEntryDTO {
-	names := store.List() // sorted
-	dtos := make([]install.SkillEntryDTO, 0, len(names))
-	for _, name := range names {
-		entry := store.Get(name)
-		if entry == nil {
-			continue
-		}
-		relPath := install.KeyToRelPath(name, entry)
-		group, bareName := splitMetadataRelPath(relPath)
-		dtos = append(dtos, install.SkillEntryDTO{
-			Name:    bareName,
-			Source:  entry.Source,
-			Tracked: entry.Tracked,
-			Group:   group,
-			Branch:  entry.Branch,
-		})
-	}
-	return dtos
-}
-
-func splitMetadataRelPath(relPath string) (group, name string) {
-	relPath = strings.Trim(relPath, "/")
-	idx := strings.LastIndex(relPath, "/")
-	if idx < 0 {
-		return "", relPath
-	}
-	return relPath[:idx], relPath[idx+1:]
-}
 
 // ---------------------------------------------------------------------------
 // globalInstallContext
@@ -56,7 +23,7 @@ type globalInstallContext struct {
 
 func (g *globalInstallContext) SourcePath() string { return g.cfg.EffectiveSkillsSource() }
 func (g *globalInstallContext) ConfigSkills() []install.SkillEntryDTO {
-	return storeToSkillEntryDTOs(g.store)
+	return install.MetadataSkillEntries(g.store)
 }
 func (g *globalInstallContext) Reconcile() error {
 	return config.ReconcileGlobalSkills(g.cfg, g.store)
@@ -79,18 +46,7 @@ type projectInstallContext struct {
 
 func (p *projectInstallContext) SourcePath() string { return p.runtime.sourcePath }
 func (p *projectInstallContext) ConfigSkills() []install.SkillEntryDTO {
-	skills := p.runtime.config.Skills
-	dtos := make([]install.SkillEntryDTO, 0, len(skills))
-	for _, s := range skills {
-		dtos = append(dtos, install.SkillEntryDTO{
-			Name:    s.Name,
-			Source:  s.Source,
-			Tracked: s.Tracked,
-			Group:   s.Group,
-			Branch:  s.Branch,
-		})
-	}
-	return dtos
+	return config.ProjectSkillEntries(p.runtime.config.Skills)
 }
 func (p *projectInstallContext) Reconcile() error {
 	return reconcileProjectRemoteSkills(p.runtime)

@@ -103,6 +103,44 @@ func matchDiscoveredSkillBySubdir(discovery *DiscoveryResult, subdir string) (Sk
 	return SkillInfo{}, false
 }
 
+// MetadataSkillEntries lists the entries of a metadata store as config skills,
+// sorted by key; it is the global-mode source of InstallContext.ConfigSkills.
+func MetadataSkillEntries(store *MetadataStore) []SkillEntryDTO {
+	names := store.List() // sorted
+	dtos := make([]SkillEntryDTO, 0, len(names))
+	for _, name := range names {
+		entry := store.Get(name)
+		if entry == nil {
+			continue
+		}
+		group, bareName := splitTrackedRelPath(filepath.ToSlash(KeyToRelPath(name, entry)))
+		dtos = append(dtos, SkillEntryDTO{
+			Name:    bareName,
+			Source:  entry.Source,
+			Tracked: entry.Tracked,
+			Group:   group,
+			Branch:  entry.Branch,
+		})
+	}
+	return dtos
+}
+
+// MissingFromConfig returns the config skills InstallFromConfig would install:
+// entries with a name whose directory does not exist on disk.
+func MissingFromConfig(ctx InstallContext) []SkillEntryDTO {
+	sourcePath := ctx.SourcePath()
+	var missing []SkillEntryDTO
+	for _, skill := range ctx.ConfigSkills() {
+		if _, bareName := skill.EffectiveParts(); strings.TrimSpace(bareName) == "" {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(sourcePath, filepath.FromSlash(skill.FullName()))); err != nil {
+			missing = append(missing, skill)
+		}
+	}
+	return missing
+}
+
 // InstallFromConfig iterates over the remote skills listed in the config
 // (via ctx.ConfigSkills) and installs each one that is not already present.
 // It handles both tracked repos and plain skills, delegates per-skill hooks
@@ -150,6 +188,9 @@ func InstallFromConfig(ctx InstallContext, opts InstallOptions) (ConfigInstallRe
 		if _, err := os.Stat(destPath); err == nil {
 			if locked == "" || InstalledCommit(destPath, store.GetByPath(displayName)) == locked {
 				result.Skipped++
+				if skill.Tracked {
+					result.SkippedRepos++
+				}
 				if !opts.Quiet {
 					ui.StepDone(displayName, "skipped (already exists)")
 				}
@@ -230,6 +271,8 @@ func InstallFromConfig(ctx InstallContext, opts InstallOptions) (ConfigInstallRe
 		}
 		result.InstalledSkills = append(result.InstalledSkills, installed.skills...)
 		result.Installed++
+		result.InstalledRepos++
+		result.InstalledRepoSkills += installed.skillCount
 	}
 
 	// ── Phase 2: grouped plain skills (clone once per repo) ──
@@ -341,9 +384,10 @@ func InstallFromConfig(ctx InstallContext, opts InstallOptions) (ConfigInstallRe
 // trackedInstallOutcome captures the result of a single tracked-repo install
 // within the config loop.
 type trackedInstallOutcome struct {
-	failed bool
-	action string   // only meaningful on dry-run
-	skills []string // skills names to record
+	failed     bool
+	action     string   // only meaningful on dry-run
+	skills     []string // skills names to record
+	skillCount int      // skills discovered in the repo
 }
 
 // installTrackedFromConfig installs a single tracked repo from config and
@@ -356,6 +400,7 @@ func installTrackedFromConfig(
 	opts InstallOptions,
 ) trackedInstallOutcome {
 	trackOpts := opts
+	trackOpts.Name = source.Name // keep the name recorded in config
 	if groupDir != "" {
 		trackOpts.Into = groupDir
 	}
@@ -380,7 +425,7 @@ func installTrackedFromConfig(
 	if len(skills) == 0 {
 		skills = []string{displayName}
 	}
-	return trackedInstallOutcome{skills: skills}
+	return trackedInstallOutcome{skills: skills, skillCount: trackedResult.SkillCount}
 }
 
 // installPlainFromConfig installs a single non-tracked skill from config.

@@ -526,3 +526,25 @@ func TestDisplayInstallResults_SkippedFallbackLabel(t *testing.T) {
 		t.Errorf("expected fallback 'same repo' label, got:\n%s", output)
 	}
 }
+
+func TestBuildConfigInstallSummary(t *testing.T) {
+	tests := []struct {
+		name string
+		in   install.ConfigInstallResult
+		want string
+	}{
+		{"skills only", install.ConfigInstallResult{Installed: 3, Skipped: 1}, "Installed 3 skills, 1 skipped"},
+		{"tracked repo", install.ConfigInstallResult{Installed: 1, InstalledRepos: 1, InstalledRepoSkills: 12, Skipped: 9, SkippedRepos: 1},
+			"Installed 1 tracked repo (12 skills), 9 skipped (1 repo, 8 skills)"},
+		{"repo and skills", install.ConfigInstallResult{Installed: 3, InstalledRepos: 1, InstalledRepoSkills: 5, FailedSkills: []string{"x"}},
+			"Installed 1 tracked repo (5 skills), 2 skills, 1 failed"},
+		{"only repos skipped", install.ConfigInstallResult{Skipped: 2, SkippedRepos: 2}, "Installed 0 skills, 2 skipped (2 repos)"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := buildConfigInstallSummary(tt.in); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
