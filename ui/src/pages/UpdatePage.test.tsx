@@ -17,8 +17,9 @@ vi.mock('../api/client', async (importOriginal) => {
       listSkills: vi.fn(),
       checkStream: vi.fn(),
       updateAllStream: vi.fn(),
-      missingTrackedRepos: vi.fn(),
-      rehydrateTrackedRepos: vi.fn(),
+      missingConfigEntries: vi.fn(),
+      installFromConfig: vi.fn(),
+      batchUninstall: vi.fn(),
       sync: vi.fn().mockResolvedValue({ results: [] }),
     },
   };
@@ -61,7 +62,7 @@ describe('UpdatePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    vi.mocked(api.missingTrackedRepos).mockResolvedValue({ repos: [] });
+    vi.mocked(api.missingConfigEntries).mockResolvedValue({ entries: [], file: '.metadata.json' });
   });
 
   const nestedSkill = {
@@ -328,24 +329,34 @@ describe('UpdatePage', () => {
     expect(await screen.findByText('Only skills are written. Agents, extras and MCP stay as they are.')).toBeInTheDocument();
   });
 
-  it('warns about missing tracked repos and rehydrates on click (issue #212)', async () => {
+  it('installs entries missing on disk from config (issue #212)', async () => {
     vi.mocked(api.listSkills).mockResolvedValue({ resources: [nestedSkill] });
-    vi.mocked(api.missingTrackedRepos).mockResolvedValue({
-      repos: [{ name: '_team-skills', source: 'https://github.com/example/team-skills', branch: 'main' }],
+    vi.mocked(api.missingConfigEntries).mockResolvedValue({
+      entries: [{ name: '_team-skills', source: 'https://github.com/example/team-skills', tracked: true, branch: 'main' }],
+      file: '.metadata.json',
     });
-    vi.mocked(api.rehydrateTrackedRepos).mockResolvedValue({
-      results: [{ name: '_team-skills', action: 'rehydrated' }],
-    });
+    vi.mocked(api.installFromConfig).mockResolvedValue({ installed: 1, installedRepos: 1, installedRepoSkills: 3, skipped: 0, failed: [] });
 
     const user = userEvent.setup();
     renderUpdatePage();
 
-    // Banner lists the missing repo.
     expect(await screen.findByText('_team-skills')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /install missing/i }));
 
-    await user.click(screen.getByRole('button', { name: /rehydrate/i }));
+    expect(await screen.findByText(/^Installed 1 tracked repo/)).toBeInTheDocument();
+  });
 
-    await waitFor(() => expect(api.rehydrateTrackedRepos).toHaveBeenCalled());
+  it('lists skills deleted upstream and prunes them', async () => {
+    vi.mocked(api.listSkills).mockResolvedValue({ resources: [nestedSkill] });
+    vi.mocked(api.batchUninstall).mockResolvedValue({ results: [] } as never);
+    cacheStatus('agent-browser', 'stale');
+
+    const user = userEvent.setup();
+    renderUpdatePage();
+    const row = await findRow('agent-browser');
+    await user.click(row.getByRole('button', { name: 'Prune' }));
+
+    await waitFor(() => expect(api.batchUninstall).toHaveBeenCalledWith({ names: ['tools/agent-browser'], force: true }));
   });
 });
 

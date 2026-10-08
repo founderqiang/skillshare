@@ -22,6 +22,8 @@ export interface ContextMenuItem {
   label: string;
   /** What picking this does, shown under the label. */
   description?: string;
+  /** Show the label as code, for field names and paths. */
+  mono?: boolean;
   icon?: React.ReactNode;
   /** Direct action — mutually exclusive with `items` */
   onSelect?: () => void;
@@ -41,11 +43,14 @@ interface SkillContextMenuProps {
   anchorPoint?: { x: number; y: number };
   open: boolean;
   onClose: () => void;
+  /** `end` puts the menu's right edge at the anchor, under a button on the right. */
+  align?: 'start' | 'end';
 }
 
 export function SkillContextMenu({
   items,
   anchorPoint,
+  align = 'start',
   open,
   onClose,
 }: SkillContextMenuProps) {
@@ -64,7 +69,7 @@ export function SkillContextMenu({
     const menu = menuRef.current;
     const rect = menu.getBoundingClientRect();
     let top = anchorPoint.y;
-    let left = anchorPoint.x;
+    let left = align === 'end' ? Math.max(8, anchorPoint.x - rect.width) : anchorPoint.x;
     if (top + rect.height > window.innerHeight - 8) {
       top = Math.max(8, anchorPoint.y - rect.height);
     }
@@ -72,7 +77,7 @@ export function SkillContextMenu({
       left = Math.max(8, anchorPoint.x - rect.width);
     }
     setPosition({ top, left });
-  }, [open, anchorPoint]);
+  }, [open, anchorPoint, align]);
 
   // Close on Escape (submenu first, then parent)
   useEffect(() => {
@@ -136,7 +141,7 @@ export function SkillContextMenu({
                 {item.icon && <span className="w-4 shrink-0 flex items-center justify-center">{item.icon}</span>}
                 {item.description ? (
                   <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className="font-mono">{item.label}</span>
+                    <span className={item.mono ? 'font-mono' : ''}>{item.label}</span>
                     <span className="text-xs font-normal leading-snug text-ink-3">{item.description}</span>
                   </span>
                 ) : item.label}

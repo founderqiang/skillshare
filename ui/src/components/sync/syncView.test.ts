@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api, type DiffTarget, type Target } from '../../api/client';
 import { hooksApi, type HookPlan } from '../../api/hooks';
 import { mcpApi, type MCPPlan } from '../../api/mcp';
-import { countChanges, countEdited, extraGroups, failureExplanation, groupByFolder, groupInSync, HOOKS_CHANGED, hooksGroups, MCP_CHANGED, mcpGroups, otherWarnings, pendingCount, resourceGroups, runSync, type SyncFailure } from './syncView';
+import { changeSets, countChanges, countEdited, discardable, extraGroups, failureExplanation, groupByFolder, groupInSync, HOOKS_CHANGED, hooksGroups, MCP_CHANGED, mcpGroups, otherWarnings, pendingCount, resourceGroups, runSync, type SyncFailure } from './syncView';
 
 vi.mock('../../api/client', async (load) => ({ ...await load<typeof import('../../api/client')>(), api: { sync: vi.fn(), syncExtras: vi.fn() } }));
 vi.mock('../../api/mcp', async (load) => ({ ...await load<typeof import('../../api/mcp')>(), mcpApi: { preview: vi.fn(), configure: vi.fn() } }));
@@ -38,6 +38,31 @@ describe('resourceGroups', () => {
   it('leaves out agents when only skills are included', () => {
     const { groups } = resourceGroups(diff, [target('claude')], new Set(['skill']), false);
     expect(groups[0].rows.map((r) => r.name)).toEqual(['pdf', 'notes']);
+  });
+});
+
+describe('changeSets', () => {
+  it('puts targets with the same changes in one set', () => {
+    const same: DiffTarget[] = ['claude', 'codex', 'cursor'].map((name) => ({ target: name, items: [{ skill: name === 'cursor' ? 'other' : 'pdf', action: 'link', reason: 'new' }] }));
+    const { groups } = resourceGroups(same, ['claude', 'codex', 'cursor'].map((n) => target(n)), new Set(['skill']), false);
+    expect(changeSets(groups).map((set) => set.targets.map((g) => g.name))).toEqual([['claude', 'codex'], ['cursor']]);
+  });
+});
+
+describe('discardable', () => {
+  const skill = (flatName: string) => ({ name: flatName, kind: 'skill', flatName, relPath: flatName, sourcePath: '', isInRepo: false }) as const;
+  const newRows: DiffTarget[] = [{ target: 'claude', items: [
+    { skill: 'fresh', action: 'link', reason: 'new' },
+    { skill: 'old', action: 'link', reason: 'new' },
+    { skill: 'handmade', action: 'link', reason: 'new' },
+    { skill: 'gone', action: 'link', reason: 'missing in target' },
+  ] }];
+
+  it('keeps skills already synced to another target and ones to copy again', () => {
+    const { groups } = resourceGroups(newRows, [target('claude')], new Set(['skill']), false);
+    const skills = ['fresh', 'old', 'handmade', 'gone'].map((n) => skill(n));
+    const expected = (name: string) => (name === 'old' ? ['claude', 'codex'] : ['claude']);
+    expect(discardable(groups, skills, expected).map((s) => s.flatName)).toEqual(['fresh', 'handmade']);
   });
 });
 

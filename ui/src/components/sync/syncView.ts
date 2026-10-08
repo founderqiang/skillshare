@@ -1,4 +1,4 @@
-import { api, type DiffTarget, type ExtraDiffResult, type SyncResponse, type Target } from '../../api/client';
+import { api, type DiffTarget, type ExtraDiffResult, type Skill, type SyncResponse, type Target } from '../../api/client';
 import { hooksApi, type HookPlan } from '../../api/hooks';
 import { mcpApi, type MCPPlan } from '../../api/mcp';
 import { formatAgentDisplayName } from '../../lib/resourceNames';
@@ -161,6 +161,44 @@ export function groupByFolder(names: string[]) {
     folders.set(folder, [...(folders.get(folder) ?? []), name.slice(slash + 1)]);
   }
   return [...folders].map(([folder, items]) => ({ folder, items }));
+}
+
+/** Targets getting exactly the same changes, as one set: twelve targets adding the same 38 skills read as one list. */
+export function changeSets(groups: ChangeGroup[]): { key: string; targets: ChangeGroup[]; rows: ChangeRow[] }[] {
+  const sets = new Map<string, { key: string; targets: ChangeGroup[]; rows: ChangeRow[] }>();
+  for (const g of groups) {
+    const sig = g.rows.map((r) => `${r.part}\t${r.name}\t${r.icon}\t${r.text}`).sort().join('\n');
+    const set = sets.get(sig);
+    if (set) set.targets.push(g);
+    else sets.set(sig, { key: g.key, targets: [g], rows: g.rows });
+  }
+  return [...sets.values()].sort((a, b) => b.rows.length - a.rows.length);
+}
+
+/** Rows per icon, conflicts counted as kept: both leave the target's copy alone. */
+export function tally(rows: ChangeRow[]): Partial<Record<RowIcon, number>> {
+  const n: Partial<Record<RowIcon, number>> = {};
+  for (const r of rows) {
+    const icon = r.icon === 'conflict' ? 'kept' : r.icon;
+    n[icon] = (n[icon] ?? 0) + 1;
+  }
+  return n;
+}
+
+/**
+ * The skills Discard all moves to trash: never synced anywhere yet, so new in every target that should get them.
+ * `expected` names the targets a skill syncs to (the sync matrix). A skill already in one of them was synced before
+ * and stays, even when a new target is about to get it. Install times can't tell this: tracked repo skills have none.
+ */
+export function discardable(groups: ChangeGroup[], skills: Skill[], expected: (flatName: string) => string[]): Skill[] {
+  const added = new Map<string, Set<string>>();
+  for (const g of groups) {
+    for (const r of g.rows) {
+      if (r.part !== 'skill' || r.icon !== 'add' || r.text === 'sync.row.recopy') continue;
+      added.set(r.name, (added.get(r.name) ?? new Set()).add(g.name));
+    }
+  }
+  return skills.filter((s) => s.kind === 'skill' && added.has(s.flatName) && expected(s.flatName).every((t) => added.get(s.flatName)!.has(t)));
 }
 
 export const countChanges = (groups: ChangeGroup[]) => groups.reduce((n, g) => n + g.rows.filter((r) => r.counts).length, 0);

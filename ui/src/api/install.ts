@@ -1,5 +1,5 @@
 import { apiFetch, BASE, createSSEStream } from './http';
-import type { BatchInstallResult, CheckResult, DiscoverResult, DiscoveredSkill, HubConfigResponse, HubIndex, HubSavedEntry, InstallResult, SearchResult, SkillPreview } from './types/install';
+import type { BatchInstallResult, CheckResult, ConfigEntry, DiscoverResult, DiscoveredSkill, HubConfigResponse, HubIndex, HubSavedEntry, InstallFromConfigResult, InstallResult, SearchResult, SkillPreview } from './types/install';
 
 export const installApi = {
   hubIndex: () => apiFetch<HubIndex>('/hub/index'),
@@ -48,6 +48,9 @@ export const installApi = {
       method: 'POST',
       body: JSON.stringify(opts),
     }),
+  // Entries recorded in config but not on disk (bare `skillshare install`)
+  missingConfigEntries: () => apiFetch<{ entries: ConfigEntry[]; file: string }>('/install/missing'),
+  installFromConfig: () => apiFetch<InstallFromConfigResult>('/install/from-config', { method: 'POST' }),
   installBatch: (opts: { source: string; skills: DiscoveredSkill[]; force?: boolean; skipAudit?: boolean; into?: string; name?: string; branch?: string; kind?: 'skill' | 'agent' }) =>
     apiFetch<BatchInstallResult>('/install/batch', {
       method: 'POST',

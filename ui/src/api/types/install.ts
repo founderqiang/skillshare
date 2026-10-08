@@ -92,6 +92,21 @@ export interface SkillCheckResult {
   message?: string;
 }
 
+export interface ConfigEntry {
+  name: string;
+  source: string;
+  tracked: boolean;
+  branch?: string;
+}
+
+export interface InstallFromConfigResult {
+  installed: number;
+  installedRepos: number;
+  installedRepoSkills: number;
+  skipped: number;
+  failed: string[];
+}
+
 export interface CheckResult {
   linked_repos?: LinkedRepo[];
   tracked_repos: RepoCheckResult[];

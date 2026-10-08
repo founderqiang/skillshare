@@ -229,7 +229,7 @@ export default function FrontmatterEditor({ frontmatter, onChange, yaml, onYaml 
         anchorPoint={menu ?? undefined}
         onClose={() => setMenu(null)}
         items={[
-          ...unset.map((f) => ({ key: f.key, label: f.key, description: t(`frontmatterEditor.field.${f.hint}.hint`), onSelect: () => setShown((prev) => new Set(prev).add(f.key)) })),
+          ...unset.map((f) => ({ key: f.key, label: f.key, mono: true, description: t(`frontmatterEditor.field.${f.hint}.hint`), onSelect: () => setShown((prev) => new Set(prev).add(f.key)) })),
           { key: '__metadata', label: t('frontmatterEditor.customMetadata'), icon: <Plus size={14} />, onSelect: () => setAddingMeta(true) },
         ]}
       />

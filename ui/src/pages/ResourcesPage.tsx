@@ -1,8 +1,10 @@
-import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Bot,
+  ChevronDown,
+  ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
   CircleCheck,
@@ -18,6 +20,7 @@ import {
   LayoutGrid,
   List,
   Link2,
+  Loader2,
   Plus,
   Power,
   Puzzle,
@@ -33,6 +36,7 @@ import { api } from '../api/client';
 import type { Skill, SourceLink } from '../api/client';
 import { queryKeys, staleTimes } from '../lib/queryKeys';
 import { globToRegex } from '../lib/glob';
+import { parseRemoteURL } from '../lib/parseRemoteURL';
 import { folderOf, formatTrackedRepoName, resourceHref } from '../lib/resourceNames';
 import {
   byTargetOrProject, countLabel, groupByFolder, groupBySource, limitGroups, parentPath, projectOf, repoOf, sortSkills, sourceLinkOf, sourceName, splitTargets, syncedByTarget,
@@ -86,7 +90,8 @@ type MenuState =
   | { mode: 'folder'; path: string; summary: TargetSummary; point: Point }
   | { mode: 'repo'; repo: string; point: Point }
   | { mode: 'skill'; skill: Skill; point: Point }
-  | { mode: 'bulk'; names: string[]; point: Point };
+  | { mode: 'bulk'; names: string[]; point: Point }
+  | { mode: 'add'; point: Point };
 type SkillsData = { resources: Skill[] };
 
 const EMPTY: Skill[] = [];
@@ -95,6 +100,10 @@ const STEP = 100;
 const SOURCE_ICON = { tracked: GitBranch, github: Github, remote: Globe, local: Folder };
 const VIEW_KEY = 'skillshare:skills-view';
 const COLLAPSED_KEY = 'skillshare:folder-collapsed';
+/** List-view group keys share the collapsed set with tree folder paths, apart by prefix. */
+const groupKey = (key: string) => `group:${key}`;
+/** A folder group's key, kept apart from source groups of the same name. */
+const folderKey = (key: string) => `f:${key}`;
 /** Enable/disable toasts replace each other, so quick on/off clicks never leave an outdated one on screen. */
 const TOGGLE_TOAST = 'resource-toggle';
 
@@ -114,6 +123,26 @@ function loadCollapsed(): Set<string> {
     if (raw) return new Set(JSON.parse(raw));
   } catch { /* corrupt or unavailable */ }
   return new Set();
+}
+
+interface Filters { source: SourceFilter; status: StatusFilter; target: string; folder: string | null }
+const FILTER_DEFAULTS: Filters = { source: 'all', status: 'all', target: 'all', folder: null };
+/** One JSON entry holds every page's filters: { skill: Filters, agent: Filters }. */
+const FILTERS_KEY = 'skillshare:resource-filters';
+
+function readFilters(): Partial<Record<Kind, Filters>> {
+  try {
+    return JSON.parse(localStorage.getItem(FILTERS_KEY) ?? '{}') ?? {};
+  } catch { /* corrupt or unavailable */ }
+  return {};
+}
+
+function loadFilters(kind: Kind): Filters {
+  return { ...FILTER_DEFAULTS, ...readFilters()[kind] };
+}
+
+function saveFilters(kind: Kind, filters: Filters) {
+  try { localStorage.setItem(FILTERS_KEY, JSON.stringify({ ...readFilters(), [kind]: filters })); } catch { /* storage unavailable */ }
 }
 
 function saveCollapsed(collapsed: Set<string>) {
@@ -173,10 +202,11 @@ function TargetStack({ names, reachable = [], max = 4 }: { names: string[]; reac
   );
 }
 
-function menuPoint(e: ReactMouseEvent): Point {
+/** Where a menu opens: at the pointer for a right-click, else under the button; `end` lines up its right edges. */
+function menuPoint(e: ReactMouseEvent, align: 'start' | 'end' = 'start'): Point {
   if (e.type === 'contextmenu') return { x: e.clientX, y: e.clientY };
   const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-  return { x: r.left, y: r.bottom + 4 };
+  return { x: align === 'end' ? r.right : r.left, y: r.bottom + 4 };
 }
 
 /* -- Page ----------------------------------------- */
@@ -221,16 +251,32 @@ export default function ResourcesPage({ kind }: { kind: Kind }) {
     }, { replace: true });
 
   const [search, setSearch] = useState('');
-  const [source, setSource] = useState<SourceFilter>('all');
-  const [status, setStatus] = useState<StatusFilter>('all');
-  const [target, setTarget] = useState('all');
+  const [saved] = useState(() => loadFilters(kind));
+  const [source, setSource] = useState<SourceFilter>(saved.source);
+  const [status, setStatus] = useState<StatusFilter>(saved.status);
+  const [target, setTarget] = useState(saved.target);
   // null = all folders; '' is the source root.
-  const [folder, setFolder] = useState<string | null>(null);
+  const [folder, setFolder] = useState<string | null>(saved.folder);
+  useEffect(() => saveFilters(kind, { source, status, target, folder }), [kind, source, status, target, folder]);
   const [sort, setSort] = useState<SortType>('name-asc');
   const [group, setGroup] = useState<GroupBy>(isAgent ? 'none' : 'source');
   const [view, setView] = useState<ViewType>(loadView);
   const [limit, setLimit] = useState(STEP);
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed);
+  // The toolbar sticks to the top; its height places the list header and group heads under it.
+  const [stuck, setStuck] = useState(false);
+  const sentinel = useRef<HTMLDivElement>(null);
+  const bar = useRef<HTMLDivElement>(null);
+  const [barHeight, setBarHeight] = useState(0);
+  useEffect(() => {
+    const el = sentinel.current, box = bar.current;
+    if (!el || !box || typeof IntersectionObserver === 'undefined' || typeof ResizeObserver === 'undefined') return;
+    const io = new IntersectionObserver(([e]) => setStuck(!e.isIntersecting));
+    const ro = new ResizeObserver(() => setBarHeight(box.offsetHeight));
+    io.observe(el);
+    ro.observe(box);
+    return () => { io.disconnect(); ro.disconnect(); };
+  }, [tab, isPending]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // The tree view selects folders and skills by row id, apart from the list's checkboxes.
   const [treeSel, setTreeSel] = useState<Set<string>>(new Set());
@@ -446,9 +492,10 @@ export default function ResourcesPage({ kind }: { kind: Kind }) {
     try { localStorage.setItem(VIEW_KEY, v); } catch { /* storage unavailable */ }
   };
   const updateCollapsed = (next: Set<string>) => { setCollapsed(next); saveCollapsed(next); };
-  const toggleFolder = (path: string) => {
+  /** Collapses or opens a tree folder path or a list group key. */
+  const toggleCollapsed = (key: string) => {
     const next = new Set(collapsed);
-    if (!next.delete(path)) next.add(path);
+    if (!next.delete(key)) next.add(key);
     updateCollapsed(next);
   };
 
@@ -492,19 +539,14 @@ export default function ResourcesPage({ kind }: { kind: Kind }) {
   );
 
   const repoActions = (repo: string) => (
-    <>
-      <Button variant="secondary" size="sm" loading={updating === repo} disabled={updating !== null} onClick={() => update(repo)}>
-        {t('resources.repo.update')}
-      </Button>
-      <button
-        type="button"
-        className="ss-ib"
-        aria-label={t('resources.repo.actions')}
-        onClick={(e) => openGroupMenu(e, repo)}
-      >
-        <Ellipsis size={16} />
-      </button>
-    </>
+    <button
+      type="button"
+      className="ss-ib"
+      aria-label={t('resources.repo.actions')}
+      onClick={(e) => openGroupMenu(e, repo)}
+    >
+      {updating === repo ? <Loader2 size={16} className="animate-spin" /> : <Ellipsis size={16} />}
+    </button>
   );
 
   const unlinkButton = (link: SourceLink) => (
@@ -518,14 +560,33 @@ export default function ResourcesPage({ kind }: { kind: Kind }) {
     </Tooltip>
   );
 
+  // Many repos share a basename such as "skills"; the owner/repo tells them apart.
+  const repoOrigin = (repo: string, items: Skill[]) => {
+    const origin = parseRemoteURL(items[0]?.repoUrl ?? items[0]?.source ?? '')?.ownerRepo;
+    return origin && origin !== formatTrackedRepoName(repo)
+      ? <span className="min-w-0 truncate font-mono text-xs text-ink-3">{origin}</span>
+      : null;
+  };
+
+  const groupToggle = (key: string, label: string) => {
+    const open = !collapsed.has(groupKey(key));
+    return (
+      <button type="button" className="ss-ib !w-6 !h-6 -ml-1 shrink-0" aria-expanded={open} aria-label={label} onClick={() => toggleCollapsed(groupKey(key))}>
+        {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+      </button>
+    );
+  };
+
   const groupHead = (g: Group, asLabel: boolean) => {
     const Icon = g.link ? Link2 : SOURCE_ICON[g.source];
     const meta = [g.link?.warning ?? countLabel(t, kind, g.items.length), g.repo && !g.link ? g.items[0].branch : ''];
     return (
       <div key={`g:${g.key}`} className={asLabel ? 'ss-gl' : 'ss-gh'} onContextMenu={g.link ? undefined : (e) => openGroupMenu(e, g.repo)}>
+        {!asLabel && groupToggle(g.key, g.link?.name ?? formatTrackedRepoName(g.repo ?? SOURCE_LABEL[g.source]))}
         <Icon size={15} className="shrink-0 text-ink-2" />
         {g.link ? <b className="font-mono">{g.link.name}</b> : g.repo ? <b className="font-mono">{formatTrackedRepoName(g.repo)}</b> : <b>{SOURCE_LABEL[g.source]}</b>}
         {g.repo && !g.link && <span className="ss-tag">tracked</span>}
+        {g.repo && !g.link && repoOrigin(g.repo, g.items)}
         {g.link && <span className="min-w-0 truncate font-mono text-xs text-ink-3" title={g.link.target}>{g.link.target}</span>}
         <span className="shrink-0 text-ink-3">{meta.filter(Boolean).join(' · ')}</span>
         <span className="flex-1" />
@@ -538,9 +599,11 @@ export default function ResourcesPage({ kind }: { kind: Kind }) {
 
   const folderHead = (g: FolderGroup, asLabel: boolean) => (
     <div key={`f:${g.key}`} className={asLabel ? 'ss-gl' : 'ss-gh'}>
+      {!asLabel && groupToggle(folderKey(g.key), g.link ? g.link.name : folderName(g.key))}
       {g.link ? <Link2 size={15} className="shrink-0 text-ink-2" /> : <Folder size={15} className="shrink-0 text-ink-2" />}
       <b className={g.key ? 'font-mono' : ''}>{g.link ? g.link.name : folderName(g.key)}</b>
       {g.repo && !g.link && <span className="ss-tag">tracked</span>}
+      {g.repo && !g.link && repoOrigin(g.key, g.items)}
       {g.link && <span className="min-w-0 truncate font-mono text-xs text-ink-3" title={g.link.target}>{g.link.target}</span>}
       <span className="shrink-0 text-ink-3">{g.link?.warning ?? countLabel(t, kind, g.items.length)}</span>
       {g.link && !isAgent && <><span className="flex-1" />{unlinkButton(g.link)}</>}
@@ -661,7 +724,7 @@ export default function ResourcesPage({ kind }: { kind: Kind }) {
             kind={kind}
             label={t(isAgent ? 'layout.nav.agents' : 'layout.nav.skills')}
             onSelect={selectNode}
-            onToggleFolder={toggleFolder}
+            onToggleFolder={toggleCollapsed}
             onOpen={(s) => navigate(resourceHref(s))}
             renderUnlink={unlinkButton}
             onContextMenu={isAgent ? undefined : (e, row) => {
@@ -725,14 +788,15 @@ export default function ResourcesPage({ kind }: { kind: Kind }) {
       </div>
     );
     let body: React.ReactNode;
+    const rows = (key: string, list: Skill[]) => (collapsed.has(groupKey(key)) ? [] : list.map((s) => itemRow(s)));
     if (group === 'source') {
-      body = limitGroups(groups, limit).map((g) => [groupHead(g, false), ...g.items.map((s) => itemRow(s))]);
+      body = limitGroups(groups, limit).map((g) => [groupHead(g, false), ...rows(g.key, g.items)]);
     } else if (group === 'folder') {
-      body = limitGroups(folderGroups, limit).map((g) => [folderHead(g, false), ...g.items.map((s) => itemRow(s))]);
+      body = limitGroups(folderGroups, limit).map((g) => [folderHead(g, false), ...rows(folderKey(g.key), g.items)]);
     } else {
       body = <>{groups.filter((g) => g.link && g.items.length === 0).map((g) => groupHead(g, false))}{filtered.slice(0, limit).map((s) => itemRow(s))}</>;
     }
-    content = <div className="ss-list">{header}{body}</div>;
+    content = <div className="ss-list stick">{header}{body}</div>;
   }
 
   // The tree view acts on its own selection through the detail pane, not the bulk toolbar.
@@ -752,17 +816,17 @@ export default function ResourcesPage({ kind }: { kind: Kind }) {
               {syncPending && <span className="size-1.5 rounded-full bg-warn" role="img" aria-label={t('plugins.pending')} />}
             </Button>
             {!isAgent && <Link to="/hubs" className="ss-btn">{t('hubs.title')}</Link>}
-            {!isAgent && <Button variant="secondary" onClick={() => setLinkOpen(true)}><Link2 size={15} />{t('sourceLinks.title')}</Button>}
-            {!isAgent && (
-              <Link to="/skills/new" className="ss-btn">
-                <Plus size={15} />
-                {t('resources.newSkill')}
-              </Link>
-            )}
-            <Button variant="primary" data-tour="install-button" onClick={() => setInstall('url')}>
-              <Download size={15} />
-              {t('resources.install')}
-            </Button>
+            <span className="ss-btnpair">
+              <Button variant="primary" data-tour="install-button" onClick={() => setInstall('url')}>
+                <Download size={15} />
+                {t('resources.install')}
+              </Button>
+              {!isAgent && (
+                <Button variant="primary" aria-label={t('resources.moreWays')} aria-haspopup="menu" onClick={(e) => setMenu({ mode: 'add', point: menuPoint(e, 'end') })}>
+                  <ChevronDown size={15} />
+                </Button>
+              )}
+            </span>
           </>
         )}
       />
@@ -795,9 +859,16 @@ export default function ResourcesPage({ kind }: { kind: Kind }) {
             </div>
           )}
 
+          <div ref={sentinel} aria-hidden className="-mt-2 h-0" />
           {/* Every control sizes to its label: fixed widths truncated the longer values
               ("xcode-claude", "Disabled") and pushed the row past the container. */}
-          <div className="flex flex-wrap items-center gap-2 -mt-2">
+          <div ref={bar} className={`ss-stickbar ${stuck ? 'stuck' : ''}`}>
+          <div className="flex flex-wrap items-center gap-2">
+            {stuck && (
+              <b className="shrink-0 mr-2 text-[15px] animate-fade-in">
+                {t(isAgent ? 'layout.nav.agents' : 'layout.nav.skills')} <span className="text-[12px] font-medium text-ink-3">{items.length}</span>
+              </b>
+            )}
             <label className="ss-inp w-[200px] shrink-0">
               <Search size={15} className="shrink-0 text-ink-3" />
               <input
@@ -855,9 +926,10 @@ export default function ResourcesPage({ kind }: { kind: Kind }) {
               />
             )}
             <span className="flex-1" />
-            {view === 'tree' && tree.children.size > 0 && (() => {
+            {((view === 'tree' && tree.children.size > 0) || (view === 'list' && group !== 'none')) && (() => {
               // One button: collapses everything once all is open, otherwise opens everything.
-              const paths = folderPaths(tree);
+              const listKeys = group === 'source' ? groups.map((g) => groupKey(g.key)) : folderGroups.map((g) => groupKey(folderKey(g.key)));
+              const paths = view === 'tree' ? folderPaths(tree) : listKeys;
               const allOpen = !paths.some((p) => collapsed.has(p));
               const label = t(allOpen ? 'resources.folder.collapseAll' : 'resources.folder.expandAll');
               return (
@@ -866,7 +938,8 @@ export default function ResourcesPage({ kind }: { kind: Kind }) {
                   className="ss-ib !w-[34px] !h-[34px] shrink-0"
                   title={label}
                   aria-label={label}
-                  onClick={() => updateCollapsed(allOpen ? new Set(paths) : new Set())}
+                  // The set also holds the other view's keys; leave those as they are.
+                  onClick={() => updateCollapsed(allOpen ? new Set([...collapsed, ...paths]) : new Set([...collapsed].filter((k) => !paths.includes(k))))}
                 >
                   {allOpen ? <ChevronsDownUp size={16} /> : <ChevronsUpDown size={16} />}
                 </button>
@@ -905,9 +978,16 @@ export default function ResourcesPage({ kind }: { kind: Kind }) {
                 { value: 'tree', label: <FolderTree size={15} />, title: t('resources.view.tree') },
               ]}
             />
+            {stuck && (
+              <Button variant="primary" size="sm" className="animate-fade-in" onClick={() => setInstall('url')}>
+                <Download size={14} />
+                {t('resources.install')}
+              </Button>
+            )}
+          </div>
           </div>
 
-          <div className="-mt-3">
+          <div className="-mt-3" style={{ '--stick': `${barHeight}px` } as React.CSSProperties}>
             {content}
             {total > 0 && (
               <div className="flex items-center justify-between mt-3">
@@ -999,12 +1079,31 @@ export default function ResourcesPage({ kind }: { kind: Kind }) {
           {menu?.mode === 'bulk' && (
             <TargetMenu open flat anchorPoint={menu.point} currentTargets={null} isUniform={false} onSelect={(target) => setManyTargets(menu.names, target)} onClose={() => setMenu(null)} />
           )}
+          {menu?.mode === 'add' && (
+            <SkillContextMenu
+              open
+              anchorPoint={menu.point}
+              align="end"
+              onClose={() => setMenu(null)}
+              items={[
+                { key: 'install', label: t('resources.add.install'), description: t('resources.add.installHint'), icon: <Download size={14} />, onSelect: () => setInstall('url') },
+                { key: 'new', label: t('resources.newSkill'), description: t('resources.add.newHint'), icon: <Plus size={14} />, onSelect: () => navigate('/skills/new') },
+                { key: 'link', label: t('sourceLinks.title'), description: t('resources.add.linkHint'), icon: <Link2 size={14} />, onSelect: () => setLinkOpen(true) },
+              ]}
+            />
+          )}
+
           {menu?.mode === 'repo' && (
             <SkillContextMenu
               open
               anchorPoint={menu.point}
               onClose={() => setMenu(null)}
               items={[{
+                key: 'update-repo',
+                label: t('resources.repo.update'),
+                icon: <RefreshCw size={14} />,
+                onSelect: () => { if (updating === null) update(menu.repo); },
+              }, {
                 key: 'uninstall-repo',
                 label: t('resources.contextMenu.uninstallRepo'),
                 icon: <Trash2 size={14} />,

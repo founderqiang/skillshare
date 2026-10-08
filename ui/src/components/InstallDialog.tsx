@@ -33,6 +33,7 @@ import { queryKeys, staleTimes } from '../lib/queryKeys';
 import { formatSkillDisplayName } from '../lib/resourceNames';
 import { useI18n, useT } from '../i18n';
 import Button from './Button';
+import ConfigInstallPanel from './ConfigInstallPanel';
 import { Checkbox } from './Checkbox';
 import DialogShell from './DialogShell';
 import EmptyState from './EmptyState';
@@ -58,6 +59,7 @@ const COMMUNITY_HUB: HubSavedEntry = {
   builtIn: true,
 };
 const STEP = 10;
+/** Past this many found items, a filter box shows. */
 const FOUND_PREVIEW = 5;
 /** Backend error code for a mixed-track-repo ambiguity (see internal/server/handler_install.go). */
 const TRACK_KIND_AMBIGUOUS = 'install.track_kind_ambiguous';
@@ -136,7 +138,6 @@ export default function InstallDialog({ kind, initialTab, initialSource, onClose
   const [wanted, setWanted] = useState<SkillsAddCommand | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('');
-  const [expanded, setExpanded] = useState(false);
 
   const [kindChoice, setKindChoice] = useState<KindChoice | null>(null);
   const [kindPick, setKindPick] = useState<Kind>(kind);
@@ -297,7 +298,6 @@ export default function InstallDialog({ kind, initialTab, initialSource, onClose
       const preselected = requestedSkills(wanted, from, items) ?? items.filter((i) => !isInstalled(i.kind ?? 'skill', discoveredSource(from, i.path)));
       setSelected(new Set(preselected.map((i) => i.path)));
       setFilter('');
-      setExpanded(false);
       setTab('url');
       setView(null);
     };
@@ -630,6 +630,7 @@ export default function InstallDialog({ kind, initialTab, initialSource, onClose
     }
     body = (
       <>
+        {!isAgent && <ConfigInstallPanel />}
         {tabs}
         <div className="flex items-center gap-2">
           <label className="ss-inp flex-1">
@@ -668,7 +669,6 @@ export default function InstallDialog({ kind, initialTab, initialSource, onClose
     const agents = found?.items[0]?.kind === 'agent';
     const f = filter.trim().toLowerCase();
     const filtered = (found?.items ?? []).filter((i) => !f || i.name.toLowerCase().includes(f) || i.description?.toLowerCase().includes(f));
-    const listed = expanded || f ? filtered : filtered.slice(0, FOUND_PREVIEW);
     const allSelected = found !== null && selected.size === found.items.length;
     const toggle = (path: string) => {
       const next = new Set(selected);
@@ -684,6 +684,7 @@ export default function InstallDialog({ kind, initialTab, initialSource, onClose
         : t(isAgent ? 'install.url.findAgents' : 'install.url.findSkills');
     body = (
       <>
+        {!isAgent && <ConfigInstallPanel />}
         {tabs}
         <div className="ss-fld">
           <label htmlFor={`${ids}src`}>{t('install.url.sourceLabel')}</label>
@@ -740,10 +741,10 @@ export default function InstallDialog({ kind, initialTab, initialSource, onClose
                 <div className="flex-1">{t(agents ? 'install.url.onlyAgents' : 'install.url.onlySkills')}</div>
               </div>
             )}
-            {/* Rows scroll inside the list frame once expanded, so the dialog keeps its height */}
+            {/* Rows scroll inside the list frame, so the dialog keeps its height */}
             <div className="ss-list !shadow-none flex flex-col">
               <div className="max-h-[264px] overflow-y-auto">
-                {listed.map((item) => (
+                {filtered.map((item) => (
                   <div
                     key={item.path}
                     className={`ss-r !min-h-11 cursor-pointer ${selected.has(item.path) ? 'sel' : ''}`}
@@ -756,12 +757,6 @@ export default function InstallDialog({ kind, initialTab, initialSource, onClose
                   </div>
                 ))}
               </div>
-              {listed.length < filtered.length && (
-                <button type="button" className="ss-r !min-h-[38px] w-full text-left" onClick={() => setExpanded(true)}>
-                  <span className="flex-1 text-[13px] text-ink-3">{t('install.url.more', { count: filtered.length - listed.length })}</span>
-                  <ChevronDown size={15} className="text-ink-3" />
-                </button>
-              )}
             </div>
           </div>
         )}

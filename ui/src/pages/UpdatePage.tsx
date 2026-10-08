@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bot, Check, CircleAlert, CircleArrowUp, CircleCheck, FolderX, GitBranch, Link, Loader2, Puzzle, RefreshCw, ShieldAlert, Trash2, X } from 'lucide-react';
+import { Bot, Check, CircleAlert, CircleArrowUp, CircleCheck, Download, FolderX, GitBranch, Link, Loader2, Puzzle, RefreshCw, ShieldAlert, Trash2, X } from 'lucide-react';
 import { api } from '../api/client';
 import type { CheckResult, LinkedRepo, Skill, UpdateResultItem } from '../api/client';
-import { queryKeys, staleTimes } from '../lib/queryKeys';
+import { queryKeys } from '../lib/queryKeys';
 import { clearAuditCache } from '../lib/auditCache';
 import { parseRemoteURL } from '../lib/parseRemoteURL';
 import { folderOf, formatTrackedRepoName } from '../lib/resourceNames';
 import { repoOf } from '../lib/resourceGrouping';
-import { formatRelativeTime, useI18n, useT } from '../i18n';
+import { formatRelativeTime, plural, useI18n, useT } from '../i18n';
 import Button from '../components/Button';
 import { Checkbox } from '../components/Checkbox';
 import EmptyState from '../components/EmptyState';
@@ -17,12 +17,13 @@ import SyncPreviewModal from '../components/SyncPreviewModal';
 import { useToast } from '../components/Toast';
 import { useSkillsQuery } from '../hooks/useSharedQueries';
 import { invalidate } from '../lib/queryEvents';
+import { useInstallFromConfig } from '../hooks/useInstallFromConfig';
 
 /* -- Types ---------------------------------------- */
 
 type Kind = Skill['kind'];
 
-type CheckStatus = 'unchecked' | 'checking' | 'behind' | 'dirty' | 'up-to-date' | 'update-available' | 'error';
+type CheckStatus = 'unchecked' | 'checking' | 'behind' | 'dirty' | 'up-to-date' | 'update-available' | 'stale' | 'error';
 
 interface CheckItemStatus {
   status: CheckStatus;
@@ -33,7 +34,7 @@ interface CheckItemStatus {
 
 type CheckStatuses = Map<string, CheckItemStatus>;
 
-const CHECK_STATUS_VALUES: CheckStatus[] = ['unchecked', 'checking', 'behind', 'dirty', 'up-to-date', 'update-available', 'error'];
+const CHECK_STATUS_VALUES: CheckStatus[] = ['unchecked', 'checking', 'behind', 'dirty', 'up-to-date', 'update-available', 'stale', 'error'];
 const UPDATE_CHECK_CACHE_KEY = 'skillshare.updateCheckCache.global';
 const UPDATE_CHECK_CACHE_VERSION = 1;
 
@@ -125,13 +126,9 @@ export default function UpdatePage({ kind }: { kind: Kind }) {
   const { toast } = useToast();
 
   const { data: skillsData } = useSkillsQuery();
-  // Tracked repos declared in metadata but missing on disk (issue #212)
-  const { data: missingReposData } = useQuery({
-    queryKey: queryKeys.missingTrackedRepos,
-    queryFn: () => api.missingTrackedRepos(),
-    staleTime: staleTimes.missingTrackedRepos,
-  });
-  const missingRepos = missingReposData?.repos ?? [];
+  // Entries recorded in config but missing on disk (issue #212)
+  const missing = useInstallFromConfig();
+  const showMissing = kind === 'skill' && missing.entries.length > 0;
 
   const resources = useMemo(() => skillsData?.resources ?? [], [skillsData]);
   // A full check covers both kinds, so results are applied to every updatable item.
@@ -146,7 +143,8 @@ export default function UpdatePage({ kind }: { kind: Kind }) {
   const [run, setRun] = useState<Map<string, RunState>>(new Map());
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
-  const [rehydrating, setRehydrating] = useState(false);
+  const [pruning, setPruning] = useState<Map<string, 'working' | 'out'>>(new Map());
+  const [pruned, setPruned] = useState(0);
   const [syncOpen, setSyncOpen] = useState(false);
   const [retried, setRetried] = useState<Set<string>>(new Set());
   const [openDetails, setOpenDetails] = useState<Set<string>>(new Set());
@@ -198,7 +196,7 @@ export default function UpdatePage({ kind }: { kind: Kind }) {
         const item = updatable.find((i) => !i.isInRepo && matchesCheckSkill(i, skill.name));
         if (!item) continue;
         next.set(item.name, {
-          status: skill.status === 'update_available' ? 'update-available' : skill.status === 'error' ? 'error' : 'up-to-date',
+          status: skill.status === 'update_available' ? 'update-available' : skill.status === 'stale' ? 'stale' : skill.status === 'error' ? 'error' : 'up-to-date',
           message: skill.message,
           checkedAt,
         });
@@ -215,6 +213,7 @@ export default function UpdatePage({ kind }: { kind: Kind }) {
   const runCheck = useCallback(() => {
     esRef.current?.close();
     setChecking(true);
+    setPruned(0);
     setRun(new Map());
     setFinished(false);
     setStatuses((prev) => {
@@ -333,21 +332,50 @@ export default function UpdatePage({ kind }: { kind: Kind }) {
     }
   }, [patchRun, invalidateSkillData, t]);
 
-  const rehydrate = useCallback(async () => {
-    setRehydrating(true);
+  // A finished install-missing banner collapses on its own unless something failed.
+  useEffect(() => {
+    if (missing.phase !== 'done' || missing.failed.size) return;
+    const id = setTimeout(missing.dismiss, 3000);
+    return () => clearTimeout(id);
+  }, [missing.phase, missing.failed.size, missing.dismiss]);
+
+  /* -- Prune (deleted upstream) -- */
+
+  const setPrune = useCallback((name: string, state?: 'working' | 'out') => setPruning((prev) => {
+    const next = new Map(prev);
+    if (state) next.set(name, state);
+    else next.delete(name);
+    return next;
+  }), []);
+
+  // Like `update --prune`: the skills go to trash in one request. Rows slide out, then their gap closes.
+  const prune = useCallback(async (list: UpdateUnit[]) => {
+    for (const u of list) setPrune(u.name, 'working');
+    let gone = list;
     try {
-      const { results } = await api.rehydrateTrackedRepos();
-      const failed = results.filter((r) => r.action !== 'rehydrated');
-      if (failed.length > 0) toast(t('update.missingRepos.rehydratePartial', { count: failed.length }), 'error');
-      else toast(t('update.missingRepos.rehydrateSuccess', { count: results.length }), 'success');
-      void invalidate(queryClient, 'missingReposChanged');
-      invalidateSkillData();
+      const { results } = await api.batchUninstall({ names: list.map((u) => u.name), force: true });
+      const failed = results.filter((r) => !r.success);
+      if (failed.length) toast(failed[0].error ?? failed[0].name, 'error');
+      gone = list.filter((u) => !failed.some((r) => r.name === u.name));
+      for (const u of list) if (!gone.includes(u)) setPrune(u.name);
     } catch (err) {
+      for (const u of list) setPrune(u.name);
       toast((err as Error).message, 'error');
-    } finally {
-      setRehydrating(false);
+      return;
     }
-  }, [t, toast, queryClient, invalidateSkillData]);
+    for (const u of gone) setPrune(u.name, 'out');
+    // ponytail: matches the .ss-collapse.out transition in components.css; change both together.
+    setTimeout(() => {
+      setStatuses((prev) => {
+        const next = new Map(prev);
+        for (const item of gone.flatMap((u) => u.items)) next.delete(item.name);
+        return next;
+      });
+      for (const u of gone) setPrune(u.name);
+      setPruned((n) => n + gone.length);
+      void invalidate(queryClient, 'skillsUninstalled');
+    }, 520);
+  }, [setPrune, setStatuses, toast, queryClient]);
 
   /* -- Render -- */
 
@@ -377,7 +405,8 @@ export default function UpdatePage({ kind }: { kind: Kind }) {
     return s === 'blocked' || s === 'error' || retried.has(name);
   };
   const failedUnits = showDone ? units.filter((u) => isTrouble(u.name)) : [];
-  const listUnits = failedUnits.length ? units.filter((u) => !isTrouble(u.name)) : units;
+  const staleUnits = units.filter((u) => unitCheck(statuses, u).status === 'stale' && !failedUnits.includes(u));
+  const listUnits = units.filter((u) => !failedUnits.includes(u) && !staleUnits.includes(u));
 
   const runDone = [...run.values()].filter((s) => s.status !== 'pending' && s.status !== 'in-progress').length;
   const current = running ? units.find((u) => run.get(u.name)?.status === 'in-progress') : undefined;
@@ -392,6 +421,8 @@ export default function UpdatePage({ kind }: { kind: Kind }) {
         return <span className="ss-st warn">{c.behind ? t('update.check.behind', { count: c.behind }) : t('update.check.behindFallback')}</span>;
       case 'update-available':
         return <span className="ss-st warn">{t('update.check.updateAvailable')}</span>;
+      case 'stale':
+        return <span className="ss-st warn">{t('update.check.stale')}</span>;
       case 'dirty':
         return <span className="ss-st warn" title={c.message}>{t('update.check.dirty')}</span>;
       case 'up-to-date':
@@ -520,15 +551,86 @@ export default function UpdatePage({ kind }: { kind: Kind }) {
         </section>
       )}
 
-      {missingRepos.length > 0 && (
-        <div className="ss-note warn">
-          <FolderX size={16} />
-          <div className="flex-1">
-            <b>{t('update.missingRepos.title', { count: missingRepos.length })}</b>{' '}
-            <span className="font-mono">{missingRepos.map((r) => r.name).join(', ')}</span>. {t('update.missingRepos.description')}
+      {showMissing && (() => {
+        const { done, summary, contents } = missing;
+        const failed = missing.failed.size;
+        return (
+          <div className={`ss-collapse ${missing.phase === 'closing' ? 'shut' : ''}`}>
+            <div className={`ss-note live items-center ${done && !failed ? 'ok' : 'warn'}`} aria-live="polite">
+              {missing.phase === 'running' ? <Loader2 size={16} className="animate-spin" />
+                : done ? (failed ? <CircleAlert size={16} className="ss-pop" /> : <Check size={16} strokeWidth={2.6} className="ss-pop" />)
+                : <FolderX size={16} />}
+              <div key={missing.phase} className="flex-1 min-w-0 animate-fade-in">
+                {missing.phase === 'running' ? (
+                  <><b>{t('install.fromConfig.installing', { file: missing.file })}</b> {t('install.audited')}</>
+                ) : done ? (
+                  <><b>{summary}.</b> {t(failed ? 'install.fromConfig.failedHint' : 'install.fromConfig.syncHint', { file: missing.file })}</>
+                ) : (
+                  <>
+                    <b>{t(plural('update.missingEntries.title', missing.entries.length), { count: missing.entries.length, file: missing.file })}</b>{' '}
+                    ({contents}): <span className="font-mono">{missing.entries.map((e) => e.name).join(', ')}</span>. {t('update.missingEntries.description')}
+                    {missing.error && <span className="block text-bad">{missing.error}</span>}
+                  </>
+                )}
+              </div>
+              {(missing.phase === 'idle' || (done && failed > 0)) && (
+                <Button variant="secondary" size="sm" onClick={missing.run}>
+                  <Download size={14} />{t(done ? 'install.preview.retry' : 'update.missingEntries.install')}
+                </Button>
+              )}
+              {missing.phase === 'running' && <span className="ss-rowbar" aria-hidden />}
+            </div>
           </div>
-          <Button variant="secondary" size="sm" loading={rehydrating} onClick={rehydrate}>{t('update.missingRepos.rehydrate')}</Button>
+        );
+      })()}
+
+      {(staleUnits.length > 0 || pruned > 0) && (
+        <div className={`ss-collapse ${staleUnits.length === 0 ? 'shut' : ''}`}>
+          <section className="flex flex-col gap-2" aria-labelledby="update-stale-title">
+            <div className="flex items-center gap-3">
+              <h2 id="update-stale-title" className="m-0 flex-1 text-[13px] font-semibold text-warn">
+                {t('update.stale.title', { count: staleUnits.filter((u) => pruning.get(u.name) !== 'out').length })}
+              </h2>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={busy || pruning.size > 0}
+                onClick={() => void prune(staleUnits)}
+              >
+                <Trash2 size={14} />{t('update.stale.pruneAll')}
+              </Button>
+            </div>
+            <div className="ss-list">
+              {staleUnits.map((unit, i) => {
+                const p = pruning.get(unit.name);
+                return (
+                  // Rows of one Prune all leave one after another.
+                  <div key={unit.name} className={`ss-collapse ${p === 'out' ? 'out' : ''}`} style={{ transitionDelay: p === 'out' ? `${i * 60}ms` : undefined }}>
+                    <div className={`ss-r ${p ? 'updating' : ''}`}>
+                      {unitIcon(unit)}
+                      {unitName(unit)}
+                      {p ? (
+                        <span className="inline-flex items-center gap-2 text-[13px] text-ink-2 animate-fade-in"><Loader2 size={13} className="animate-spin" />{t('update.updating.purging')}</span>
+                      ) : (
+                        <>
+                          <span className="ss-st warn">{t('update.check.stale')}</span>
+                          <Button variant="secondary" size="sm" disabled={busy} onClick={() => void prune([unit])}>{t('update.updating.purge')}</Button>
+                        </>
+                      )}
+                      {p && <span className="ss-rowbar" aria-hidden />}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="m-0 text-[13px] text-ink-3">{t('update.stale.note')}</p>
+          </section>
         </div>
+      )}
+      {pruned > 0 && staleUnits.length === 0 && (
+        <p className="m-0 -mt-3 flex items-center gap-2 text-[13px] text-ink-2 animate-fade-in">
+          <Check size={15} strokeWidth={2.6} className="ss-pop text-ok" />{t(plural('update.stale.pruned', pruned), { count: pruned })}
+        </p>
       )}
 
       {failedUnits.length > 0 && (
@@ -587,7 +689,7 @@ export default function UpdatePage({ kind }: { kind: Kind }) {
       )}
 
       {units.length === 0 ? (
-        missingRepos.length === 0 && linkedRepos.length === 0 && (
+        !showMissing && linkedRepos.length === 0 && (
           <EmptyState
             icon={CircleCheck}
             title={t(kind === 'agent' ? 'update.empty.agentsTitle' : 'update.empty.title')}

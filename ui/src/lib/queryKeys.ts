@@ -54,7 +54,7 @@ export const queryKeys = {
 
   config: ['config'] as const,
   check: ['check'] as const,
-  missingTrackedRepos: ['missing-tracked-repos'] as const,
+  missingConfigEntries: ['missing-config-entries'] as const,
   // Last update check, kept client-side (see UpdatePage) and shared by the Updates tab and its count.
   updateCheck: ['update-check'] as const,
   syncMatrix: (target?: string) => ['sync-matrix', target ?? '__all'] as const,
@@ -148,7 +148,7 @@ export const staleTimes = {
   audit: 5 * 60 * 1000,         // 5min — full audit scan, expensive
   auditSkill: 5 * 60 * 1000,   // 5min — per-skill audit, rarely changes
   check: 60 * 1000,            // 1min
-  missingTrackedRepos: 60 * 1000, // 1min
+  missingConfigEntries: 60 * 1000, // 1min
   syncMatrix: 30 * 1000,       // 30s — changes after filter edits
   extras: 30 * 1000,        // 30s — fast-changing like diff
   analyze: 2 * 60 * 1000,   // 2min — walks every skill file

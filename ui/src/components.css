@@ -233,6 +233,15 @@ svg.lucide { flex: none; stroke-width: var(--isw); }
 .ss-gh { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 16px; background: var(--sunken); border-top: var(--sep); font-size: 13px; }
 .ss-gh:first-child { border-top: 0; }
 .ss-plain .ss-r { padding-left: 0; padding-right: 0; min-height: 44px; }
+/* A toolbar that sticks to the top while its list scrolls; .stick lists keep their header and group heads under it */
+.ss-stickbar { position: sticky; top: 0; z-index: 20; margin: 0 -12px; padding: 12px; background: var(--bg); }
+.ss-stickbar.stuck { box-shadow: 0 1px 0 var(--line); }
+.ss-btnpair { display: inline-flex; }
+.ss-btnpair>.ss-btn:first-child:not(:last-child) { border-top-right-radius: 0; border-bottom-right-radius: 0; padding-right: 12px; }
+.ss-btnpair>.ss-btn:last-child:not(:first-child) { border-top-left-radius: 0; border-bottom-left-radius: 0; padding: 0 9px; border-left: 1px solid color-mix(in srgb, var(--on-pri) 22%, transparent); }
+.ss-list.stick { overflow: clip; }
+.ss-list.stick>.ss-lh { position: sticky; top: var(--stick, 0px); z-index: 3; }
+.ss-list.stick>.ss-gh { position: sticky; top: calc(var(--stick, 0px) + 34px); z-index: 2; }
 /* Update progress: a bar on the status card, a moving line under the row being updated, and a pop when a row finishes */
 .ss-update-icon { width: 40px; height: 40px; flex-shrink: 0; display: grid; place-items: center; border-radius: 11px; background: var(--sunken); color: var(--ink); }
 .ss-update-icon.ok { background: var(--ok-bg); color: var(--ok); }
@@ -249,9 +258,20 @@ svg.lucide { flex: none; stroke-width: var(--isw); }
 @keyframes ss-indet { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
 @keyframes ss-flash { from { background: var(--ok-bg); } to { background: transparent; } }
 @keyframes ss-pop { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+/* Collapse a block to nothing: wrap it in .ss-collapse and add .shut */
+.ss-collapse { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .45s cubic-bezier(.3,.7,.3,1), opacity .3s; }
+.ss-collapse>* { overflow: hidden; min-height: 0; }
+.ss-collapse.shut { grid-template-rows: 0fr; opacity: 0; }
+/* A removed row slides out, then its .ss-collapse wrapper closes the gap */
+.ss-collapse.out { grid-template-rows: 0fr; transition-delay: .2s; }
+.ss-collapse.out .ss-r { transform: translateX(-32px); opacity: 0; }
+.ss-collapse .ss-r { transition: transform .26s cubic-bezier(.5,0,.75,0), opacity .22s, background .3s; }
+.ss-note.ok { background: var(--ok-bg); border-color: transparent; }
+.ss-note.ok>svg { color: var(--ok); }
+.ss-note.live { position: relative; overflow: hidden; transition: background .45s; }
 @media (prefers-reduced-motion: reduce) {
   .ss-bar.indet>span, .ss-rowbar::after, .ss-r.flash, .ss-pop { animation: none; }
-  .ss-bar>span { transition: none; }
+  .ss-bar>span, .ss-collapse, .ss-collapse .ss-r, .ss-note.live { transition: none; }
 }
 .ss-note { display: flex; align-items: flex-start; gap: 10px; padding: 11px 14px; border-radius: 10px; background: var(--sunken); border: 1px solid var(--line); font-size: 13px; line-height: 1.5; }
 :root[data-theme="playful"] .ss-note { border: 2px solid var(--line); border-radius: 12px; }
@@ -462,6 +482,8 @@ span.bad, b.bad, svg.bad { color: var(--bad); }
 :root[data-theme="playful"] .ss-gh { background: var(--pe); border-top: 2px solid var(--line); border-bottom: 1.5px dashed var(--line); }
 :root[data-theme="playful"] .ss-gh:first-child { border-top: 0; }
 :root[data-theme="playful"] .ss-lh+.ss-gh { border-top: 0; }
+:root[data-theme="playful"] .ss-list.stick>.ss-lh { background: var(--surface); }
+:root[data-theme="playful"] .ss-list.stick>.ss-gh { top: calc(var(--stick, 0px) + 36px); }
 :root[data-theme="playful"] .ss-gh+.ss-r { border-top: 0; }
 :root[data-theme="playful"] .ss-tabs { border-bottom: 0; gap: 8px; }
 :root[data-theme="playful"] .ss-tabs>* { margin: 0; padding: 0 14px; height: 34px; border: 2px solid transparent; border-radius: 999px; }
