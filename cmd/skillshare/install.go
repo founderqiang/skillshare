@@ -639,8 +639,8 @@ func printInstallHelp() {
 			{"skillshare install ~/my-skill --into frontend/react", ""},
 		}},
 		helpGroup{title: "Tracked repositories (Team Edition)", examples: true, rows: []helpRow{
-			{"skillshare install team/shared-skills --track", "Clone as _shared-skills"},
-			{"skillshare install _shared-skills --update", "Update tracked repo"},
+			{"skillshare install team/shared-skills --track", "Clone as _team-shared-skills"},
+			{"skillshare install _team-shared-skills --update", "Update tracked repo"},
 		}},
 		helpGroup{title: "Install from config (no arguments)", examples: true, rows: []helpRow{
 			{"skillshare install", "Install all skills from config.yaml"},
