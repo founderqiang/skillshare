@@ -1,6 +1,7 @@
 package install
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -160,6 +161,26 @@ func TestInstallTrackedRepo_SameBasenameDoesNotCollide(t *testing.T) {
 			t.Fatalf("repo %s got colliding name %q", owner, result.RepoName)
 		}
 		seen[result.RepoName] = true
+	}
+}
+
+// TestInstallTrackedRepo_ReusesLegacyBasenameCheckout verifies that repeating
+// an install whose repo was cloned under the older basename name (_skills)
+// skips as the same repo instead of cloning a second _owner-skills copy.
+func TestInstallTrackedRepo_ReusesLegacyBasenameCheckout(t *testing.T) {
+	remoteURL := makeRemote(t, "")
+	sourceDir := t.TempDir()
+	source := &Source{Type: SourceTypeGitSSH, Raw: "git@example.com:alice/skills.git", CloneURL: remoteURL, Name: "skills"}
+	if _, err := InstallTrackedRepo(source, sourceDir, InstallOptions{Name: "skills", SkipAudit: true}); err != nil {
+		t.Fatalf("legacy install: %v", err)
+	}
+
+	_, err := InstallTrackedRepo(source, sourceDir, InstallOptions{SkipAudit: true})
+	if !errors.Is(err, ErrSkipSameRepo) {
+		t.Fatalf("err = %v, want ErrSkipSameRepo", err)
+	}
+	if _, err := os.Stat(filepath.Join(sourceDir, "_"+source.TrackName())); err == nil {
+		t.Fatal("cloned a second copy under the owner-qualified name")
 	}
 }
 

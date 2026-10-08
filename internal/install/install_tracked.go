@@ -24,6 +24,12 @@ func installTrackedRepoImpl(source *Source, sourceDir string, opts InstallOption
 	repoName := opts.Name
 	if repoName == "" {
 		repoName = source.TrackName()
+		// Before owner-repo naming the clone was _<basename>; keep using that
+		// checkout when it is the same repo, so a repeat install does not clone twice.
+		legacy := filepath.Join(sourceDir, opts.Into, "_"+strings.TrimPrefix(source.Name, "_"))
+		if source.Name != "" && repoURLsMatch(getRemoteURL(legacy), source.CloneURL) {
+			repoName = source.Name
+		}
 	}
 	if repoName == "" {
 		repoName = source.Name
