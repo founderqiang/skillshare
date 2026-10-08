@@ -266,8 +266,13 @@ func (s *Server) handleExtrasEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Links into the old folder go before the config points elsewhere, so the
-	// next sync does not leave them behind.
+	if err := s.saveAndReloadConfig(); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Links into the old folder go only once the config points elsewhere, so a
+	// failed save leaves working targets alone.
 	var pruneErrs []string
 	if relink {
 		for _, t := range extra.Targets {
@@ -275,10 +280,6 @@ func (s *Server) handleExtrasEdit(w http.ResponseWriter, r *http.Request) {
 			_, errs := clearExtraTarget(extra.File, oldSource, resolveExtrasTargetPath(s.projectRoot, t.Path), t.As, mode)
 			pruneErrs = append(pruneErrs, errs...)
 		}
-	}
-	if err := s.saveAndReloadConfig(); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
 	}
 
 	resp := map[string]any{"success": true, "name": next.Name}

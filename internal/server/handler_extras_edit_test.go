@@ -139,3 +139,13 @@ func TestHandleExtrasEdit_NewSourceRelinksTargets(t *testing.T) {
 		t.Errorf("guide.md should link into the new folder, got %q, %v", dest, err)
 	}
 }
+
+func TestHandleExtrasMode_SymlinkRejectedWhenTargetHasFilters(t *testing.T) {
+	s, _, tgt := newDocsExtraServer(t, config.ExtraTargetConfig{Include: []string{"index.md"}})
+
+	rr := serveExtras(s, http.MethodPatch, "/api/extras/docs/mode", `{"target":"`+tgt+`","mode":"symlink"}`)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+}

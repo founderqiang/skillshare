@@ -104,3 +104,15 @@ func TestValidSyncModes_SkillsRejectImport(t *testing.T) {
 		t.Errorf("extras mode import rejected: %v", err)
 	}
 }
+
+// A malformed pattern written by hand in the config must stop sync before it
+// matches nothing and merge prunes every link.
+func TestValidateExtraConnections_RejectsBadFilterOnFolderExtra(t *testing.T) {
+	err := ValidateExtraConnections([]ExtraConfig{
+		{Name: "docs", Targets: []ExtraTargetConfig{{Path: "/tgt", Include: []string{"["}}}},
+	}, func(e ExtraConfig) string { return "/src/" + e.Name }, func(p string) string { return p })
+
+	if err == nil {
+		t.Fatal("expected an error for the malformed include pattern")
+	}
+}

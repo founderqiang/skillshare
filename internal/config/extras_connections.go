@@ -29,7 +29,7 @@ func ValidateExtraConnections(extras []ExtraConfig, sourceDir func(ExtraConfig) 
 	type owner struct{ name, mode string }
 	owners := map[string]owner{}
 	for _, extra := range extras {
-		if !usesSingleFileSettings(extra) {
+		if !needsExtraValidation(extra) {
 			continue
 		}
 		if err := ValidateExtraConfig(extra); err != nil {
@@ -159,12 +159,15 @@ func validateExtrasImportSupport(extras []ExtraConfig, targets map[string]Target
 	return nil
 }
 
-func usesSingleFileSettings(extra ExtraConfig) bool {
+// needsExtraValidation reports whether an extra sets anything beyond a plain
+// folder sync (single-file settings or file filters), which ValidateExtraConfig
+// must then check before sync.
+func needsExtraValidation(extra ExtraConfig) bool {
 	if extra.File != "" {
 		return true
 	}
 	for _, target := range extra.Targets {
-		if target.As != "" || ManagedExtraMode(target.Mode) {
+		if target.As != "" || ManagedExtraMode(target.Mode) || len(target.Include) > 0 || len(target.Exclude) > 0 {
 			return true
 		}
 	}
