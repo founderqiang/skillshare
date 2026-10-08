@@ -149,3 +149,19 @@ func TestClearExtraTarget_SymlinkTargetThatCannotBeInspectedReportsError(t *test
 		t.Errorf("kept = %v, errs = %v; want an error", kept, errs)
 	}
 }
+
+func TestClearExtraTarget_KeepsRealDirectoryThatResolvesToSource(t *testing.T) {
+	root := t.TempDir()
+	src := filepath.Join(root, "docs")
+	os.MkdirAll(src, 0755)
+	alias := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(root, alias); err != nil {
+		t.Fatal(err)
+	}
+
+	_, kept, errs := ClearExtraTarget("", src, filepath.Join(alias, "docs"), "", "symlink", nil)
+
+	if !kept || len(errs) > 0 {
+		t.Errorf("kept = %v, errs = %v; want the real directory kept", kept, errs)
+	}
+}

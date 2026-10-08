@@ -633,7 +633,11 @@ func ClearExtraTarget(file, sourceDir, targetPath, as, mode string, managedFiles
 // LinksTo reports whether link is a symlink to dir, comparing the link text
 // too, so a link whose folder has since moved or been deleted still counts.
 func LinksTo(link, dir string) bool {
-	// ResolveLinkTarget also handles Windows junctions, which Readlink can't read.
+	// ResolveLinkTarget also resolves a real directory, so check the link itself
+	// first; it handles Windows junctions, which Readlink can't read.
+	if !utils.IsSymlinkOrJunction(link) {
+		return false
+	}
 	dest, err := utils.ResolveLinkTarget(link)
 	if err != nil {
 		return false
