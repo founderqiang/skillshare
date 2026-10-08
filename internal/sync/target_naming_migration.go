@@ -14,10 +14,11 @@ import (
 // taken holds the names other skills sync to in this run.
 func selectActiveTargetNameForSync(mode, targetPath string, skill ResolvedTargetSkill, taken map[string]bool, manifest *Manifest, dryRun bool) (string, error) {
 	desiredName := skill.TargetName
-	legacyName, legacyNaming, err := findLegacyTargetEntry(mode, targetPath, skill, taken, manifest)
-	if err != nil || legacyName == "" {
+	legacy, err := findLegacyTargetEntry(mode, targetPath, skill, taken, manifest)
+	if err != nil || legacy.name == "" {
 		return desiredName, err
 	}
+	legacyName, legacyNaming := legacy.name, legacy.naming
 	legacyPath := filepath.Join(targetPath, legacyName)
 
 	desiredPath := filepath.Join(targetPath, desiredName)
@@ -52,10 +53,10 @@ func selectActiveTargetNameForSync(mode, targetPath string, skill ResolvedTarget
 }
 
 // findLegacyTargetEntry returns the managed entry a skill holds under the name
-// another target naming gave it, and that naming, or "" when there is none:
+// another target naming gave it, with that naming, or a zero value when there is none:
 // when the skill already has its current name, or the old name is one another
 // skill syncs to (taken), there is nothing to migrate.
-func findLegacyTargetEntry(mode, targetPath string, skill ResolvedTargetSkill, taken map[string]bool, manifest *Manifest) (string, string, error) {
+func findLegacyTargetEntry(mode, targetPath string, skill ResolvedTargetSkill, taken map[string]bool, manifest *Manifest) (namedTarget, error) {
 	prev := ""
 	for _, c := range targetNameCandidates(skill.Skill) {
 		if c.name == "" || c.name == prev || c.name == skill.TargetName || taken[c.name] {
@@ -68,18 +69,18 @@ func findLegacyTargetEntry(mode, targetPath string, skill ResolvedTargetSkill, t
 			continue
 		}
 		if err != nil {
-			return "", "", fmt.Errorf("failed to inspect legacy target entry %s: %w", c.name, err)
+			return namedTarget{}, fmt.Errorf("failed to inspect legacy target entry %s: %w", c.name, err)
 		}
 		if !isManagedTargetEntry(mode, legacyPath, info, skill, manifest, c) {
 			continue
 		}
 		desiredPath := filepath.Join(targetPath, skill.TargetName)
 		if info, err := os.Lstat(desiredPath); err == nil && isManagedTargetEntry(mode, desiredPath, info, skill, manifest, namedTarget{name: skill.TargetName}) {
-			return "", "", nil
+			return namedTarget{}, nil
 		}
-		return c.name, c.naming, nil
+		return c, nil
 	}
-	return "", "", nil
+	return namedTarget{}, nil
 }
 
 // isManagedTargetEntry reports whether the entry c.name at entryPath is the
