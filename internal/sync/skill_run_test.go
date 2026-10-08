@@ -51,6 +51,20 @@ func TestSyncSkillTarget_ReportsUnmatchedIncludeWithTargetName(t *testing.T) {
 	}
 }
 
+// A partial source may hold the skills the filter names, so it is not called unmatched.
+func TestSyncSkillTarget_IncompleteSourceReportsNoUnmatchedInclude(t *testing.T) {
+	sourceDir, skills := skillRunSource(t)
+	for _, mode := range []string{"merge", "copy"} {
+		target := config.TargetConfig{Skills: &config.ResourceTargetConfig{Path: t.TempDir(), Include: []string{"missing"}}}
+
+		r := SyncSkillTarget(SkillTarget{Name: "claude", Target: target, Mode: mode}, skills, SkillRunOptions{Source: sourceDir, SourceIncomplete: true})
+
+		if r.Err != nil || len(r.UnmatchedIncludes) != 0 {
+			t.Fatalf("%s: unmatched = %+v, want none", mode, r.UnmatchedIncludes)
+		}
+	}
+}
+
 func TestSyncSkillTarget_SymlinkConflictNeedsForce(t *testing.T) {
 	sourceDir, skills := skillRunSource(t)
 	elsewhere := t.TempDir()

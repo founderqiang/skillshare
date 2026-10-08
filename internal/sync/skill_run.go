@@ -70,10 +70,11 @@ func SyncSkillTarget(t SkillTarget, skills []DiscoveredSkill, opts SkillRunOptio
 			return res
 		}
 		res.Linked, res.Updated, res.Skipped, res.DirCreated = result.Linked, result.Updated, result.Skipped, result.DirCreated
-		res.UnmatchedIncludes = result.UnmatchedIncludes
+		// A partial source may hold what the filter names, so only a full one reports unmatched patterns.
 		if opts.SourceIncomplete {
 			break
 		}
+		res.UnmatchedIncludes = result.UnmatchedIncludes
 		prune, err := PruneOrphanLinksWithSkills(PruneOptions{
 			TargetPath: sc.Path, SourcePath: opts.Source, Skills: skills,
 			Include: sc.Include, Exclude: sc.Exclude, TargetNaming: sc.TargetNaming, TargetName: t.Name,
@@ -91,10 +92,11 @@ func SyncSkillTarget(t SkillTarget, skills []DiscoveredSkill, opts SkillRunOptio
 			return res
 		}
 		res.Linked, res.Updated, res.Skipped, res.DirCreated = result.Copied, result.Updated, result.Skipped, result.DirCreated
-		res.UnmatchedIncludes = result.UnmatchedIncludes
+		// A partial source may hold what the filter names, so only a full one reports unmatched patterns.
 		if opts.SourceIncomplete {
 			break
 		}
+		res.UnmatchedIncludes = result.UnmatchedIncludes
 		prune, err := PruneOrphanCopiesWithSkills(sc.Path, skills, sc.Include, sc.Exclude, t.Name, sc.TargetNaming, opts.DryRun)
 		res.addPrune(prune, err)
 
