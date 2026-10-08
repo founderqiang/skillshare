@@ -11,6 +11,7 @@ import Spinner from '../Spinner';
 import SyncResultList, { SyncUpToDate } from '../SyncResultList';
 import { countChanges, HOOKS_CHANGED, hooksGroups, MCP_CHANGED, mcpGroups, otherWarnings, projectChanges, resourceGroups, runSync, type ChangeGroup, type SyncFailure } from '../sync/syncView';
 import SyncResult from '../sync/SyncResult';
+import UnmatchedNotices from '../sync/UnmatchedNotices';
 import { useT } from '../../i18n';
 import type { ProjectRow } from './projectView';
 import { useDiffQuery, useHooksQuery, useMcpQuery } from '../../hooks/useSharedQueries';
@@ -104,6 +105,7 @@ export default function ProjectSyncDialog({ open, onClose, project, targets }: P
             {failures.length === 0 && <div className="ss-note inf"><CircleCheck size={16} /><span className="flex-1">{t('projects.sync.done', { name: project.name })}</span></div>}
             {/* No Force switch here, so a symlink conflict offers Open target only. */}
             <SyncResult failures={failures} warnings={otherWarnings(done)} synced={synced} />
+            <UnmatchedNotices items={done?.unmatched} />
           </>
         ) : (
           <>

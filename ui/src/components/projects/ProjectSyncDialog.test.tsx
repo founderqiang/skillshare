@@ -108,6 +108,18 @@ describe('Project sync dialog', () => {
     expect(screen.queryByText('app is synced.')).not.toBeInTheDocument();
   });
 
+  it('explains a project filter that selects no skill', async () => {
+    vi.mocked(api.diff).mockResolvedValue({ diffs: [{ target: 'app@claude', items: [{ skill: 'team-a', action: 'link', reason: 'new' }] }] } as Awaited<ReturnType<typeof api.diff>>);
+    vi.mocked(mcpApi.list).mockResolvedValue({ source: { path: '', configPath: '', targets: null, servers: {}, projects: { '/work/app': {} } }, projectConfigs: [], paths: {}, detected: [], plan: { ...plan, changes: [] }, previewError: '', backups: [], unmanaged: [] });
+    vi.mocked(hooksApi.list).mockResolvedValue(inventory(null));
+    vi.mocked(api.sync).mockResolvedValue({ results: [], warnings: [], unmatched: [{ target: 'app@claude', root: '/work/app', patterns: ['*review*'], all: true }] } as unknown as Awaited<ReturnType<typeof api.sync>>);
+    const user = userEvent.setup();
+    render(<MemoryRouter><QueryClientProvider client={new QueryClient()}><I18nProvider><ProjectSyncDialog open onClose={vi.fn()} project={project} targets={targets} /></I18nProvider></QueryClientProvider></MemoryRouter>);
+
+    await user.click(await screen.findByRole('button', { name: 'Sync Now' }));
+    expect(await screen.findByRole('link', { name: 'Edit filter' })).toHaveAttribute('href', `/projects/${encodeURIComponent('/work/app')}`);
+  });
+
   // A row per file counts the conflicts; the note says which entry and why.
   it('names each MCP conflict with its reason', async () => {
     const conflict = { target: 'cursor', path: '/work/app/.cursor/mcp.json', name: 'shared', root: '/work/app', action: 'conflict', message: 'existing entry is not managed; import it to explicitly adopt it' };

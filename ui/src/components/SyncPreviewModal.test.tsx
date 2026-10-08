@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { api, type Target } from '../api/client';
@@ -31,6 +32,16 @@ describe('Sync preview modal', () => {
     show('agent');
     expect(screen.getByText('Only agents are written. Skills, extras and MCP stay as they are.')).toBeInTheDocument();
     expect(await screen.findByText('Everything is up to date. No sync needed.')).toBeInTheDocument();
+  });
+
+  it('explains an include filter that selects no skill after syncing', async () => {
+    vi.mocked(api.listTargets).mockResolvedValue({ targets } as never);
+    vi.mocked(api.diff).mockResolvedValue({ diffs: [{ target: 'claude', items: [{ skill: 'pdf', action: 'link' }] }] } as never);
+    vi.mocked(api.sync).mockResolvedValue({ results: [], warnings: [], unmatched: [{ target: 'codex', patterns: ['*review*'], all: true }] } as never);
+    const user = userEvent.setup();
+    show('skill');
+    await user.click(await screen.findByRole('button', { name: 'Sync Now' }));
+    expect(await screen.findByRole('link', { name: 'Edit filter' })).toHaveAttribute('href', '/targets/codex');
   });
 
   it('opens with focus on Cancel, not the secondary Sync page link', () => {
