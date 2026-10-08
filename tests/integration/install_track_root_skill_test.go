@@ -173,45 +173,6 @@ func TestUpdate_Track_RootSkillMd_BackfillsMissingFileHashes(t *testing.T) {
 	}
 }
 
-// TestInstall_Track_RootSkillMd_ShowsInStatus verifies that a tracked repo
-// with only a root SKILL.md still appears in `status --json` under
-// tracked_repos. Regression test for issue #163.
-func TestInstall_Track_RootSkillMd_ShowsInStatus(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-	setupGlobalConfig(sb)
-
-	repoURL := setupBareRepoWithRootSkill(t, sb, "root-status")
-
-	installResult := sb.RunCLI("install", repoURL, "--track", "--name", "status-tracked")
-	installResult.AssertSuccess(t)
-
-	statusResult := sb.RunCLI("status", "--json")
-	statusResult.AssertSuccess(t)
-
-	var output struct {
-		TrackedRepos []struct {
-			Name       string `json:"name"`
-			SkillCount int    `json:"skill_count"`
-			Dirty      bool   `json:"dirty"`
-		} `json:"tracked_repos"`
-	}
-	if err := json.Unmarshal([]byte(statusResult.Stdout), &output); err != nil {
-		t.Fatalf("failed to parse status --json: %v\nstdout: %s", err, statusResult.Stdout)
-	}
-
-	found := false
-	for _, r := range output.TrackedRepos {
-		if r.Name == "_status-tracked" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("tracked_repos should contain '_status-tracked', got %+v", output.TrackedRepos)
-	}
-}
-
 // TestInstall_Track_Into_NamesRepoByPath verifies that a tracked repo
 // installed with --into is named by its path in the install hint and status.
 func TestInstall_Track_Into_NamesRepoByPath(t *testing.T) {

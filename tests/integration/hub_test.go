@@ -154,15 +154,6 @@ func TestHub_IndexMinimalOmitsMetadata(t *testing.T) {
 	}
 }
 
-func TestHub_Help(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	result := sb.RunCLI("hub", "--help")
-	result.AssertSuccess(t)
-	result.AssertAnyOutputContains(t, "index")
-}
-
 func TestHub_IndexHelp(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()

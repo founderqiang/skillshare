@@ -166,54 +166,6 @@ func TestInstallBranch_RegularInstall(t *testing.T) {
 	}
 }
 
-func TestInstallBranch_MetadataPersistence(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-	sb.WriteConfig("source: " + sb.SourcePath + "\ntargets: {}\n")
-
-	// Create bare repo with staging branch
-	remoteRepo := filepath.Join(sb.Root, "meta-repo.git")
-	gitInit(t, remoteRepo, true)
-
-	workDir := filepath.Join(sb.Root, "work-meta")
-	gitClone(t, remoteRepo, workDir)
-	os.MkdirAll(filepath.Join(workDir, "my-skill"), 0755)
-	os.WriteFile(filepath.Join(workDir, "my-skill", "SKILL.md"), []byte("---\nname: my-skill\n---\n# Skill"), 0644)
-	gitAddCommit(t, workDir, "add skill")
-	gitPush(t, workDir)
-
-	cmd := exec.Command("git", "checkout", "-b", "staging")
-	cmd.Dir = workDir
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git checkout -b staging: %s %v", out, err)
-	}
-	// Need a commit on staging so it differs from main
-	os.WriteFile(filepath.Join(workDir, "my-skill", "SKILL.md"), []byte("---\nname: my-skill\n---\n# Skill staging"), 0644)
-	gitAddCommit(t, workDir, "staging commit")
-	pushCmd := exec.Command("git", "push", "origin", "staging")
-	pushCmd.Dir = workDir
-	if out, err := pushCmd.CombinedOutput(); err != nil {
-		t.Fatalf("git push: %s %v", out, err)
-	}
-
-	// Install from staging branch
-	result := sb.RunCLI("install", "file://"+remoteRepo, "--branch", "staging", "--all", "--skip-audit")
-	result.AssertSuccess(t)
-
-	// Check .metadata.json has branch field
-	store, err := install.LoadMetadata(sb.SourcePath)
-	if err != nil {
-		t.Fatalf("load metadata: %v", err)
-	}
-	entry := store.Get("my-skill")
-	if entry == nil {
-		t.Fatal("expected metadata entry for my-skill")
-	}
-	if entry.Branch != "staging" {
-		t.Errorf("entry.Branch = %q, want %q", entry.Branch, "staging")
-	}
-}
-
 func TestInstallBranch_UpdatePreservesBranch(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()

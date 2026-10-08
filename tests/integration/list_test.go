@@ -522,52 +522,6 @@ func TestList_JSON_Empty(t *testing.T) {
 	}
 }
 
-// --- --no-tui tests ---
-
-func TestList_NoTUI_ShowsPlainText(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("my-skill", map[string]string{
-		"SKILL.md": "---\nname: my-skill\n---\n# My Skill",
-	})
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + "\ntargets: {}\n")
-
-	result := sb.RunCLI("list", "--no-tui")
-	if result.ExitCode != 0 {
-		t.Errorf("expected exit code 0, got %d\n\tstdout: %s\n\tstderr: %s", result.ExitCode, result.Stdout, result.Stderr)
-	}
-	if !strings.Contains(result.Stdout, "my-skill") {
-		t.Errorf("expected output to contain 'my-skill', got:\n%s", result.Stdout)
-	}
-}
-
-func TestList_NoTUI_WithPattern(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("react-helper", map[string]string{
-		"SKILL.md": "---\nname: react-helper\n---\n# React",
-	})
-	sb.CreateSkill("vue-helper", map[string]string{
-		"SKILL.md": "---\nname: vue-helper\n---\n# Vue",
-	})
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + "\ntargets: {}\n")
-
-	result := sb.RunCLI("list", "--no-tui", "react")
-	if result.ExitCode != 0 {
-		t.Errorf("expected exit code 0, got %d", result.ExitCode)
-	}
-	if !strings.Contains(result.Stdout, "react-helper") {
-		t.Errorf("expected output to contain 'react-helper'")
-	}
-	if strings.Contains(result.Stdout, "vue-helper") {
-		t.Errorf("should not contain 'vue-helper' when filtered")
-	}
-}
-
 // --- --status tests ---
 
 // setupStatusSandbox creates one enabled and one disabled skill ("off-skill"

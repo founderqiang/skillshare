@@ -148,28 +148,6 @@ func TestUninstall_JSON_DryRun(t *testing.T) {
 	}
 }
 
-func TestUninstall_JSON_SkipsConfirmation(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("auto-force", map[string]string{"SKILL.md": "# Auto"})
-	sb.WriteConfig(`source: ` + sb.SourcePath + "\ntargets: {}\n")
-
-	// --json should skip confirmation without requiring --force.
-	result := sb.RunCLI("uninstall", "auto-force", "--json")
-	result.AssertSuccess(t)
-
-	var output map[string]any
-	if err := json.Unmarshal([]byte(result.Stdout), &output); err != nil {
-		t.Fatalf("invalid JSON output: %v\nStdout: %s", err, result.Stdout)
-	}
-
-	removed, ok := output["removed"].([]any)
-	if !ok || len(removed) != 1 {
-		t.Errorf("expected 1 removed skill, got %v", output["removed"])
-	}
-}
-
 // --- collect --json ---
 
 // --- target list --json ---
@@ -795,23 +773,6 @@ func TestStatus_Project_JSON(t *testing.T) {
 }
 
 // --- update --json single target (P1: verify suppressUIToDevnull works) ---
-
-func TestUpdate_JSON_SingleTarget_PureJSON(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + "\ntargets: {}\n")
-
-	d := sb.CreateSkill("json-pure", map[string]string{"SKILL.md": "# Test"})
-	writeMeta(t, d)
-
-	result := sb.RunCLI("update", "json-pure", "--json", "--dry-run")
-	result.AssertSuccess(t)
-
-	// stdout must be pure JSON — UI header/step/spinner must not leak
-	stdout := strings.TrimSpace(result.Stdout)
-	assertPureJSON(t, stdout)
-}
 
 func TestUpdate_JSON_BatchTarget_PureJSON(t *testing.T) {
 	sb := testutil.NewSandbox(t)

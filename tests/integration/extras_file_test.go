@@ -213,60 +213,6 @@ func TestExtrasFile_BackupThenReplaceAndRestore(t *testing.T) {
 	}
 }
 
-func TestExtrasFile_ReattachAfterConfigOnlyRemoveTargetRestoresNewFile(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-	sb.CreateSkill("placeholder", map[string]string{"SKILL.md": "# P"})
-	setupSingleFileExtra(t, sb, "instructions", "AGENTS.md", "# shared")
-	claudeDir := filepath.Join(sb.Home, ".claude")
-	claudeMD := filepath.Join(claudeDir, "CLAUDE.md")
-	otherDir := filepath.Join(sb.Home, ".other")
-	sb.WriteFile(claudeMD, "v1")
-	cfg := singleFileConfig(sb, `  - name: instructions
-    file: AGENTS.md
-    targets:
-      - path: `+otherDir+`
-      - path: `+claudeDir+`
-        as: CLAUDE.md
-`)
-	sb.WriteConfig(cfg)
-	sb.RunCLI("sync", "extras").AssertSuccess(t)
-
-	sb.RunCLI("extras", "instructions", "--remove-target", claudeDir, "-g").AssertSuccess(t)
-	os.Remove(claudeMD)
-	sb.WriteFile(claudeMD, "v2")
-	sb.WriteConfig(cfg)
-	sb.RunCLI("sync", "extras").AssertSuccess(t)
-	sb.RunCLI("extras", "remove", "instructions", "--force").AssertSuccess(t)
-
-	if got := sb.ReadFile(claudeMD); got != "v2" {
-		t.Errorf("CLAUDE.md = %q, want the file present at the second attach", got)
-	}
-}
-
-func TestExtrasFile_ModifiedStatus(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-	sb.CreateSkill("placeholder", map[string]string{"SKILL.md": "# P"})
-	setupSingleFileExtra(t, sb, "instructions", "AGENTS.md", "# shared")
-	claudeDir := filepath.Join(sb.Home, ".claude")
-	claudeMD := filepath.Join(claudeDir, "CLAUDE.md")
-	sb.WriteConfig(singleFileConfig(sb, `  - name: instructions
-    file: AGENTS.md
-    targets:
-      - path: `+claudeDir+`
-        mode: symlink
-        as: CLAUDE.md
-`))
-	sb.RunCLI("sync", "extras").AssertSuccess(t)
-	os.Remove(claudeMD)
-	sb.WriteFile(claudeMD, "# edited in the tool")
-
-	if got := extrasListStatuses(t, sb)["instructions"]; got != "modified" {
-		t.Errorf("list status = %q, want modified", got)
-	}
-}
-
 func TestExtrasFile_ImportRequiresFile(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()

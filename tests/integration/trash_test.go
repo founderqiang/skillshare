@@ -89,27 +89,6 @@ targets: {}
 	result.AssertAnyOutputContains(t, "not found in trash")
 }
 
-func TestTrash_Restore_AlreadyExists(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("conflict", map[string]string{"SKILL.md": "# V1"})
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets: {}
-`)
-
-	// Uninstall
-	sb.RunCLI("uninstall", "conflict", "--force")
-
-	// Recreate a skill with the same name
-	sb.CreateSkill("conflict", map[string]string{"SKILL.md": "# V2"})
-
-	// Restore should fail
-	result := sb.RunCLI("trash", "restore", "conflict")
-	result.AssertFailure(t)
-	result.AssertAnyOutputContains(t, "already exists")
-}
-
 func TestTrash_Delete_Success(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()

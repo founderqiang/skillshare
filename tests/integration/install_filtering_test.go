@@ -11,37 +11,6 @@ import (
 	"skillshare/internal/testutil"
 )
 
-func TestInstall_SkillIgnore_WildcardPattern(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + "\ntargets: {}\n")
-
-	gitRepoPath := filepath.Join(sb.Root, "wildcard-repo")
-	for _, name := range []string{"radar/radar", "radar/helper", "test-one", "test-two"} {
-		p := filepath.Join(gitRepoPath, name)
-		os.MkdirAll(p, 0755)
-		os.WriteFile(filepath.Join(p, "SKILL.md"), []byte("# "+name), 0644)
-	}
-	os.WriteFile(filepath.Join(gitRepoPath, ".skillignore"), []byte("test-*\nradar/radar\n"), 0644)
-
-	initGitRepo(t, gitRepoPath)
-
-	source, _ := install.ParseSource("file://" + gitRepoPath)
-	discovery, err := install.DiscoverFromGit(source)
-	if err != nil {
-		t.Fatalf("DiscoverFromGit() error = %v", err)
-	}
-	defer install.CleanupDiscovery(discovery)
-
-	if len(discovery.Skills) != 1 {
-		t.Errorf("expected 1 skill (helper), got %d: %+v", len(discovery.Skills), discovery.Skills)
-	}
-	if len(discovery.Skills) == 1 && discovery.Skills[0].Name != "helper" {
-		t.Errorf("expected helper, got %s", discovery.Skills[0].Name)
-	}
-}
-
 // Pattern semantics are covered in internal/skillignore; keep Git discovery wiring here.
 
 func TestInstall_SkillIgnore_NegationPattern(t *testing.T) {

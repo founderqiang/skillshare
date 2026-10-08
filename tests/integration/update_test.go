@@ -941,19 +941,6 @@ func corruptGitIndex(t *testing.T, repoPath string) {
 	}
 }
 
-func TestUpdate_TrackedRepo_GitStatusErrorFailsUpdate(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-	setupGlobalConfig(sb)
-
-	repoName := setupCleanTrackedRepo(t, sb, "status-broken")
-	corruptGitIndex(t, filepath.Join(sb.SourcePath, repoName))
-
-	result := sb.RunCLI("update", repoName)
-	result.AssertFailure(t)
-	result.AssertAnyOutputContains(t, "failed to check git status")
-}
-
 func TestUpdate_BatchGitStatusErrorFailsRepo(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()

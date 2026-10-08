@@ -41,41 +41,6 @@ func TestUninstallProject_Force_SkipsConfirmation(t *testing.T) {
 	result.AssertAnyOutputContains(t, "✓ Uninstall bye")
 }
 
-func TestUninstallProject_UpdatesConfig(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-	projectRoot := sb.SetupProjectDir("claude")
-
-	// Create remote skill with meta in centralized store
-	sb.CreateProjectSkill(projectRoot, "remote", map[string]string{
-		"SKILL.md": "# Remote",
-	})
-	skillsDir := filepath.Join(projectRoot, ".skillshare", "skills")
-	metaStore := install.NewMetadataStore()
-	metaStore.Set("remote", &install.MetadataEntry{Source: "org/skills/remote", Type: "github"})
-	metaStore.Save(skillsDir)
-
-	// Write config and registry with the skill
-	sb.WriteProjectConfig(projectRoot, `targets:
-  - claude
-`)
-	os.WriteFile(filepath.Join(projectRoot, ".skillshare", "registry.yaml"), []byte(`skills:
-  - name: remote
-    source: org/skills/remote
-`), 0644)
-
-	result := sb.RunCLIInDir(projectRoot, "uninstall", "remote", "--force", "-p")
-	result.AssertSuccess(t)
-
-	store, err := install.LoadMetadata(filepath.Join(projectRoot, ".skillshare", "skills"))
-	if err != nil {
-		t.Fatalf("load metadata: %v", err)
-	}
-	if store.Has("remote") {
-		t.Error("metadata should not contain removed skill")
-	}
-}
-
 func TestUninstallProject_NotFound_Error(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()

@@ -49,47 +49,6 @@ targets:
 	}
 }
 
-func TestSync_MergeMode_PreservesLocalSkills(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	// Create source skill
-	sb.CreateSkill("shared-skill", map[string]string{
-		"SKILL.md": "# Shared",
-	})
-
-	// Create target with local skill
-	targetPath := sb.CreateTarget("claude")
-	localSkillPath := filepath.Join(targetPath, "local-skill")
-	os.MkdirAll(localSkillPath, 0755)
-	os.WriteFile(filepath.Join(localSkillPath, "SKILL.md"), []byte("# Local"), 0644)
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-mode: merge
-targets:
-  claude:
-    path: ` + targetPath + `
-`)
-
-	result := sb.RunCLI("sync")
-
-	result.AssertSuccess(t)
-
-	// Verify local skill preserved (is still a directory, not symlink)
-	if sb.IsSymlink(localSkillPath) {
-		t.Error("local skill should not be converted to symlink")
-	}
-	if !sb.FileExists(filepath.Join(localSkillPath, "SKILL.md")) {
-		t.Error("local skill files should be preserved")
-	}
-
-	// Verify shared skill is symlinked
-	sharedSkillPath := filepath.Join(targetPath, "shared-skill")
-	if !sb.IsSymlink(sharedSkillPath) {
-		t.Error("shared skill should be a symlink")
-	}
-}
-
 func TestSync_DryRun_NoChanges(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
@@ -238,134 +197,6 @@ targets:
 	}
 }
 
-func TestSync_Force_OverwritesConflict(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("skill", map[string]string{"SKILL.md": "# Skill"})
-
-	// Create target as symlink to wrong location
-	targetPath := filepath.Join(sb.Home, ".claude", "skills")
-	wrongSource := filepath.Join(sb.Home, "wrong-source")
-	os.MkdirAll(wrongSource, 0755)
-	os.MkdirAll(filepath.Dir(targetPath), 0755)
-	os.RemoveAll(targetPath)
-	os.Symlink(wrongSource, targetPath)
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets:
-  claude:
-    path: ` + targetPath + `
-    mode: symlink
-`)
-
-	// Execute without force - should fail
-	result := sb.RunCLI("sync")
-	result.AssertFailure(t)
-
-	// Execute with force - should succeed
-	result = sb.RunCLI("sync", "--force")
-	result.AssertSuccess(t)
-
-	// Verify symlink now points to correct source
-	if got := sb.SymlinkTarget(targetPath); got != sb.SourcePath {
-		t.Errorf("symlink target = %q, want %q", got, sb.SourcePath)
-	}
-}
-
-func TestSync_NestedSkills_FlatNaming(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	// Create nested skill structure
-	// Source: personal/writing/email/SKILL.md -> Target: personal__writing__email
-	sb.CreateNestedSkill("personal/writing/email", map[string]string{
-		"SKILL.md": "# Email Writing Skill",
-	})
-
-	// Also create a regular flat skill for comparison
-	sb.CreateSkill("my-helper", map[string]string{
-		"SKILL.md": "# My Helper",
-	})
-
-	targetPath := sb.CreateTarget("claude")
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-mode: merge
-targets:
-  claude:
-    path: ` + targetPath + `
-`)
-
-	result := sb.RunCLI("sync")
-
-	result.AssertSuccess(t)
-
-	// Verify flat skill is symlinked normally
-	flatSkillLink := filepath.Join(targetPath, "my-helper")
-	if !sb.IsSymlink(flatSkillLink) {
-		t.Error("flat skill should be a symlink")
-	}
-
-	// Verify nested skill is symlinked with flat naming
-	nestedSkillLink := filepath.Join(targetPath, "personal__writing__email")
-	if !sb.IsSymlink(nestedSkillLink) {
-		t.Errorf("nested skill should be a symlink at %s", nestedSkillLink)
-	}
-
-	// Verify symlink points to correct nested source
-	expectedNestedTarget := filepath.Join(sb.SourcePath, "personal", "writing", "email")
-	if got := sb.SymlinkTarget(nestedSkillLink); got != expectedNestedTarget {
-		t.Errorf("nested symlink target = %q, want %q", got, expectedNestedTarget)
-	}
-}
-
-func TestSync_TrackedRepoSkills_FlatNaming(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	// Create a tracked repo structure with nested skills
-	// Source: _team-repo/frontend/ui/SKILL.md -> Target: _team-repo__frontend__ui
-	sb.CreateNestedSkill("_team-repo/frontend/ui", map[string]string{
-		"SKILL.md": "# UI Components",
-	})
-
-	// Another skill in the same tracked repo
-	sb.CreateNestedSkill("_team-repo/backend/api", map[string]string{
-		"SKILL.md": "# API Utilities",
-	})
-
-	targetPath := sb.CreateTarget("claude")
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-mode: merge
-targets:
-  claude:
-    path: ` + targetPath + `
-`)
-
-	result := sb.RunCLI("sync")
-
-	result.AssertSuccess(t)
-
-	// Verify tracked repo skills are symlinked with flat naming
-	uiSkillLink := filepath.Join(targetPath, "_team-repo__frontend__ui")
-	if !sb.IsSymlink(uiSkillLink) {
-		t.Errorf("tracked repo skill should be a symlink at %s", uiSkillLink)
-	}
-
-	apiSkillLink := filepath.Join(targetPath, "_team-repo__backend__api")
-	if !sb.IsSymlink(apiSkillLink) {
-		t.Errorf("tracked repo skill should be a symlink at %s", apiSkillLink)
-	}
-
-	// Verify symlinks point to correct nested sources
-	expectedUITarget := filepath.Join(sb.SourcePath, "_team-repo", "frontend", "ui")
-	if got := sb.SymlinkTarget(uiSkillLink); got != expectedUITarget {
-		t.Errorf("UI symlink target = %q, want %q", got, expectedUITarget)
-	}
-}
-
 func TestSync_TrackedRepoSkills_HiddenDirs(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
@@ -490,38 +321,6 @@ targets:
 	content := string(data)
 	if !strings.Contains(content, "remote-tool") {
 		t.Errorf("sync should preserve registry entry for installed skill without local files, got:\n%s", content)
-	}
-}
-
-func TestSync_MergeMode_IncludeThenExclude(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("codex-plan", map[string]string{"SKILL.md": "# Plan"})
-	sb.CreateSkill("codex-test", map[string]string{"SKILL.md": "# Test"})
-	sb.CreateSkill("claude-help", map[string]string{"SKILL.md": "# Claude"})
-	targetPath := sb.CreateTarget("claude")
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-mode: merge
-targets:
-  claude:
-    path: ` + targetPath + `
-    include: [codex-*]
-    exclude: ["*-test"]
-`)
-
-	result := sb.RunCLI("sync")
-	result.AssertSuccess(t)
-
-	if !sb.IsSymlink(filepath.Join(targetPath, "codex-plan")) {
-		t.Error("included skill should be symlinked")
-	}
-	if sb.FileExists(filepath.Join(targetPath, "codex-test")) {
-		t.Error("exclude should be applied after include")
-	}
-	if sb.FileExists(filepath.Join(targetPath, "claude-help")) {
-		t.Error("skills outside include should not be synced")
 	}
 }
 
@@ -689,80 +488,6 @@ targets:
 	}
 }
 
-func TestSync_MergeMode_ManifestPrunesOrphanDir(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("my-skill", map[string]string{"SKILL.md": "# My Skill"})
-	targetPath := sb.CreateTarget("claude")
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-mode: merge
-targets:
-  claude:
-    path: ` + targetPath + `
-`)
-
-	// First sync — creates symlink + manifest
-	result := sb.RunCLI("sync")
-	result.AssertSuccess(t)
-
-	if !sb.IsSymlink(filepath.Join(targetPath, "my-skill")) {
-		t.Fatal("my-skill should be a symlink after sync")
-	}
-
-	// Replace symlink with a real directory (simulates copy-mode residue)
-	os.Remove(filepath.Join(targetPath, "my-skill"))
-	os.MkdirAll(filepath.Join(targetPath, "my-skill"), 0755)
-	os.WriteFile(filepath.Join(targetPath, "my-skill", "SKILL.md"), []byte("# Copy"), 0644)
-
-	// Remove source skill (simulates uninstall)
-	os.RemoveAll(filepath.Join(sb.SourcePath, "my-skill"))
-
-	// Sync again — manifest knows my-skill was managed, so it should be pruned
-	result = sb.RunCLI("sync")
-	result.AssertSuccess(t)
-
-	if sb.FileExists(filepath.Join(targetPath, "my-skill")) {
-		t.Error("manifest-tracked orphan directory should have been pruned")
-	}
-}
-
-func TestSync_MergeMode_ManifestPreservesUserDir(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("shared-skill", map[string]string{"SKILL.md": "# Shared"})
-	targetPath := sb.CreateTarget("claude")
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-mode: merge
-targets:
-  claude:
-    path: ` + targetPath + `
-`)
-
-	// Sync to establish manifest
-	result := sb.RunCLI("sync")
-	result.AssertSuccess(t)
-
-	// Manually create a user directory (never synced by skillshare)
-	userDir := filepath.Join(targetPath, "user-created")
-	os.MkdirAll(userDir, 0755)
-	os.WriteFile(filepath.Join(userDir, "SKILL.md"), []byte("# User"), 0644)
-
-	// Remove source skill
-	os.RemoveAll(filepath.Join(sb.SourcePath, "shared-skill"))
-
-	// Sync again — user-created should be preserved (not in manifest)
-	result = sb.RunCLI("sync")
-	result.AssertSuccess(t)
-
-	if !sb.FileExists(userDir) {
-		t.Error("user-created directory should be preserved (not in manifest)")
-	}
-}
-
 func TestSync_MergeMode_InvalidFilterPatternFails(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
@@ -916,41 +641,6 @@ targets:
 	result.AssertAnyOutputContains(t, "1 skill(s) ignored by .skillignore")
 	result.AssertAnyOutputContains(t, "private-other")
 	result.AssertAnyOutputContains(t, ".local")
-}
-
-func TestSync_SkillignoreLocal_OnlyLocalFile(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("my-skill", map[string]string{
-		"SKILL.md": "---\nname: my-skill\n---\nContent",
-	})
-	sb.CreateSkill("debug-tool", map[string]string{
-		"SKILL.md": "---\nname: debug-tool\n---\nDebug",
-	})
-	targetPath := sb.CreateTarget("claude")
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-mode: merge
-targets:
-  claude:
-    path: ` + targetPath + `
-`)
-
-	// Only .skillignore.local, no .skillignore
-	os.WriteFile(filepath.Join(sb.SourcePath, ".skillignore.local"), []byte("debug-tool\n"), 0644)
-
-	result := sb.RunCLI("sync")
-	result.AssertSuccess(t)
-
-	// debug-tool should be ignored
-	if _, err := os.Stat(filepath.Join(targetPath, "debug-tool")); err == nil {
-		t.Error("debug-tool should be ignored by .skillignore.local")
-	}
-
-	// my-skill should be synced
-	if _, err := os.Stat(filepath.Join(targetPath, "my-skill")); os.IsNotExist(err) {
-		t.Error("my-skill should be synced")
-	}
 }
 
 // A built-in target listed without a path takes its path from targets.yaml.

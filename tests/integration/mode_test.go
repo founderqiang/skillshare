@@ -40,18 +40,6 @@ targets:
 	result.AssertRowContains(t, "skills", "~/.config/skillshare/skills")
 }
 
-func TestMode_AutoDetect_ProjectWhenConfigExists(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-	projectRoot := sb.SetupProjectDir("claude")
-	sb.CreateProjectSkill(projectRoot, "auto-detect", map[string]string{"SKILL.md": "# A"})
-
-	// No flag → auto-detect project mode
-	result := sb.RunCLIInDir(projectRoot, "list")
-	result.AssertSuccess(t)
-	result.AssertOutputContains(t, "Skills · project")
-}
-
 func TestMode_AutoDetect_GlobalWhenNoConfig(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"skillshare/internal/config"
+	"skillshare/internal/resource"
 )
 
 // ExtraRunOptions holds what differs between the callers of RunExtraTargets.
@@ -21,6 +22,29 @@ type ExtraRunOptions struct {
 	// AgentTargetPaths holds cleaned agents sync target paths. Targets of the
 	// extra named "agents" at these paths are skipped. Nil skips nothing.
 	AgentTargetPaths map[string]bool
+}
+
+// AgentTargetPaths returns the cleaned agentPaths, the folders the agents sync
+// writes to, for ExtraRunOptions.AgentTargetPaths. It returns nil when
+// agentsSource holds no agents, since the agents sync then writes nothing.
+func AgentTargetPaths(agentsSource string, agentPaths []string) map[string]bool {
+	if _, err := os.Stat(agentsSource); err != nil {
+		return nil
+	}
+	if agents, err := (resource.AgentKind{}).Discover(agentsSource); err != nil || len(agents) == 0 {
+		return nil
+	}
+	var paths map[string]bool
+	for _, p := range agentPaths {
+		if p == "" {
+			continue
+		}
+		if paths == nil {
+			paths = make(map[string]bool)
+		}
+		paths[filepath.Clean(p)] = true
+	}
+	return paths
 }
 
 // ExtraRun is the outcome of RunExtraTargets for one extra.

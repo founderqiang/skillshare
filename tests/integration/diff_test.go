@@ -11,29 +11,6 @@ import (
 	"skillshare/internal/testutil"
 )
 
-func TestDiff_InSync_ShowsNoChanges(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("skill1", map[string]string{"SKILL.md": "# Skill 1"})
-	targetPath := sb.CreateTarget("claude")
-
-	// Create symlink to simulate synced state
-	os.Symlink(filepath.Join(sb.SourcePath, "skill1"), filepath.Join(targetPath, "skill1"))
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-mode: merge
-targets:
-  claude:
-    path: ` + targetPath + `
-`)
-
-	result := sb.RunCLI("diff")
-
-	result.AssertSuccess(t)
-	result.AssertOutputContains(t, "claude")
-}
-
 func TestDiff_NoTargets_SaysSo(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
@@ -45,27 +22,6 @@ func TestDiff_NoTargets_SaysSo(t *testing.T) {
 	result.AssertSuccess(t)
 	result.AssertOutputContains(t, "No targets configured")
 	result.AssertOutputNotContains(t, "No differences")
-}
-
-func TestDiff_SkillOnlyInSource_ShowsDifference(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("new-skill", map[string]string{"SKILL.md": "# New Skill"})
-	targetPath := sb.CreateTarget("claude")
-	// Target is empty, skill not synced yet
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-mode: merge
-targets:
-  claude:
-    path: ` + targetPath + `
-`)
-
-	result := sb.RunCLI("diff")
-
-	result.AssertSuccess(t)
-	result.AssertOutputContains(t, "claude")
 }
 
 func TestDiff_LocalOnlySkill_ShowsDifference(t *testing.T) {

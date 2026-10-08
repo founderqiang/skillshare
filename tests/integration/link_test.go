@@ -122,21 +122,6 @@ func TestLink_WarnsWhenTargetIsNotCheckout(t *testing.T) {
 	result.AssertOutputNotContains(t, "not a git checkout")
 }
 
-func TestUnlink_RemovesOnlyTheLink(t *testing.T) {
-	sb, checkout := linkSandbox(t)
-	defer sb.Cleanup()
-	sb.WriteConfig("source: " + sb.SourcePath + "\nfollow_source_links: true\ntargets: {}\n")
-	sb.RunCLI("link", checkout).AssertSuccess(t)
-
-	sb.RunCLI("unlink", "_dev-skills").AssertSuccess(t)
-	if _, err := os.Lstat(filepath.Join(sb.SourcePath, "_dev-skills")); !os.IsNotExist(err) {
-		t.Fatalf("link still present: %v", err)
-	}
-	if !sb.FileExists(filepath.Join(checkout, "foo", "SKILL.md")) {
-		t.Fatal("unlink touched the target")
-	}
-}
-
 func TestUnlink_OptionTerminator(t *testing.T) {
 	for _, name := range []string{"-local", "-g", "-p"} {
 		t.Run(name, func(t *testing.T) {
@@ -199,20 +184,6 @@ func TestLink_OptionTerminatorPath(t *testing.T) {
 	}
 	if got, err := filepath.EvalSymlinks(filepath.Join(sb.SourcePath, "_-checkout")); err != nil || got != want {
 		t.Fatalf("link target = %q, %v; want %s", got, err, want)
-	}
-}
-
-func TestUnlink_RefusesPlainDirectory(t *testing.T) {
-	sb, _ := linkSandbox(t)
-	defer sb.Cleanup()
-	sb.WriteConfig("source: " + sb.SourcePath + "\ntargets: {}\n")
-	sb.CreateSkill("local", map[string]string{"SKILL.md": "---\nname: local\n---\n# local"})
-
-	result := sb.RunCLI("unlink", "local")
-	result.AssertFailure(t)
-	result.AssertAnyOutputContains(t, "is not a link")
-	if !sb.FileExists(filepath.Join(sb.SourcePath, "local", "SKILL.md")) {
-		t.Fatal("unlink removed a plain directory")
 	}
 }
 

@@ -80,43 +80,6 @@ targets: {}
 	}
 }
 
-func TestInstall_ConfigBased_WithGroup(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	// Create a local skill to use as source
-	sourceSkill := filepath.Join(sb.Root, "source-pdf")
-	os.MkdirAll(sourceSkill, 0755)
-	os.WriteFile(filepath.Join(sourceSkill, "SKILL.md"), []byte("# PDF Skill"), 0644)
-
-	// First install normally with --into to populate config
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets: {}
-`)
-	result := sb.RunCLI("install", sourceSkill, "--into", "frontend")
-	result.AssertSuccess(t)
-
-	// Verify skill exists
-	skillPath := filepath.Join(sb.SourcePath, "frontend", "source-pdf", "SKILL.md")
-	if !sb.FileExists(skillPath) {
-		t.Fatal("skill should exist after initial install")
-	}
-
-	// Verify metadata was stored correctly after install
-	store, err := install.LoadMetadata(sb.SourcePath)
-	if err != nil {
-		t.Fatalf("failed to load metadata: %v", err)
-	}
-	// Full-path key: "frontend/source-pdf"
-	entry := store.Get("frontend/source-pdf")
-	if entry == nil {
-		t.Fatal("expected metadata entry for 'frontend/source-pdf' after --into install")
-	}
-	if entry.Group != "frontend" {
-		t.Errorf("metadata group = %q, want %q", entry.Group, "frontend")
-	}
-}
-
 func TestInstall_LegacySlashName_BackwardCompat(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()

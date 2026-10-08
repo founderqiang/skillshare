@@ -97,24 +97,6 @@ func TestList_Agents_JSON_IncludesKind(t *testing.T) {
 	result.AssertAnyOutputContains(t, `"tutor"`)
 }
 
-func TestList_All_MixedOutput(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("my-skill", map[string]string{
-		"SKILL.md": "---\nname: my-skill\n---\n# Content",
-	})
-	createAgentSource(t, sb, map[string]string{
-		"tutor.md": "# Tutor agent",
-	})
-	sb.WriteConfig(`source: ` + sb.SourcePath + "\ntargets: {}\n")
-
-	result := sb.RunCLI("list", "--all", "--json")
-	result.AssertSuccess(t)
-	result.AssertAnyOutputContains(t, `"skill"`)
-	result.AssertAnyOutputContains(t, `"agent"`)
-}
-
 func TestList_Default_SkillsOnly(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()

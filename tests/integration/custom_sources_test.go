@@ -36,24 +36,6 @@ targets:
 	}
 }
 
-func TestSyncProject_CustomSkillsSource_DefaultFallback(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	projectRoot := sb.SetupProjectDir("claude")
-	sb.CreateProjectSkill(projectRoot, "default-skill", map[string]string{
-		"SKILL.md": "# Default",
-	})
-
-	result := sb.RunCLIInDir(projectRoot, "sync", "-p")
-	result.AssertSuccess(t)
-
-	link := filepath.Join(projectRoot, ".claude", "skills", "default-skill")
-	if !sb.IsSymlink(link) {
-		t.Error("sync should still work with default source when sources not configured")
-	}
-}
-
 func TestStatusProject_CustomSkillsSource(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()

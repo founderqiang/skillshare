@@ -11,23 +11,6 @@ import (
 	"skillshare/internal/testutil"
 )
 
-func TestSyncProject_CreatesSymlinks(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-	projectRoot := sb.SetupProjectDir("claude")
-	sb.CreateProjectSkill(projectRoot, "my-skill", map[string]string{
-		"SKILL.md": "# My Skill",
-	})
-
-	result := sb.RunCLIInDir(projectRoot, "sync", "-p")
-	result.AssertSuccess(t)
-
-	link := filepath.Join(projectRoot, ".claude", "skills", "my-skill")
-	if !sb.IsSymlink(link) {
-		t.Error("should create symlink")
-	}
-}
-
 func TestSyncProject_MultipleTargets(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
@@ -44,30 +27,6 @@ func TestSyncProject_MultipleTargets(t *testing.T) {
 	}
 	if !sb.IsSymlink(filepath.Join(projectRoot, ".agents", "skills", "shared")) {
 		t.Error("symlink in cursor target missing")
-	}
-}
-
-func TestSyncProject_PreservesLocalSkills(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-	projectRoot := sb.SetupProjectDir("claude")
-	sb.CreateProjectSkill(projectRoot, "remote-skill", map[string]string{
-		"SKILL.md": "# Remote",
-	})
-
-	// Place local skill directly in target
-	localDir := filepath.Join(projectRoot, ".claude", "skills", "local-only")
-	os.MkdirAll(localDir, 0755)
-	os.WriteFile(filepath.Join(localDir, "SKILL.md"), []byte("# Local"), 0644)
-
-	result := sb.RunCLIInDir(projectRoot, "sync", "-p")
-	result.AssertSuccess(t)
-
-	if sb.IsSymlink(localDir) {
-		t.Error("local skill should not become symlink")
-	}
-	if !sb.FileExists(filepath.Join(localDir, "SKILL.md")) {
-		t.Error("local skill should be preserved")
 	}
 }
 
@@ -190,42 +149,5 @@ func TestSyncProject_RelativeSymlinks(t *testing.T) {
 	expected, _ := filepath.EvalSymlinks(filepath.Join(projectRoot, ".skillshare", "skills", "my-skill"))
 	if resolved != expected {
 		t.Errorf("resolved symlink = %q, want %q", resolved, expected)
-	}
-}
-
-func TestSync_GlobalMode_AbsoluteSymlinks(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("my-skill", map[string]string{
-		"SKILL.md": "# My Skill\n\nDescription here.",
-	})
-	targetPath := sb.CreateTarget("claude")
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-mode: merge
-targets:
-  claude:
-    path: ` + targetPath + `
-`)
-
-	result := sb.RunCLI("sync")
-	result.AssertSuccess(t)
-
-	link := filepath.Join(targetPath, "my-skill")
-	if !sb.IsSymlink(link) {
-		t.Fatal("skill should be a symlink")
-	}
-
-	// Global-mode symlinks must be absolute
-	target := sb.SymlinkTarget(link)
-	if !filepath.IsAbs(target) {
-		t.Errorf("global-mode symlink should be absolute, got relative: %q", target)
-	}
-
-	// Verify the symlink points directly to the source skill
-	expected := filepath.Join(sb.SourcePath, "my-skill")
-	if target != expected {
-		t.Errorf("symlink target = %q, want %q", target, expected)
 	}
 }

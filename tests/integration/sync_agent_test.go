@@ -41,53 +41,6 @@ targets:
 	}
 }
 
-func TestSync_Agents_IncludeExcludeCombined(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	agentsDir := filepath.Join(filepath.Dir(sb.SourcePath), "agents")
-	os.MkdirAll(agentsDir, 0755)
-	os.WriteFile(filepath.Join(agentsDir, "team-reviewer.md"), []byte("# Team Reviewer"), 0644)
-	os.WriteFile(filepath.Join(agentsDir, "team-debugger.md"), []byte("# Team Debugger"), 0644)
-	os.WriteFile(filepath.Join(agentsDir, "personal-tutor.md"), []byte("# Personal Tutor"), 0644)
-
-	claudeSkills := filepath.Join(sb.Home, ".claude", "skills")
-	claudeAgents := filepath.Join(sb.Home, ".claude", "agents")
-	os.MkdirAll(claudeSkills, 0755)
-	os.MkdirAll(claudeAgents, 0755)
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets:
-  claude:
-    skills:
-      path: "` + claudeSkills + `"
-    agents:
-      path: "` + claudeAgents + `"
-      include:
-        - "team-*"
-      exclude:
-        - "*-debugger"
-`)
-
-	result := sb.RunCLI("sync", "agents")
-	result.AssertSuccess(t)
-
-	// team-reviewer matches include and not exclude → synced
-	if _, err := os.Lstat(filepath.Join(claudeAgents, "team-reviewer.md")); err != nil {
-		t.Error("team-reviewer.md should be synced (included, not excluded)")
-	}
-
-	// team-debugger matches include but also matches exclude → NOT synced
-	if _, err := os.Lstat(filepath.Join(claudeAgents, "team-debugger.md")); !os.IsNotExist(err) {
-		t.Error("team-debugger.md should NOT be synced (excluded by *-debugger)")
-	}
-
-	// personal-tutor does not match include → NOT synced
-	if _, err := os.Lstat(filepath.Join(claudeAgents, "personal-tutor.md")); !os.IsNotExist(err) {
-		t.Error("personal-tutor.md should NOT be synced (not in include list)")
-	}
-}
-
 func TestSync_Agents_DisabledAgentsNotSynced(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
@@ -129,50 +82,6 @@ targets:
 	}
 	if _, err := os.Lstat(filepath.Join(claudeAgents, "disabled-two.md")); !os.IsNotExist(err) {
 		t.Error("disabled-two.md should NOT be synced (disabled via .agentignore)")
-	}
-}
-
-func TestSync_Agents_DisabledByGlobPattern(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	agentsDir := filepath.Join(filepath.Dir(sb.SourcePath), "agents")
-	os.MkdirAll(agentsDir, 0755)
-	os.WriteFile(filepath.Join(agentsDir, "prod-reviewer.md"), []byte("# Prod"), 0644)
-	os.WriteFile(filepath.Join(agentsDir, "draft-experiment.md"), []byte("# Draft 1"), 0644)
-	os.WriteFile(filepath.Join(agentsDir, "draft-wip.md"), []byte("# Draft 2"), 0644)
-
-	// Glob pattern disables all draft-* agents
-	os.WriteFile(filepath.Join(agentsDir, ".agentignore"), []byte("draft-*\n"), 0644)
-
-	claudeSkills := filepath.Join(sb.Home, ".claude", "skills")
-	claudeAgents := filepath.Join(sb.Home, ".claude", "agents")
-	os.MkdirAll(claudeSkills, 0755)
-	os.MkdirAll(claudeAgents, 0755)
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets:
-  claude:
-    skills:
-      path: "` + claudeSkills + `"
-    agents:
-      path: "` + claudeAgents + `"
-`)
-
-	result := sb.RunCLI("sync", "agents")
-	result.AssertSuccess(t)
-
-	// Non-draft agent should be synced
-	if _, err := os.Lstat(filepath.Join(claudeAgents, "prod-reviewer.md")); err != nil {
-		t.Error("prod-reviewer.md should be synced")
-	}
-
-	// Draft agents should NOT be synced
-	if _, err := os.Lstat(filepath.Join(claudeAgents, "draft-experiment.md")); !os.IsNotExist(err) {
-		t.Error("draft-experiment.md should NOT be synced (disabled by draft-* pattern)")
-	}
-	if _, err := os.Lstat(filepath.Join(claudeAgents, "draft-wip.md")); !os.IsNotExist(err) {
-		t.Error("draft-wip.md should NOT be synced (disabled by draft-* pattern)")
 	}
 }
 

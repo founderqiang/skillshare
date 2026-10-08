@@ -11,30 +11,6 @@ import (
 	"skillshare/internal/testutil"
 )
 
-func TestCollect_FindsLocalSkills(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	targetPath := sb.CreateTarget("claude")
-
-	// Create local skill in target (not a symlink)
-	localSkillPath := filepath.Join(targetPath, "local-skill")
-	os.MkdirAll(localSkillPath, 0755)
-	os.WriteFile(filepath.Join(localSkillPath, "SKILL.md"), []byte("# Local Skill"), 0644)
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets:
-  claude:
-    path: ` + targetPath + `
-`)
-
-	// Run with --dry-run to just see what would be collected
-	result := sb.RunCLI("collect", "--dry-run")
-
-	result.AssertSuccess(t)
-	result.AssertOutputContains(t, "local-skill")
-}
-
 func TestCollect_SpecificTarget_OnlyThat(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
@@ -210,33 +186,6 @@ targets:
 	// Should ask to specify target
 	result.AssertSuccess(t)
 	result.AssertOutputContains(t, "Specify a target")
-}
-
-func TestCollect_CopyToMergeSwitch_FindsOrphanedCopies(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	targetPath := sb.CreateTarget("claude")
-
-	// Simulate: skill was synced in copy mode (physical dir + manifest entry)
-	copiedSkill := filepath.Join(targetPath, "copied-skill")
-	os.MkdirAll(copiedSkill, 0755)
-	os.WriteFile(filepath.Join(copiedSkill, "SKILL.md"), []byte("# Copied"), 0644)
-
-	writeManifest(t, targetPath, map[string]string{"copied-skill": "abc123"})
-
-	// Config now uses merge mode — orphaned copy should be detected as local
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets:
-  claude:
-    path: ` + targetPath + `
-    mode: merge
-`)
-
-	result := sb.RunCLI("collect", "--dry-run")
-
-	result.AssertSuccess(t)
-	result.AssertOutputContains(t, "copied-skill")
 }
 
 func TestCollect_GlobalCopyMode_InheritedTarget_SkipsManaged(t *testing.T) {

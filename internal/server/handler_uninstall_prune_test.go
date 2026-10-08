@@ -16,9 +16,7 @@ import (
 // pruneCase seeds a source and a metadata store, uninstalls one name through
 // a dashboard route, and names the store keys that must be gone or kept.
 type pruneCase struct {
-	name    string
 	repos   []string // tracked repos to create (committed, one member skill "a")
-	skills  []string // plain skill dirs to create
 	entries map[string]*install.MetadataEntry
 	remove  string
 	gone    []string
@@ -28,55 +26,19 @@ type pruneCase struct {
 // pruneSource marks an entry reconcile keeps while its directory exists.
 const pruneSource = "github.com/acme/skills"
 
-var pruneCases = []pruneCase{
-	{
-		name:  "repo entry and full-path members",
-		repos: []string{"_team"},
-		entries: map[string]*install.MetadataEntry{
-			"_team":   {Tracked: true},
-			"_team/a": {Group: "_team", Tracked: true},
-		},
-		remove: "_team",
-		gone:   []string{"_team", "_team/a"},
+// repoPrune checks that a route hands the repo to the prune and saves both the
+// in-memory and on-disk store. Which keys a removal matches is
+// install.MetadataStore.RemoveByNames's rule and is tested there.
+var repoPrune = pruneCase{
+	repos: []string{"_team", "_team-other"},
+	entries: map[string]*install.MetadataEntry{
+		"_team":         {Tracked: true},
+		"_team/a":       {Group: "_team", Tracked: true},
+		"_team-other/a": {Group: "_team-other", Source: pruneSource},
 	},
-	{
-		name:  "legacy basename key grouped under the repo",
-		repos: []string{"_team"},
-		entries: map[string]*install.MetadataEntry{
-			"a": {Group: "_team", Tracked: true},
-		},
-		remove: "_team",
-		gone:   []string{"a"},
-	},
-	{
-		name:  "legacy group without the underscore prefix",
-		repos: []string{"_team"},
-		entries: map[string]*install.MetadataEntry{
-			"team/a": {Group: "team", Tracked: true},
-		},
-		remove: "_team",
-		gone:   []string{"team/a"},
-	},
-	{
-		name:   "untracked group that shares the repo's name stays",
-		repos:  []string{"_team"},
-		skills: []string{"team/a"},
-		entries: map[string]*install.MetadataEntry{
-			"team/a": {Group: "team", Source: pruneSource},
-		},
-		remove: "_team",
-		kept:   []string{"team/a"},
-	},
-	{
-		name:   "sibling repo with a shared name prefix stays",
-		repos:  []string{"_team", "_team-other"},
-		skills: nil,
-		entries: map[string]*install.MetadataEntry{
-			"_team-other/a": {Group: "_team-other", Source: pruneSource},
-		},
-		remove: "_team",
-		kept:   []string{"_team-other/a"},
-	},
+	remove: "_team",
+	gone:   []string{"_team", "_team/a"},
+	kept:   []string{"_team-other/a"},
 }
 
 func seedPruneCase(t *testing.T, tc pruneCase) (*Server, string) {
@@ -85,9 +47,6 @@ func seedPruneCase(t *testing.T, tc pruneCase) (*Server, string) {
 	for _, repo := range tc.repos {
 		addSkill(t, src, repo+"/a")
 		initGitRepo(t, filepath.Join(src, repo)) // commits the member skill
-	}
-	for _, skill := range tc.skills {
-		addSkill(t, src, skill)
 	}
 	s.skillsStore = install.NewMetadataStore()
 	for key, entry := range tc.entries {
@@ -148,27 +107,19 @@ func deleteSkill(t *testing.T, s *Server, name string) *httptest.ResponseRecorde
 }
 
 func TestHandleBatchUninstall_PrunesMetadata(t *testing.T) {
-	for _, tc := range pruneCases {
-		t.Run(tc.name, func(t *testing.T) {
-			s, src := seedPruneCase(t, tc)
-			if code, results := postBatchUninstall(t, s, false, tc.remove); code != http.StatusOK || len(results) != 1 || !results[0].Success {
-				t.Fatalf("uninstall failed: %d %+v", code, results)
-			}
-			assertPruned(t, s, src, tc)
-		})
+	s, src := seedPruneCase(t, repoPrune)
+	if code, results := postBatchUninstall(t, s, false, repoPrune.remove); code != http.StatusOK || len(results) != 1 || !results[0].Success {
+		t.Fatalf("uninstall failed: %d %+v", code, results)
 	}
+	assertPruned(t, s, src, repoPrune)
 }
 
 func TestHandleUninstallRepo_PrunesMetadata(t *testing.T) {
-	for _, tc := range pruneCases {
-		t.Run(tc.name, func(t *testing.T) {
-			s, src := seedPruneCase(t, tc)
-			if rr := deleteRepo(t, s, tc.remove, ""); rr.Code != http.StatusOK {
-				t.Fatalf("uninstall failed: %d %s", rr.Code, rr.Body.String())
-			}
-			assertPruned(t, s, src, tc)
-		})
+	s, src := seedPruneCase(t, repoPrune)
+	if rr := deleteRepo(t, s, repoPrune.remove, ""); rr.Code != http.StatusOK {
+		t.Fatalf("uninstall failed: %d %s", rr.Code, rr.Body.String())
 	}
+	assertPruned(t, s, src, repoPrune)
 }
 
 // A plain skill and a grouped skill may share a basename; removing one must

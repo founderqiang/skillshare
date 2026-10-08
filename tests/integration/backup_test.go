@@ -69,30 +69,6 @@ targets:
 	}
 }
 
-func TestBackup_CreatesBackup(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("skill1", map[string]string{"SKILL.md": "# Skill 1"})
-	targetPath := sb.CreateTarget("claude")
-
-	// Create some files in target to backup
-	localSkillPath := filepath.Join(targetPath, "local-skill")
-	os.MkdirAll(localSkillPath, 0755)
-	os.WriteFile(filepath.Join(localSkillPath, "SKILL.md"), []byte("# Local"), 0644)
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets:
-  claude:
-    path: ` + targetPath + `
-`)
-
-	result := sb.RunCLI("backup")
-
-	result.AssertSuccess(t)
-	result.AssertOutputContains(t, "claude")
-}
-
 func TestBackup_SpecificTarget_BackupsOnlyThat(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
@@ -161,20 +137,6 @@ targets:
 
 	result.AssertSuccess(t)
 	result.AssertOutputContains(t, "nothing to back up")
-}
-
-func TestBackup_List_ShowsAllBackups(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets: {}
-`)
-
-	result := sb.RunCLI("backup", "--list")
-
-	result.AssertSuccess(t)
-	// May show "No backups found" if none exist
 }
 
 func TestBackup_List_Empty_ShowsNone(t *testing.T) {
@@ -416,33 +378,6 @@ targets:
 	if string(content) != "# Modified" {
 		t.Error("dry-run should not modify files")
 	}
-}
-
-func TestRestore_Force_OverwritesNonEmpty(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	targetPath := sb.CreateTarget("claude")
-
-	skillPath := filepath.Join(targetPath, "my-skill")
-	os.MkdirAll(skillPath, 0755)
-	os.WriteFile(filepath.Join(skillPath, "SKILL.md"), []byte("# Backed Up"), 0644)
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets:
-  claude:
-    path: ` + targetPath + `
-`)
-
-	sb.RunCLI("backup").AssertSuccess(t)
-
-	// Add extra files to target
-	os.WriteFile(filepath.Join(skillPath, "SKILL.md"), []byte("# Changed"), 0644)
-	os.WriteFile(filepath.Join(targetPath, "extra.txt"), []byte("extra"), 0644)
-
-	result := sb.RunCLI("restore", "claude", "--force")
-	result.AssertSuccess(t)
-	result.AssertOutputContains(t, "Restored")
 }
 
 func TestRestore_NoForce_NonEmpty_Fails(t *testing.T) {

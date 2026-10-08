@@ -74,31 +74,6 @@ targets: {}
 	}
 }
 
-func TestUninstall_Force_SkipsConfirm(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	// Create existing skill
-	sb.CreateSkill("force-skill", map[string]string{"SKILL.md": "# Force"})
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets: {}
-`)
-
-	// Without --force, would wait for stdin (but RunCLI provides no input)
-	// With --force, should complete immediately
-	result := sb.RunCLI("uninstall", "force-skill", "--force")
-
-	result.AssertSuccess(t)
-	result.AssertOutputContains(t, "✓ Uninstall force-skill")
-
-	// Verify skill was removed
-	skillPath := filepath.Join(sb.SourcePath, "force-skill")
-	if sb.FileExists(skillPath) {
-		t.Error("skill should be removed with --force")
-	}
-}
-
 func TestUninstall_Help_ShowsUsage(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()

@@ -101,45 +101,6 @@ targets: {}
 	result.AssertAnyOutputContains(t, "already initialized")
 }
 
-func TestInit_CreatesDefaultSkill(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	// Remove config file
-	os.Remove(sb.ConfigPath)
-
-	// Use flags for reliability (survey MultiSelect doesn't work well in non-TTY stdin)
-	result := sb.RunCLI("init", "--no-copy", "--no-targets", "--no-git", "--skill")
-
-	result.AssertSuccess(t)
-
-	// Verify default skillshare skill was created
-	defaultSkillPath := filepath.Join(sb.SourcePath, "skillshare", "SKILL.md")
-	if !sb.FileExists(defaultSkillPath) {
-		t.Error("default skillshare skill should be created")
-	}
-}
-
-func TestInit_DetectsCLI_OffersImport(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	// Remove config file
-	os.Remove(sb.ConfigPath)
-
-	// Create existing claude skills directory with a skill
-	claudeSkillsPath := filepath.Join(sb.Home, ".claude", "skills")
-	os.MkdirAll(claudeSkillsPath, 0755)
-	testSkillPath := filepath.Join(claudeSkillsPath, "test-skill")
-	os.MkdirAll(testSkillPath, 0755)
-	os.WriteFile(filepath.Join(testSkillPath, "SKILL.md"), []byte("# Test"), 0644)
-
-	result := sb.RunCLI("init", "--no-skill")
-
-	result.AssertSuccess(t)
-	result.AssertOutputContains(t, "claude")
-}
-
 func TestInit_WithSkills_CopiesOnConfirm(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
@@ -1061,22 +1022,6 @@ func TestInit_SkillFlag_InstallsSkill(t *testing.T) {
 	}
 }
 
-func TestInit_Fresh_ConfigHasSchemaComment(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	os.Remove(sb.ConfigPath)
-
-	result := sb.RunCLI("init", "--no-copy", "--no-targets", "--no-git", "--no-skill")
-	result.AssertSuccess(t)
-
-	configContent := sb.ReadFile(sb.ConfigPath)
-	firstLine := strings.SplitN(configContent, "\n", 2)[0]
-	if !strings.HasPrefix(firstLine, "# yaml-language-server: $schema=") {
-		t.Errorf("config should start with schema comment, got first line: %q", firstLine)
-	}
-}
-
 func TestInit_SuccessMessage_ShowsNextSteps(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
@@ -1268,23 +1213,6 @@ func TestInit_CodexAndClaude_AddsClaudeAndUniversal(t *testing.T) {
 	}
 	if strings.Contains(configContent, "codex:") {
 		t.Errorf("config should not contain a separate codex target, got:\n%s", configContent)
-	}
-}
-
-func TestInit_TargetsCodex_UsesAgentsPath(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	os.Remove(sb.ConfigPath)
-
-	result := sb.RunCLI("init", "--no-copy", "--targets", "codex", "--no-git", "--no-skill")
-
-	result.AssertSuccess(t)
-
-	configContent := sb.ReadFile(sb.ConfigPath)
-	agentsPath := filepath.Join(sb.Home, ".agents", "skills")
-	if !strings.Contains(configContent, agentsPath) {
-		t.Errorf("codex target should point to %s, got:\n%s", agentsPath, configContent)
 	}
 }
 

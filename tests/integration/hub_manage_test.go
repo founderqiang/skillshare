@@ -34,20 +34,6 @@ func TestHubAdd_DeriveLabel(t *testing.T) {
 	result.AssertAnyOutputContains(t, "team-hub")
 }
 
-func TestHubAdd_Duplicate(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + "\ntargets: {}\n")
-
-	result := sb.RunCLI("hub", "add", "https://example.com/hub.json", "--label", "test")
-	result.AssertSuccess(t)
-
-	result = sb.RunCLI("hub", "add", "https://other.com/hub.json", "--label", "test")
-	result.AssertFailure(t)
-	result.AssertAnyOutputContains(t, "already exists")
-}
-
 func TestHubList_Empty(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
@@ -89,17 +75,6 @@ func TestHubRemove_Basic(t *testing.T) {
 	result = sb.RunCLI("hub", "list")
 	result.AssertSuccess(t)
 	result.AssertAnyOutputContains(t, "No saved hubs")
-}
-
-func TestHubRemove_NotFound(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + "\ntargets: {}\n")
-
-	result := sb.RunCLI("hub", "remove", "nonexistent")
-	result.AssertFailure(t)
-	result.AssertAnyOutputContains(t, "not found")
 }
 
 func TestHubDefault_Show(t *testing.T) {

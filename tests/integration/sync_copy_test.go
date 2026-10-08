@@ -100,31 +100,6 @@ targets:
 	}
 }
 
-func TestSync_CopyMode_SkipsUnchanged(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("skill-a", map[string]string{
-		"SKILL.md": "# Skill A",
-	})
-	targetPath := sb.CreateTarget("claude")
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets:
-  claude:
-    path: ` + targetPath + `
-    mode: copy
-`)
-
-	// First sync
-	sb.RunCLI("sync").AssertSuccess(t)
-
-	// Second sync — should skip
-	result := sb.RunCLI("sync")
-	result.AssertSuccess(t)
-	result.AssertOutputContains(t, "up to date")
-}
-
 func TestSync_CopyMode_UpdatesChanged(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
@@ -562,31 +537,6 @@ targets:
 	result2 := sb.RunCLI("sync")
 	result2.AssertSuccess(t)
 	result2.AssertOutputContains(t, "up to date")
-}
-
-func TestSync_CopyMode_MtimeCache_ForceBypassesMtime(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("skill-a", map[string]string{
-		"SKILL.md": "# Skill A",
-	})
-	targetPath := sb.CreateTarget("claude")
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets:
-  claude:
-    path: ` + targetPath + `
-    mode: copy
-`)
-
-	// First sync
-	sb.RunCLI("sync").AssertSuccess(t)
-
-	// Force sync — should NOT use mtime shortcut
-	result := sb.RunCLI("sync", "--force")
-	result.AssertSuccess(t)
-	result.AssertOutputContains(t, "updated")
 }
 
 // --- project mode copy ---

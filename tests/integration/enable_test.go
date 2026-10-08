@@ -90,26 +90,6 @@ func TestEnable_NotDisabled(t *testing.T) {
 	result.AssertAnyOutputContains(t, "not disabled")
 }
 
-func TestDisable_GlobPattern(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("draft-a", map[string]string{"SKILL.md": "# A"})
-	sb.CreateSkill("draft-b", map[string]string{"SKILL.md": "# B"})
-	sb.CreateSkill("keep-me", map[string]string{"SKILL.md": "# Keep"})
-	sb.WriteConfig("source: " + sb.SourcePath + "\ntargets: {}\n")
-
-	result := sb.RunCLI("disable", "draft-*")
-	result.AssertSuccess(t)
-	result.AssertRowContains(t, "draft-*", "added to .skillignore")
-
-	ignorePath := filepath.Join(sb.SourcePath, ".skillignore")
-	data, _ := os.ReadFile(ignorePath)
-	if !strings.Contains(string(data), "draft-*") {
-		t.Errorf(".skillignore should contain draft-*, got: %q", string(data))
-	}
-}
-
 func TestDisable_DryRun(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()

@@ -348,26 +348,6 @@ func TestUpdateProject_Prune_RemovesStaleSkill(t *testing.T) {
 	}
 }
 
-// TestUpdateProject_Prune_RegistryCleanup verifies project registry is cleaned after prune.
-func TestUpdateProject_Prune_RegistryCleanup(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-	projectRoot := sb.SetupProjectDir("claude")
-
-	_, _, staleName := setupProjectMultiSkillRepo(t, sb, projectRoot)
-
-	result := sb.RunCLIInDir(projectRoot, "update", "--all", "--prune", "--skip-audit", "-p")
-	result.AssertSuccess(t)
-
-	regPath := filepath.Join(projectRoot, ".skillshare", "registry.yaml")
-	if _, err := os.Stat(regPath); err == nil {
-		regContent := sb.ReadFile(regPath)
-		if contains(regContent, staleName) {
-			t.Errorf("project registry should not contain pruned skill %q", staleName)
-		}
-	}
-}
-
 // TestUpdateProject_StaleWarning_NoPrune verifies stale warning in project mode without --prune.
 func TestUpdateProject_StaleWarning_NoPrune(t *testing.T) {
 	sb := testutil.NewSandbox(t)

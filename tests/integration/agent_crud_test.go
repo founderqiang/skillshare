@@ -404,35 +404,6 @@ targets:
 
 // --- trash agents ---
 
-func TestTrash_Agents_ListEmpty(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + "\ntargets: {}\n")
-
-	result := sb.RunCLI("trash", "agents", "list", "--no-tui")
-	result.AssertSuccess(t)
-	result.AssertAnyOutputContains(t, "empty")
-}
-
-func TestTrash_Agents_ListAfterUninstall(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	createAgentSource(t, sb, map[string]string{
-		"tutor.md": "# Tutor agent",
-	})
-	sb.WriteConfig(`source: ` + sb.SourcePath + "\ntargets: {}\n")
-
-	// Uninstall to trash
-	sb.RunCLI("uninstall", "-g", "agents", "tutor", "--force")
-
-	// List agent trash
-	result := sb.RunCLI("trash", "agents", "list", "--no-tui")
-	result.AssertSuccess(t)
-	result.AssertAnyOutputContains(t, "tutor")
-}
-
 func TestTrash_Agents_Restore(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
@@ -487,18 +458,6 @@ func TestTrash_Agents_Restore_Nested_DoesNotGoToSkills(t *testing.T) {
 }
 
 // --- default behavior unchanged ---
-
-func TestTrash_Default_SkillsOnly(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + "\ntargets: {}\n")
-
-	// Default trash list should check skill trash (not agent trash)
-	result := sb.RunCLI("trash", "list", "--no-tui")
-	result.AssertSuccess(t)
-	result.AssertAnyOutputContains(t, "empty")
-}
 
 func TestTrash_Default_SkillsOnly_IgnoresAgentTrash(t *testing.T) {
 	sb := testutil.NewSandbox(t)

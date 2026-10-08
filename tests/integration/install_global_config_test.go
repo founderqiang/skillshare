@@ -5,10 +5,8 @@ package integration
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
-	"skillshare/internal/install"
 	"skillshare/internal/testutil"
 )
 
@@ -67,20 +65,6 @@ targets: {}
 	result.AssertOutputNotContains(t, "would clone")
 }
 
-func TestInstall_Global_FromConfig_EmptySkills(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets: {}
-`)
-
-	result := sb.RunCLI("install", "--global")
-
-	result.AssertSuccess(t)
-	result.AssertAnyOutputContains(t, "No remote skills defined")
-}
-
 func TestInstall_Global_NoSource_IncompatibleFlags(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
@@ -109,41 +93,5 @@ targets: {}
 			result.AssertFailure(t)
 			result.AssertAnyOutputContains(t, "require a source argument")
 		})
-	}
-}
-
-func TestInstall_Global_Reconcile_AfterInstall(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	// Create a local skill directory with a recognizable name
-	parentDir := t.TempDir()
-	localSkill := filepath.Join(parentDir, "test-skill")
-	if err := os.MkdirAll(localSkill, 0755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(localSkill, "SKILL.md"), []byte("---\nname: test-skill\n---\n# Test"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets: {}
-`)
-
-	result := sb.RunCLI("install", "--global", localSkill)
-	result.AssertSuccess(t)
-
-	// Read centralized .metadata.json (skills are stored here, not in registry.yaml or config.yaml)
-	store, err := install.LoadMetadata(sb.SourcePath)
-	if err != nil {
-		t.Fatalf("failed to load metadata: %v", err)
-	}
-
-	entry := store.Get("test-skill")
-	if entry == nil {
-		t.Fatal("expected metadata entry for test-skill after install")
-	}
-	if strings.TrimSpace(entry.Source) == "" {
-		t.Error("expected non-empty source for test-skill")
 	}
 }

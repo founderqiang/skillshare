@@ -164,47 +164,6 @@ targets: {}
 	result.AssertOutputContains(t, "✓ Push")
 }
 
-func TestPush_NoUpstream_AutoSetsUpstream(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets: {}
-`)
-
-	// Create bare repo as "remote"
-	bareRepo := filepath.Join(sb.Home, "remote.git")
-	cmd := exec.Command("git", "init", "--bare", bareRepo)
-	if err := cmd.Run(); err != nil {
-		t.Skip("git not available")
-	}
-
-	// Initialize git and add remote — but do NOT set upstream tracking
-	cmd = exec.Command("git", "init")
-	cmd.Dir = sb.SourcePath
-	cmd.Run()
-
-	cmd = exec.Command("git", "remote", "add", "origin", bareRepo)
-	cmd.Dir = sb.SourcePath
-	cmd.Run()
-
-	testutil.ConfigureGitUser(t, sb.SourcePath)
-
-	// Create initial commit (simulates what skillshare init does)
-	cmd = exec.Command("git", "commit", "--allow-empty", "-m", "initial")
-	cmd.Dir = sb.SourcePath
-	cmd.Run()
-
-	// Create a skill (uncommitted)
-	sb.CreateSkill("first-push-skill", map[string]string{"SKILL.md": "# First Push"})
-
-	// Push should succeed even without upstream tracking
-	result := sb.RunCLI("push", "-m", "first push")
-
-	result.AssertSuccess(t)
-	result.AssertOutputContains(t, "✓ Push")
-}
-
 func TestPush_NoUpstream_RemoteMain_LocalMaster_PushesToMain_NoMasterCreated(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()

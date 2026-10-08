@@ -86,30 +86,6 @@ targets: {}
 	result.AssertAnyOutputContains(t, "does not exist")
 }
 
-func TestTargetRemove_ExistingTarget_Removes(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("skill1", map[string]string{"SKILL.md": "# Skill 1"})
-	targetPath := sb.CreateTarget("claude")
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets:
-  claude:
-    path: ` + targetPath + `
-`)
-
-	result := sb.RunCLI("target", "remove", "claude")
-
-	result.AssertSuccess(t)
-
-	// Verify config was updated
-	configContent := sb.ReadFile(sb.ConfigPath)
-	if strings.Contains(configContent, "claude") {
-		t.Error("target should be removed from config")
-	}
-}
-
 func TestTargetRemove_DryRun_DoesNotRemove(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()

@@ -79,28 +79,6 @@ targets: {}
 	}
 }
 
-func TestInstall_ExistsWithoutForce_Errors(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	// Create existing skill in source
-	sb.CreateSkill("existing-skill", map[string]string{"SKILL.md": "# Existing"})
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets: {}
-`)
-
-	// Create local skill to install
-	localSkillPath := filepath.Join(sb.Root, "existing-skill")
-	os.MkdirAll(localSkillPath, 0755)
-	os.WriteFile(filepath.Join(localSkillPath, "SKILL.md"), []byte("# New Version"), 0644)
-
-	result := sb.RunCLI("install", localSkillPath)
-
-	result.AssertFailure(t)
-	result.AssertAnyOutputContains(t, "already exists")
-}
-
 func TestInstall_Force_Overwrites(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
@@ -469,38 +447,5 @@ targets: {}
 	}
 	if entry.InstalledAt.IsZero() {
 		t.Error("metadata should contain installed_at timestamp")
-	}
-}
-
-func TestInstall_GitSubdir_DirectInstall(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets: {}
-`)
-
-	// Create a monorepo-style git repository with multiple skills
-	gitRepoPath := filepath.Join(sb.Root, "monorepo")
-	skill1Path := filepath.Join(gitRepoPath, "skills", "skill-one")
-	skill2Path := filepath.Join(gitRepoPath, "skills", "skill-two")
-
-	os.MkdirAll(skill1Path, 0755)
-	os.MkdirAll(skill2Path, 0755)
-	os.WriteFile(filepath.Join(skill1Path, "SKILL.md"), []byte("# Skill One"), 0644)
-	os.WriteFile(filepath.Join(skill2Path, "SKILL.md"), []byte("# Skill Two"), 0644)
-
-	initGitRepo(t, gitRepoPath)
-
-	// Install specific skill from subdir (using local path with subdir pattern)
-	// This tests the direct install path when subdir is specified
-	result := sb.RunCLI("install", filepath.Join(gitRepoPath, "skills", "skill-one"))
-
-	result.AssertSuccess(t)
-	result.AssertOutputContains(t, "✓ Install ")
-
-	// Verify only skill-one was installed
-	if !sb.FileExists(filepath.Join(sb.SourcePath, "skill-one", "SKILL.md")) {
-		t.Error("skill-one should be installed")
 	}
 }

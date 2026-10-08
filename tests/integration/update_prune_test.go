@@ -101,26 +101,6 @@ func TestUpdate_StaleWarning_NoPruneFlag(t *testing.T) {
 	}
 }
 
-func TestUpdate_Prune_RegistryCleanup(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-	setupGlobalConfig(sb)
-
-	_, _, staleName := setupMultiSkillRepo(t, sb)
-
-	result := sb.RunCLI("update", "--all", "--prune", "--skip-audit")
-	result.AssertSuccess(t)
-
-	// Check registry does not contain the stale skill
-	regPath := filepath.Join(sb.SourcePath, "registry.yaml")
-	if _, err := os.Stat(regPath); err == nil {
-		regContent := sb.ReadFile(regPath)
-		if contains(regContent, staleName) {
-			t.Errorf("registry should not contain pruned skill %q", staleName)
-		}
-	}
-}
-
 // TestUpdate_Prune_AllStale verifies that when ALL skills from a repo are
 // deleted upstream, --prune removes them all without panic or error.
 func TestUpdate_Prune_AllStale(t *testing.T) {

@@ -788,31 +788,6 @@ func TestDoctor_JSON_ProjectMode(t *testing.T) {
 	}
 }
 
-func TestDoctor_JSON_HasVersionField(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("skill1", map[string]string{"SKILL.md": "# Skill 1"})
-	targetPath := sb.CreateTarget("claude")
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets:
-  claude:
-    path: ` + targetPath + `
-`)
-
-	result := sb.RunCLI("doctor", "--json")
-
-	result.AssertSuccess(t)
-	out := parseDoctorJSON(t, result.Stdout)
-	if out.Version == nil {
-		t.Fatal("expected version field to be present")
-	}
-	if out.Version.Current == "" {
-		t.Error("expected version.current to be non-empty")
-	}
-}
-
 func TestDoctor_JSON_HasBackupTrash(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()

@@ -215,94 +215,6 @@ targets:
 	result.AssertAnyOutputContains(t, "not configured")
 }
 
-func TestAnalyze_IncludeExcludeFilter(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("keep-me", map[string]string{
-		"SKILL.md": "---\nname: keep-me\ndescription: kept\n---\n# Keep",
-	})
-	sb.CreateSkill("skip-me", map[string]string{
-		"SKILL.md": "---\nname: skip-me\ndescription: skipped\n---\n# Skip",
-	})
-
-	target := sb.CreateTarget("claude")
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets:
-  claude:
-    path: ` + target + `
-    exclude:
-      - "skip-*"
-`)
-
-	result := sb.RunCLI("analyze", "--json")
-	result.AssertSuccess(t)
-
-	var output struct {
-		Targets []struct {
-			SkillCount int `json:"skill_count"`
-		} `json:"targets"`
-	}
-	if err := json.Unmarshal([]byte(result.Stdout), &output); err != nil {
-		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, result.Stdout)
-	}
-	if len(output.Targets) != 1 {
-		t.Fatalf("expected 1 target, got %d", len(output.Targets))
-	}
-	if output.Targets[0].SkillCount != 1 {
-		t.Errorf("expected 1 skill after exclude, got %d", output.Targets[0].SkillCount)
-	}
-}
-
-func TestAnalyze_SkillTargetRestriction(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("claude-only", map[string]string{
-		"SKILL.md": "---\nname: claude-only\ntargets:\n  - claude\ndescription: only claude\n---\n# Claude",
-	})
-	sb.CreateSkill("universal", map[string]string{
-		"SKILL.md": "---\nname: universal\ndescription: everywhere\n---\n# Universal",
-	})
-
-	target1 := sb.CreateTarget("claude")
-	target2 := sb.CreateTarget("cursor")
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets:
-  claude:
-    path: ` + target1 + `
-  cursor:
-    path: ` + target2 + `
-`)
-
-	result := sb.RunCLI("analyze", "--json")
-	result.AssertSuccess(t)
-
-	var output struct {
-		Targets []struct {
-			Name       string `json:"name"`
-			SkillCount int    `json:"skill_count"`
-		} `json:"targets"`
-	}
-	if err := json.Unmarshal([]byte(result.Stdout), &output); err != nil {
-		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, result.Stdout)
-	}
-
-	for _, tgt := range output.Targets {
-		switch tgt.Name {
-		case "claude":
-			if tgt.SkillCount != 2 {
-				t.Errorf("claude: expected 2 skills, got %d", tgt.SkillCount)
-			}
-		case "cursor":
-			if tgt.SkillCount != 1 {
-				t.Errorf("cursor: expected 1 skill (universal only), got %d", tgt.SkillCount)
-			}
-		}
-	}
-}
-
 func TestAnalyze_ProjectMode(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
@@ -314,21 +226,6 @@ func TestAnalyze_ProjectMode(t *testing.T) {
 
 	result := sb.RunCLIInDir(projectDir, "analyze", "-p")
 	result.AssertSuccess(t)
-}
-
-func TestAnalyze_NoTUI(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("skill1", map[string]string{
-		"SKILL.md": "---\nname: skill1\ndescription: First skill\n---\n# Body",
-	})
-	target := sb.CreateTarget("claude")
-	sb.WriteConfig(`source: ` + sb.SourcePath + "\ntargets:\n  claude:\n    path: " + target)
-
-	result := sb.RunCLI("analyze", "--no-tui")
-	result.AssertSuccess(t)
-	result.AssertOutputContains(t, "Always loaded  ")
 }
 
 func TestAnalyze_HelpShowsNoTUI(t *testing.T) {

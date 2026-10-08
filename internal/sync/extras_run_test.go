@@ -45,6 +45,41 @@ func TestRunExtraTargets_SkipsAgentOverlap(t *testing.T) {
 	}
 }
 
+// Only the "agents" extra's target at an agents sync path is skipped.
+func TestRunExtraTargets_AgentOverlapIsPerTargetAndPerName(t *testing.T) {
+	src, overlap := setupExtrasTest(t, map[string]string{"a.md": "a"})
+	other := t.TempDir()
+	opts := runTestOptions()
+	opts.AgentTargetPaths = map[string]bool{filepath.Clean(overlap): true}
+	targets := []config.ExtraTargetConfig{{Path: overlap}, {Path: other}}
+
+	agents := RunExtraTargets(config.ExtraConfig{Name: "agents", Targets: targets}, src, opts).Targets
+	if agents[0].SkippedBy != "agents" || agents[1].SkippedBy != "" || agents[1].Result == nil {
+		t.Errorf("agents extra: want only the overlapping target skipped, got %+v", agents)
+	}
+	rules := RunExtraTargets(config.ExtraConfig{Name: "rules", Targets: targets[:1]}, src, opts).Targets
+	if rules[0].SkippedBy != "" || rules[0].Result == nil {
+		t.Errorf("rules extra at an agents path must sync, got %+v", rules[0])
+	}
+}
+
+func TestAgentTargetPaths(t *testing.T) {
+	source := t.TempDir()
+	target := filepath.Join(t.TempDir(), "agents")
+
+	if got := AgentTargetPaths(source, []string{target}); got != nil {
+		t.Errorf("no agents in the source: want nil, got %v", got)
+	}
+
+	if err := os.WriteFile(filepath.Join(source, "helper.md"), []byte("# Helper"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := AgentTargetPaths(source, []string{target + "/", ""})
+	if len(got) != 1 || !got[target] {
+		t.Errorf("want only the cleaned %s, got %v", target, got)
+	}
+}
+
 func TestRunExtraTargets_ReportsModeAndExtensionErrors(t *testing.T) {
 	src, tgt := setupExtrasTest(t, map[string]string{"a.md": "a"})
 	extra := config.ExtraConfig{Name: "rules", Targets: []config.ExtraTargetConfig{{Path: tgt, Mode: "merge", Extension: "x"}}}

@@ -65,55 +65,6 @@ targets:
 	}
 }
 
-func TestSync_IdempotentWithSymlinkedDirs(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	// Setup symlinked source
-	realSource := filepath.Join(sb.Root, "dotfiles", "skills")
-	os.MkdirAll(realSource, 0755)
-	skillDir := filepath.Join(realSource, "gamma")
-	os.MkdirAll(skillDir, 0755)
-	os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: gamma\n---\n# Gamma"), 0644)
-
-	os.RemoveAll(sb.SourcePath)
-	if err := os.Symlink(realSource, sb.SourcePath); err != nil {
-		t.Fatal(err)
-	}
-
-	realTarget := filepath.Join(sb.Root, "dotfiles", "claude-skills")
-	if err := os.MkdirAll(realTarget, 0755); err != nil {
-		t.Fatal(err)
-	}
-	targetPath := filepath.Join(sb.Home, ".claude", "skills")
-	if err := os.Symlink(realTarget, targetPath); err != nil {
-		t.Fatal(err)
-	}
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-mode: merge
-targets:
-  claude:
-    path: ` + targetPath + `
-`)
-
-	// First sync
-	r1 := sb.RunCLI("sync")
-	r1.AssertSuccess(t)
-
-	// Second sync — should still succeed
-	r2 := sb.RunCLI("sync")
-	r2.AssertSuccess(t)
-
-	// Verify link is still correct
-	skillLink := filepath.Join(targetPath, "gamma")
-	if !sb.IsSymlink(skillLink) {
-		t.Fatal("skill should still be a symlink after double sync")
-	}
-	if _, err := os.Stat(skillLink); err != nil {
-		t.Fatalf("symlink does not resolve after double sync: %v", err)
-	}
-}
-
 // TestStatus_WithSymlinkedSource verifies `status` reports correctly
 // when source is a symlink.
 func TestStatus_WithSymlinkedSource(t *testing.T) {

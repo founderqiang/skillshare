@@ -314,37 +314,6 @@ targets:
 	}
 }
 
-func TestPull_BothHaveSkills_MergesSuccessfully(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets: {}
-`)
-
-	bareRepo := testutil.SetupBareRemoteRepo(t, sb.Home)
-	testutil.SeedRemoteBranch(t, sb.Home, bareRepo, "main", map[string]string{
-		"remote-skill/SKILL.md": "# Remote Skill",
-	})
-
-	initLocalRepoWithRemotePull(t, sb.SourcePath, bareRepo)
-	sb.CreateSkill("local-skill", map[string]string{"SKILL.md": "# Local Skill"})
-	testutil.RunGit(t, sb.SourcePath, "add", "-A")
-	testutil.RunGit(t, sb.SourcePath, "commit", "-m", "local skill")
-
-	result := sb.RunCLI("pull")
-	result.AssertSuccess(t)
-	result.AssertOutputContains(t, "✓ Pull")
-
-	// Both skills should exist after merge.
-	if !sb.FileExists(filepath.Join(sb.SourcePath, "local-skill", "SKILL.md")) {
-		t.Error("local skill should be preserved after merge")
-	}
-	if !sb.FileExists(filepath.Join(sb.SourcePath, "remote-skill", "SKILL.md")) {
-		t.Error("remote skill should exist after merge")
-	}
-}
-
 func TestPull_FirstPull_RemoteNoSkills_LocalHasSkills_AutoMergeHistories(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()

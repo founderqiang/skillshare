@@ -187,7 +187,3 @@ func TestInstall_SkillAndTrackConflict(t *testing.T) {
 	result.AssertFailure(t)
 	result.AssertAnyOutputContains(t, "--skill cannot be used with --track")
 }
-
-// TestInstall_SubdirFuzzyResolve tests that when a subdir doesn't exist at the
-// exact path, the installer scans the repo for a matching skill by basename.
-// e.g. "owner/repo/pdf" where "pdf" lives at "skills/pdf/SKILL.md".

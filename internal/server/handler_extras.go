@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"skillshare/internal/config"
-	"skillshare/internal/resource"
 	syncpkg "skillshare/internal/sync"
 	"skillshare/internal/utils"
 )
@@ -754,25 +753,17 @@ func (s *Server) syncExtras(name string, dryRun, force bool) []extraSyncResult {
 	return results
 }
 
-// extrasAgentTargetPaths returns the cleaned agent target paths the agents
-// sync writes to, or nil when the agents source holds no agents, matching the
-// CLI. Callers must hold s.mu.
+// extrasAgentTargetPaths returns the agents sync target paths for
+// syncpkg.ExtraRunOptions.AgentTargetPaths. Callers must hold s.mu.
 func (s *Server) extrasAgentTargetPaths() map[string]bool {
-	agentsSource := s.agentsSource()
-	if _, err := os.Stat(agentsSource); err != nil {
-		return nil
-	}
-	if agents, err := (resource.AgentKind{}).Discover(agentsSource); err != nil || len(agents) == 0 {
-		return nil
-	}
 	builtinAgents := s.builtinAgentTargets()
-	paths := make(map[string]bool)
+	var paths []string
 	for name, target := range s.cfg.Targets {
 		if p := resolveAgentPath(target, builtinAgents, name, s.IsProjectMode()); p != "" {
-			paths[filepath.Clean(resolveExtrasTargetPath(s.projectRoot, p))] = true
+			paths = append(paths, resolveExtrasTargetPath(s.projectRoot, p))
 		}
 	}
-	return paths
+	return syncpkg.AgentTargetPaths(s.agentsSource(), paths)
 }
 
 // handleExtrasMode — PATCH /api/extras/{name}/mode

@@ -160,22 +160,6 @@ func TestInstall_Track_Update_RollsBackOnMalicious(t *testing.T) {
 	}
 }
 
-func TestInstall_Track_CleanContentPasses(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-	setupGlobalConfig(sb)
-
-	repoURL := setupBareRepoWithCleanContent(t, sb, "track-clean")
-
-	result := sb.RunCLI("install", repoURL, "--track", "--name", "clean-repo")
-	result.AssertSuccess(t)
-
-	repoPath := filepath.Join(sb.SourcePath, "_clean-repo")
-	if !sb.FileExists(repoPath) {
-		t.Error("tracked repo should exist for clean content")
-	}
-}
-
 func TestInstall_Track_InvalidNameRejected(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()

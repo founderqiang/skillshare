@@ -328,60 +328,28 @@ func renderAgentRun(results []sync.AgentTargetResult, agentCount int, dryRun, js
 	return totals, syncErr
 }
 
-// collectAgentTargetPathsGlobal returns the set of resolved agent target paths
-// for all targets in the global config. Returns nil when agents source does not
-// exist or contains no agent files (meaning no real agent sync would happen).
+// collectAgentTargetPathsGlobal returns the agents sync target paths of the
+// global config for sync.ExtraRunOptions.AgentTargetPaths.
 func collectAgentTargetPathsGlobal(cfg *config.Config) map[string]bool {
-	agentsSource := cfg.EffectiveAgentsSource()
-	if _, err := os.Stat(agentsSource); err != nil {
-		return nil
-	}
-	agents, err := resource.AgentKind{}.Discover(agentsSource)
-	if err != nil || len(agents) == 0 {
-		return nil
-	}
-
 	builtinAgents := config.DefaultAgentTargets()
-	paths := make(map[string]bool)
-	for name := range cfg.Targets {
-		agentPath := resolveAgentTargetPath(cfg.Targets[name], builtinAgents, name)
-		if agentPath != "" {
-			paths[filepath.Clean(agentPath)] = true
-		}
+	var paths []string
+	for name, tc := range cfg.Targets {
+		paths = append(paths, resolveAgentTargetPath(tc, builtinAgents, name))
 	}
-	if len(paths) == 0 {
-		return nil
-	}
-	return paths
+	return sync.AgentTargetPaths(cfg.EffectiveAgentsSource(), paths)
 }
 
-// collectAgentTargetPathsProject returns the set of resolved agent target paths
-// for all targets in the project config. Returns nil when no agents exist.
+// collectAgentTargetPathsProject returns the agents sync target paths of the
+// project config for sync.ExtraRunOptions.AgentTargetPaths.
 func collectAgentTargetPathsProject(projectRoot string) map[string]bool {
 	projCfg, err := config.LoadProject(projectRoot)
 	if err != nil {
 		return nil
 	}
-
-	agentsSource := projCfg.EffectiveAgentsSource(projectRoot)
-	if _, err := os.Stat(agentsSource); err != nil {
-		return nil
-	}
-	agents, err := resource.AgentKind{}.Discover(agentsSource)
-	if err != nil || len(agents) == 0 {
-		return nil
-	}
-
 	builtinAgents := config.ProjectAgentTargets()
-	paths := make(map[string]bool)
+	var paths []string
 	for _, entry := range projCfg.Targets {
-		agentPath := resolveProjectAgentTargetPath(entry, builtinAgents, projectRoot)
-		if agentPath != "" {
-			paths[filepath.Clean(agentPath)] = true
-		}
+		paths = append(paths, resolveProjectAgentTargetPath(entry, builtinAgents, projectRoot))
 	}
-	if len(paths) == 0 {
-		return nil
-	}
-	return paths
+	return sync.AgentTargetPaths(projCfg.EffectiveAgentsSource(projectRoot), paths)
 }

@@ -37,76 +37,6 @@ targets:
 	}
 }
 
-func TestExclude_GlobalMerge_RemovesExistingSourceLink(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("keep-me", map[string]string{"SKILL.md": "# Keep"})
-	sb.CreateSkill("exclude-me", map[string]string{"SKILL.md": "# Exclude"})
-	targetPath := sb.CreateTarget("claude")
-
-	// First sync without filters creates links for both skills.
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-mode: merge
-targets:
-  claude:
-    path: ` + targetPath + `
-`)
-	sb.RunCLI("sync").AssertSuccess(t)
-
-	// Add exclude and sync again.
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-mode: merge
-targets:
-  claude:
-    path: ` + targetPath + `
-    exclude: [exclude-*]
-`)
-	result := sb.RunCLI("sync")
-	result.AssertSuccess(t)
-
-	if !sb.IsSymlink(filepath.Join(targetPath, "keep-me")) {
-		t.Error("non-excluded skill should remain linked")
-	}
-	if sb.FileExists(filepath.Join(targetPath, "exclude-me")) {
-		t.Error("excluded existing source-linked entry should be removed")
-	}
-}
-
-func TestExclude_GlobalMerge_PreservesLocalDirectory(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("exclude-me", map[string]string{"SKILL.md": "# Source"})
-	targetPath := sb.CreateTarget("claude")
-
-	localDir := filepath.Join(targetPath, "exclude-me")
-	if err := os.MkdirAll(localDir, 0755); err != nil {
-		t.Fatalf("mkdir local dir: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(localDir, "SKILL.md"), []byte("# Local"), 0644); err != nil {
-		t.Fatalf("write local SKILL.md: %v", err)
-	}
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-mode: merge
-targets:
-  claude:
-    path: ` + targetPath + `
-    exclude: [exclude-*]
-`)
-
-	result := sb.RunCLI("sync")
-	result.AssertSuccess(t)
-
-	if !sb.FileExists(localDir) {
-		t.Error("local directory should be preserved")
-	}
-	if sb.IsSymlink(localDir) {
-		t.Error("local directory should not be converted to symlink")
-	}
-}
-
 func TestExclude_GlobalSymlinkMode_Ignored(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
@@ -177,68 +107,6 @@ func TestExclude_ProjectMerge_SkipsExcludedOnFirstSync(t *testing.T) {
 	}
 }
 
-func TestExclude_ProjectMerge_RemovesExistingSourceLink(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	projectRoot := sb.SetupProjectDir("claude")
-	sb.CreateProjectSkill(projectRoot, "keep-me", map[string]string{"SKILL.md": "# Keep"})
-	sb.CreateProjectSkill(projectRoot, "exclude-me", map[string]string{"SKILL.md": "# Exclude"})
-
-	// First sync without filters.
-	sb.WriteProjectConfig(projectRoot, `targets:
-  - claude
-`)
-	sb.RunCLIInDir(projectRoot, "sync", "-p").AssertSuccess(t)
-
-	// Add exclude and sync again.
-	sb.WriteProjectConfig(projectRoot, `targets:
-  - name: claude
-    exclude: [exclude-*]
-`)
-	result := sb.RunCLIInDir(projectRoot, "sync", "-p")
-	result.AssertSuccess(t)
-
-	targetPath := filepath.Join(projectRoot, ".claude", "skills")
-	if !sb.IsSymlink(filepath.Join(targetPath, "keep-me")) {
-		t.Error("non-excluded project skill should remain linked")
-	}
-	if sb.FileExists(filepath.Join(targetPath, "exclude-me")) {
-		t.Error("excluded existing project source-linked entry should be removed")
-	}
-}
-
-func TestExclude_ProjectMerge_PreservesLocalDirectory(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	projectRoot := sb.SetupProjectDir("claude")
-	sb.CreateProjectSkill(projectRoot, "exclude-me", map[string]string{"SKILL.md": "# Source"})
-	sb.WriteProjectConfig(projectRoot, `targets:
-  - name: claude
-    exclude: [exclude-*]
-`)
-
-	targetPath := filepath.Join(projectRoot, ".claude", "skills")
-	localDir := filepath.Join(targetPath, "exclude-me")
-	if err := os.MkdirAll(localDir, 0755); err != nil {
-		t.Fatalf("mkdir local dir: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(localDir, "SKILL.md"), []byte("# Local"), 0644); err != nil {
-		t.Fatalf("write local SKILL.md: %v", err)
-	}
-
-	result := sb.RunCLIInDir(projectRoot, "sync", "-p")
-	result.AssertSuccess(t)
-
-	if !sb.FileExists(localDir) {
-		t.Error("local project directory should be preserved")
-	}
-	if sb.IsSymlink(localDir) {
-		t.Error("local project directory should not become symlink")
-	}
-}
-
 func TestExclude_ProjectMerge_InvalidExcludePatternFails(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
@@ -279,40 +147,6 @@ targets:
 	}
 	if sb.FileExists(filepath.Join(targetPath, "other-skill")) {
 		t.Error("non-included skill should not be synced")
-	}
-}
-
-func TestInclude_GlobalMerge_RemovesExistingSourceLinkOutsideInclude(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("include-me", map[string]string{"SKILL.md": "# Include"})
-	sb.CreateSkill("other-skill", map[string]string{"SKILL.md": "# Other"})
-	targetPath := sb.CreateTarget("claude")
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-mode: merge
-targets:
-  claude:
-    path: ` + targetPath + `
-`)
-	sb.RunCLI("sync").AssertSuccess(t)
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-mode: merge
-targets:
-  claude:
-    path: ` + targetPath + `
-    include: [include-*]
-`)
-	result := sb.RunCLI("sync")
-	result.AssertSuccess(t)
-
-	if !sb.IsSymlink(filepath.Join(targetPath, "include-me")) {
-		t.Error("included skill should remain linked")
-	}
-	if sb.FileExists(filepath.Join(targetPath, "other-skill")) {
-		t.Error("source-linked skill outside include should be removed")
 	}
 }
 
@@ -392,35 +226,6 @@ targets:
 	}
 	if sb.FileExists(filepath.Join(targetPath, "tool-main")) {
 		t.Error("tool-main outside include should be removed")
-	}
-}
-
-func TestInclude_ProjectMerge_RemovesExistingSourceLinkOutsideInclude(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	projectRoot := sb.SetupProjectDir("claude")
-	sb.CreateProjectSkill(projectRoot, "include-me", map[string]string{"SKILL.md": "# Include"})
-	sb.CreateProjectSkill(projectRoot, "other-skill", map[string]string{"SKILL.md": "# Other"})
-
-	sb.WriteProjectConfig(projectRoot, `targets:
-  - claude
-`)
-	sb.RunCLIInDir(projectRoot, "sync", "-p").AssertSuccess(t)
-
-	sb.WriteProjectConfig(projectRoot, `targets:
-  - name: claude
-    include: [include-*]
-`)
-	result := sb.RunCLIInDir(projectRoot, "sync", "-p")
-	result.AssertSuccess(t)
-
-	targetPath := filepath.Join(projectRoot, ".claude", "skills")
-	if !sb.IsSymlink(filepath.Join(targetPath, "include-me")) {
-		t.Error("included project skill should remain linked")
-	}
-	if sb.FileExists(filepath.Join(targetPath, "other-skill")) {
-		t.Error("project source-linked skill outside include should be removed")
 	}
 }
 

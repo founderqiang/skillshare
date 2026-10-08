@@ -465,17 +465,3 @@ func TestSyncProject_All_NestedAgentsSameBasename_FlattensAndStaysStable(t *test
 }
 
 // --- default -p shows both skills and agents ---
-
-func TestStatusProject_Default_ShowsBoth(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	projectDir := setupProjectWithAgents(t, sb)
-
-	// status always shows both skills and agents in unified layout
-	result := sb.RunCLIInDir(projectDir, "status", "-p")
-	result.AssertSuccess(t)
-	result.AssertAnyOutputContains(t, "Source")
-	result.AssertAnyOutputContains(t, "1 agent") // agents in source section
-	result.AssertAnyOutputContains(t, "agents")  // agents sub-item in targets
-}

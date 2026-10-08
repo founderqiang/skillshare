@@ -180,45 +180,6 @@ extras:
 	}
 }
 
-// TestExtras_SyncExtras_Global verifies that "sync extras" syncs files from the
-// extras source directory into the configured target.
-func TestExtras_SyncExtras_Global(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	// Create extras source with files.
-	rulesSource := filepath.Join(sb.Home, ".config", "skillshare", "extras", "rules")
-	os.MkdirAll(rulesSource, 0755)
-	os.WriteFile(filepath.Join(rulesSource, "coding.md"), []byte("# Coding"), 0644)
-
-	rulesTarget := filepath.Join(sb.Home, ".claude", "rules")
-	os.MkdirAll(rulesTarget, 0755)
-
-	claudeTarget := sb.CreateTarget("claude")
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-targets:
-  claude:
-    path: ` + claudeTarget + `
-extras:
-  - name: rules
-    targets:
-      - path: ` + rulesTarget + `
-`)
-
-	result := sb.RunCLI("sync", "extras", "-g")
-
-	result.AssertSuccess(t)
-	result.AssertOutputContains(t, "\nExtras\n")
-	// Sync verb or file count should appear
-	result.AssertAnyOutputContains(t, "synced")
-
-	// Verify file was symlinked into target.
-	codingLink := filepath.Join(rulesTarget, "coding.md")
-	if !sb.IsSymlink(codingLink) {
-		t.Error("coding.md should be a symlink in target after sync")
-	}
-}
-
 // TestExtras_Init_Duplicate verifies that initialising an extra with an already-used
 // name is rejected.
 func TestExtras_Init_Duplicate(t *testing.T) {

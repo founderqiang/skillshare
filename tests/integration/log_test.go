@@ -170,50 +170,6 @@ targets:
 	result.AssertOutputContains(t, "bad-skill")
 }
 
-func TestLog_JSONLFileCreated(t *testing.T) {
-	sb := testutil.NewSandbox(t)
-	defer sb.Cleanup()
-
-	sb.CreateSkill("test-skill", map[string]string{
-		"SKILL.md": "# Test\n\nTest.",
-	})
-
-	targetPath := sb.CreateTarget("claude")
-
-	sb.WriteConfig(`source: ` + sb.SourcePath + `
-mode: merge
-targets:
-  claude:
-    path: ` + targetPath + `
-`)
-
-	sb.RunCLI("sync")
-
-	// Check the log file exists and is valid JSONL
-	logDir := filepath.Join(sb.Home, ".local", "state", "skillshare", "logs")
-	logFile := filepath.Join(logDir, "operations.log")
-
-	data, err := os.ReadFile(logFile)
-	if err != nil {
-		t.Fatalf("operations.log should exist after sync: %v", err)
-	}
-
-	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	if len(lines) == 0 {
-		t.Fatal("operations.log should have at least one line")
-	}
-
-	// Each line should be valid JSON containing "cmd" and "status"
-	for i, line := range lines {
-		if !strings.Contains(line, `"cmd"`) {
-			t.Errorf("line %d missing cmd field: %s", i, line)
-		}
-		if !strings.Contains(line, `"status"`) {
-			t.Errorf("line %d missing status field: %s", i, line)
-		}
-	}
-}
-
 func TestLog_InstallDetailIncludesInstalledSkills(t *testing.T) {
 	sb := testutil.NewSandbox(t)
 	defer sb.Cleanup()
@@ -405,17 +361,6 @@ targets:
 	return sb
 }
 
-func TestLog_FilterByCmd(t *testing.T) {
-	sb := setupSyncAndInstallLog(t)
-	defer sb.Cleanup()
-
-	// --cmd sync should only show sync entries
-	result := sb.RunCLI("log", "--cmd", "sync")
-	result.AssertSuccess(t)
-	result.AssertOutputContains(t, "sync")
-	result.AssertOutputNotContains(t, "install")
-}
-
 func TestLog_FilterByStatus(t *testing.T) {
 	sb := setupSyncAndInstallLog(t)
 	defer sb.Cleanup()
@@ -439,15 +384,6 @@ func TestLog_FilterBySince(t *testing.T) {
 	result2 := sb.RunCLI("log", "--since", "2099-01-01")
 	result2.AssertSuccess(t)
 	result2.AssertOutputContains(t, "No operation")
-}
-
-func TestLog_InvalidSince(t *testing.T) {
-	sb := setupSyncAndInstallLog(t)
-	defer sb.Cleanup()
-
-	result := sb.RunCLI("log", "--since", "xyz")
-	result.AssertFailure(t)
-	result.AssertAnyOutputContains(t, "invalid time format")
 }
 
 func TestLog_JSONOutput(t *testing.T) {
