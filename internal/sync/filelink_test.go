@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"skillshare/internal/config"
 	"skillshare/internal/resource"
 )
 
@@ -147,13 +148,13 @@ func TestSyncExtraFile_WithoutFileLinksReplacesLinkWithCopy(t *testing.T) {
 func TestSyncExtra_MergeCopiesUpdatesAndPrunesWithoutFileLinks(t *testing.T) {
 	withoutFileLinks(t)
 	src, tgt := setupExtrasTest(t, map[string]string{"a.md": "v1", "b.md": "b"})
-	if _, err := SyncExtra(src, tgt, "merge", false, false, false, "", nil); err != nil {
+	if _, err := syncExtraDir(src, tgt, "merge", config.ExtraTargetConfig{}, nil, ExtraSyncOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	os.WriteFile(filepath.Join(src, "a.md"), []byte("v2"), 0644)
 	os.Remove(filepath.Join(src, "b.md"))
 
-	res, err := SyncExtra(src, tgt, "merge", false, false, false, "", nil)
+	res, err := syncExtraDir(src, tgt, "merge", config.ExtraTargetConfig{}, nil, ExtraSyncOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -315,11 +316,11 @@ func TestSyncExtra_MergeWithoutFileLinksPreservesIdenticalLocalFile(t *testing.T
 	os.WriteFile(filepath.Join(src, "a.md"), []byte("local"), 0644)
 	p := filepath.Join(tgt, "a.md")
 	os.WriteFile(p, []byte("local"), 0644)
-	if _, err := SyncExtra(src, tgt, "merge", false, false, false, "", nil); err != nil {
+	if _, err := syncExtraDir(src, tgt, "merge", config.ExtraTargetConfig{}, nil, ExtraSyncOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	os.Remove(filepath.Join(src, "a.md"))
-	if _, err := SyncExtra(src, tgt, "merge", false, false, false, "", nil); err != nil {
+	if _, err := syncExtraDir(src, tgt, "merge", config.ExtraTargetConfig{}, nil, ExtraSyncOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(p); err != nil {
@@ -386,9 +387,9 @@ func TestCopyFallbackMissingManifestIsSyncedButUnowned(t *testing.T) {
 		t.Fatal(got)
 	}
 	src, tgt = setupExtrasTest(t, map[string]string{"a.md": "a"})
-	SyncExtra(src, tgt, "merge", false, false, false, "", nil)
+	syncExtraDir(src, tgt, "merge", config.ExtraTargetConfig{}, nil, ExtraSyncOptions{})
 	os.Remove(filepath.Join(tgt, ".skillshare-manifest.json"))
-	extra, err := SyncExtra(src, tgt, "merge", false, false, false, "", nil)
+	extra, err := syncExtraDir(src, tgt, "merge", config.ExtraTargetConfig{}, nil, ExtraSyncOptions{})
 	if err != nil || extra.Synced != 0 || extra.Skipped != 1 || extra.Preserved != 1 {
 		t.Errorf("result=%+v err=%v", extra, err)
 	}
@@ -396,7 +397,7 @@ func TestCopyFallbackMissingManifestIsSyncedButUnowned(t *testing.T) {
 		t.Errorf("status=%q", status)
 	}
 	os.Remove(filepath.Join(src, "a.md"))
-	SyncExtra(src, tgt, "merge", false, false, false, "", nil)
+	syncExtraDir(src, tgt, "merge", config.ExtraTargetConfig{}, nil, ExtraSyncOptions{})
 	if got := readFile(t, filepath.Join(tgt, "a.md")); got != "a" {
 		t.Fatal(got)
 	}

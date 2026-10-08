@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"skillshare/internal/config"
 )
 
 func TestResolveExtensionMode(t *testing.T) {
@@ -196,9 +198,9 @@ func TestSyncExtraTransform_GeneratesRenamedFiles(t *testing.T) {
 	tgtDir := filepath.Join(dir, "tgt")
 	spec := &ExtensionSpec{Run: []string{"cat"}, Dir: dir, Name: "id", OutputExt: "toml"}
 
-	res, err := SyncExtra(srcDir, tgtDir, "copy", false, false, false, "", spec)
+	res, err := syncExtraDir(srcDir, tgtDir, "copy", config.ExtraTargetConfig{}, spec, ExtraSyncOptions{})
 	if err != nil {
-		t.Fatalf("SyncExtra: %v", err)
+		t.Fatalf("syncExtraDir: %v", err)
 	}
 	if res.Synced != 1 {
 		t.Errorf("Synced = %d, want 1", res.Synced)
@@ -227,9 +229,9 @@ func TestSyncExtraTransform_PreservesGeneratedOrphansWithoutOwnership(t *testing
 	}
 	spec := &ExtensionSpec{Run: []string{"cat"}, Dir: dir, Name: "id", OutputExt: "toml"}
 
-	res, err := SyncExtra(srcDir, tgtDir, "copy", false, false, false, "", spec)
+	res, err := syncExtraDir(srcDir, tgtDir, "copy", config.ExtraTargetConfig{}, spec, ExtraSyncOptions{})
 	if err != nil {
-		t.Fatalf("SyncExtra: %v", err)
+		t.Fatalf("syncExtraDir: %v", err)
 	}
 	if _, statErr := os.Stat(filepath.Join(tgtDir, "a.toml")); statErr != nil {
 		t.Errorf("expected a.toml to exist (not pruned): %v", statErr)
@@ -254,9 +256,9 @@ func TestSyncExtraTransform_DryRunNoSpawn(t *testing.T) {
 	tgtDir := filepath.Join(dir, "tgt")
 	spec := &ExtensionSpec{Run: []string{"false"}, Dir: dir, Name: "x", OutputExt: "toml"}
 
-	res, err := SyncExtra(srcDir, tgtDir, "copy", true, false, false, "", spec)
+	res, err := syncExtraDir(srcDir, tgtDir, "copy", config.ExtraTargetConfig{}, spec, ExtraSyncOptions{DryRun: true})
 	if err != nil {
-		t.Fatalf("SyncExtra dry-run: %v", err)
+		t.Fatalf("syncExtraDir dry-run: %v", err)
 	}
 	if res.Synced != 1 {
 		t.Errorf("Synced = %d, want 1 (counted, not run)", res.Synced)
@@ -296,9 +298,9 @@ func TestSyncExtraTransform_ConflictSkippedWithoutForce(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := SyncExtra(srcDir, tgtDir, "copy", false, false, false, "", spec)
+	res, err := syncExtraDir(srcDir, tgtDir, "copy", config.ExtraTargetConfig{}, spec, ExtraSyncOptions{})
 	if err != nil {
-		t.Fatalf("SyncExtra: %v", err)
+		t.Fatalf("syncExtraDir: %v", err)
 	}
 	if res.Synced != 0 || res.Skipped != 1 {
 		t.Errorf("Synced=%d Skipped=%d, want 0/1", res.Synced, res.Skipped)
@@ -316,9 +318,9 @@ func TestSyncExtraTransform_ConflictForceOverwrites(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := SyncExtra(srcDir, tgtDir, "copy", false, true, false, "", spec)
+	res, err := syncExtraDir(srcDir, tgtDir, "copy", config.ExtraTargetConfig{}, spec, ExtraSyncOptions{Force: true})
 	if err != nil {
-		t.Fatalf("SyncExtra: %v", err)
+		t.Fatalf("syncExtraDir: %v", err)
 	}
 	if res.Synced != 1 || res.Skipped != 0 {
 		t.Errorf("Synced=%d Skipped=%d, want 1/0", res.Synced, res.Skipped)
@@ -337,9 +339,9 @@ func TestSyncExtraTransform_IdempotentWhenIdentical(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := SyncExtra(srcDir, tgtDir, "copy", false, false, false, "", spec)
+	res, err := syncExtraDir(srcDir, tgtDir, "copy", config.ExtraTargetConfig{}, spec, ExtraSyncOptions{})
 	if err != nil {
-		t.Fatalf("SyncExtra: %v", err)
+		t.Fatalf("syncExtraDir: %v", err)
 	}
 	if res.Synced != 1 || res.Skipped != 0 {
 		t.Errorf("Synced=%d Skipped=%d, want 1/0", res.Synced, res.Skipped)
@@ -355,9 +357,9 @@ func TestSyncExtraTransform_ReplacesLeftoverSymlink(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := SyncExtra(srcDir, tgtDir, "copy", false, false, false, "", spec)
+	res, err := syncExtraDir(srcDir, tgtDir, "copy", config.ExtraTargetConfig{}, spec, ExtraSyncOptions{})
 	if err != nil {
-		t.Fatalf("SyncExtra: %v", err)
+		t.Fatalf("syncExtraDir: %v", err)
 	}
 	if res.Synced != 1 || res.Skipped != 0 {
 		t.Errorf("Synced=%d Skipped=%d, want 1/0", res.Synced, res.Skipped)
@@ -384,9 +386,9 @@ func TestSyncExtraTransform_DirConflictSkippedWithoutForce(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := SyncExtra(srcDir, tgtDir, "copy", false, false, false, "", spec)
+	res, err := syncExtraDir(srcDir, tgtDir, "copy", config.ExtraTargetConfig{}, spec, ExtraSyncOptions{})
 	if err != nil {
-		t.Fatalf("SyncExtra: %v", err)
+		t.Fatalf("syncExtraDir: %v", err)
 	}
 	if res.Synced != 0 || res.Skipped != 1 {
 		t.Errorf("Synced=%d Skipped=%d, want 0/1", res.Synced, res.Skipped)
@@ -412,9 +414,9 @@ func TestSyncExtraTransform_DirConflictForceReplaces(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := SyncExtra(srcDir, tgtDir, "copy", false, true, false, "", spec)
+	res, err := syncExtraDir(srcDir, tgtDir, "copy", config.ExtraTargetConfig{}, spec, ExtraSyncOptions{Force: true})
 	if err != nil {
-		t.Fatalf("SyncExtra: %v", err)
+		t.Fatalf("syncExtraDir: %v", err)
 	}
 	if res.Synced != 1 || res.Skipped != 0 {
 		t.Errorf("Synced=%d Skipped=%d, want 1/0", res.Synced, res.Skipped)
@@ -436,13 +438,13 @@ func TestSyncExtraTransform_DirConflictForceReplaces(t *testing.T) {
 func TestSyncExtra_TransformRejectsNonCopyMode(t *testing.T) {
 	srcDir, tgtDir, spec := transformFixture(t)
 	for _, mode := range []string{"merge", "symlink"} {
-		if _, err := SyncExtra(srcDir, tgtDir, mode, false, false, false, "", spec); err == nil {
+		if _, err := syncExtraDir(srcDir, tgtDir, mode, config.ExtraTargetConfig{}, spec, ExtraSyncOptions{}); err == nil {
 			t.Errorf("mode %q with extension: expected error, got nil", mode)
 		}
 	}
 	// Empty and explicit copy are both accepted.
 	for _, mode := range []string{"", "copy"} {
-		if _, err := SyncExtra(srcDir, tgtDir, mode, false, false, false, "", spec); err != nil {
+		if _, err := syncExtraDir(srcDir, tgtDir, mode, config.ExtraTargetConfig{}, spec, ExtraSyncOptions{}); err != nil {
 			t.Errorf("mode %q with extension: unexpected error: %v", mode, err)
 		}
 	}
