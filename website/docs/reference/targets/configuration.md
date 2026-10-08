@@ -713,6 +713,8 @@ extras:
 | `targets[].mode` | No | `merge` (default), `copy`, or `symlink`; `import`, `prepend` and `append` for single-file extras only |
 | `targets[].as` | No | File name in the target for a single-file extra (default: the `file` name) |
 | `targets[].flatten` | No | When `true`, sync subdirectory files directly into target root (cannot use with `symlink` or `file`) |
+| `targets[].include` | No | Sync only source files matching these `.gitignore`-style patterns (cannot use with `symlink` or `file`). See [choosing files](../commands/extras.md#choosing-files) |
+| `targets[].exclude` | No | Skip source files matching these patterns; applied after `include` (cannot use with `symlink` or `file`) |
 
 `extras_source` is auto-populated to the default path (`~/.config/skillshare/extras/`) on `skillshare init` or first `extras init`. Override it to use a custom location for all extras.
 

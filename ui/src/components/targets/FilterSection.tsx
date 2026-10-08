@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { SyncMatrixEntry } from '../../api/client';
@@ -8,7 +8,7 @@ import { useI18n, useT, plural } from '../../i18n';
 import PatternInput from './PatternInput';
 import { joinList, patternName, togglePatterns } from './targetView';
 
-type Kind = 'skill' | 'agent';
+type Kind = 'skill' | 'agent' | 'file';
 const MODES = ['merge', 'copy', 'symlink'] as const;
 // Sentences that end in a full-width stop run on without a space.
 const CJK_STOP = /[。！？]$/;
@@ -31,13 +31,15 @@ interface Props {
   alsoReadBy?: string[];
   /** Targets with skills on whose folder this tool also reads, so it sees their skills twice */
   readsFrom?: string[];
+  /** Shown in place of the include hint, such as an include that matches nothing */
+  includeWarning?: ReactNode;
 }
 
 /** Include and exclude patterns with a live preview; a click on a preview row edits them. */
-export default function FilterSection({ kind, mode, name, include, exclude, onChange, entries, loaded, loading, error, disabled, alsoReadBy = [], readsFrom = [] }: Props) {
+export default function FilterSection({ kind, mode, name, include, exclude, onChange, entries, loaded, loading, error, disabled, alsoReadBy = [], readsFrom = [], includeWarning }: Props) {
   const { t, locale } = useI18n();
   const [help, setHelp] = useState(false);
-  const agent = kind === 'agent';
+  const files = kind === 'file';
   const synced = entries.filter((e) => e.status === 'synced').length;
 
   const reason = (e: SyncMatrixEntry) => {
@@ -50,7 +52,7 @@ export default function FilterSection({ kind, mode, name, include, exclude, onCh
     }
   };
 
-  const baseHint = t(agent ? 'targetDetail.includeHint.agents' : 'targetDetail.includeHint.skills');
+  const baseHint = t(`targetDetail.includeHint.${kind}s`);
   const includeHint = alsoReadBy.length > 0
     ? baseHint + (CJK_STOP.test(baseHint) ? '' : ' ') + t('targetDetail.alsoReadBy.filterHint', { names: joinList(alsoReadBy, locale) })
     : baseHint;
@@ -71,7 +73,7 @@ export default function FilterSection({ kind, mode, name, include, exclude, onCh
     <>
       {loaded && (
         <p className="text-[13.5px]">
-          {t(plural(`targetDetail.summary.${agent ? 'agents' : 'skills'}`, entries.length), { synced, total: entries.length, name })}
+          {t(plural(`targetDetail.summary.${kind}s`, entries.length), { synced, total: entries.length, name })}
         </p>
       )}
       {readers}
@@ -79,12 +81,12 @@ export default function FilterSection({ kind, mode, name, include, exclude, onCh
       <div className="ss-fld">
         <label htmlFor="filter-include">{t('targetDetail.include')}</label>
         <PatternInput id="filter-include" patterns={include} onChange={(next) => onChange({ include: next, exclude })} disabled={disabled} />
-        <span className="hp">{includeHint}</span>
+        {includeWarning ?? <span className="hp">{includeHint}</span>}
       </div>
       <div className="ss-fld">
         <label htmlFor="filter-exclude">{t('targetDetail.exclude')}</label>
         <PatternInput id="filter-exclude" patterns={exclude} onChange={(next) => onChange({ include, exclude: next })} disabled={disabled} />
-        <span className="hp">{t(agent ? 'targetDetail.excludeHint.agents' : 'targetDetail.excludeHint.skills')}</span>
+        <span className="hp">{t(`targetDetail.excludeHint.${kind}s`)}</span>
       </div>
       <button type="button" className="ss-disc self-start" aria-expanded={help} onClick={() => setHelp(!help)}>
         {help ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
@@ -93,9 +95,19 @@ export default function FilterSection({ kind, mode, name, include, exclude, onCh
       {help && (
         <ul className="ml-[22px] -mt-2 flex list-disc flex-col gap-1 pl-4 text-[13px] text-ink-2">
           <li>{t('targetDetail.help.wildcards')}</li>
-          <li>{t('targetDetail.help.nested')}</li>
-          <li>{t('targetDetail.help.order')}</li>
-          <li>{t('targetDetail.help.declared')}</li>
+          {files ? (
+            <>
+              <li>{t('targetDetail.help.anyDepth')}</li>
+              <li>{t('targetDetail.help.folders')}</li>
+              <li>{t('targetDetail.help.orderFiles')}</li>
+            </>
+          ) : (
+            <>
+              <li>{t('targetDetail.help.nested')}</li>
+              <li>{t('targetDetail.help.order')}</li>
+              <li>{t('targetDetail.help.declared')}</li>
+            </>
+          )}
         </ul>
       )}
 
@@ -108,11 +120,11 @@ export default function FilterSection({ kind, mode, name, include, exclude, onCh
         <div className="mt-2 flex flex-col gap-3 border-t border-line pt-5">
           <div className="flex flex-col gap-0.5">
             <h3 className="text-[14px] font-semibold">{t('targetDetail.previewCount', { count: entries.length })}</h3>
-            <p className="text-[13px] text-ink-3">{t('targetDetail.clickHint')}</p>
+            <p className="text-[13px] text-ink-3">{t(files ? 'targetDetail.clickHintFiles' : 'targetDetail.clickHint')}</p>
           </div>
           <div className="ss-list !shadow-none">
             <div className="ss-lh">
-              <span className="flex-1">{t('resources.col.name')}</span>
+              <span className="flex-1">{t(files ? 'targetDetail.colFile' : 'resources.col.name')}</span>
               <span className="w-[170px]">{t('targetDetail.becauseOf')}</span>
               <span className="w-[96px]">{t('targetDetail.result')}</span>
             </div>

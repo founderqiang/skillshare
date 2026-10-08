@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ellipsis, FileText, FoldVertical, Folder, FolderPlus, Link2, Plus, Puzzle, RefreshCw, Trash2, X, Zap } from 'lucide-react';
+import { Ellipsis, FileText, FoldVertical, Folder, FolderPlus, Link2, ListFilter, Pencil, Plus, Puzzle, RefreshCw, Trash2, X, Zap } from 'lucide-react';
 import { api } from '../api/client';
 import type { AvailableTarget, Extra, ExtraTarget } from '../api/client';
 import { queryKeys, staleTimes } from '../lib/queryKeys';
@@ -24,20 +24,11 @@ import ProjectInstructions from '../components/instructions/ProjectInstructions'
 import SharedInstructions from '../components/instructions/SharedInstructions';
 import { isAgentsExtra } from '../components/instructions/instructionsView';
 import { useAvailableTargetsQuery, useOverviewQuery } from '../hooks/useSharedQueries';
+import { EditExtraDialog, EditTargetDialog, FILE_MODES, MODES, joinFile } from '../components/extras/ExtraEditDialogs';
 import { invalidate } from '../lib/queryEvents';
-
-const MODES = ['merge', 'copy', 'symlink'] as const;
-// A single file can't be a directory symlink; import writes an @ line instead.
-const FILE_MODES = ['merge', 'copy', 'import', 'prepend', 'append'] as const;
 
 /** A file name typed where a path would be wrong. */
 const isPathLike = (name: string) => /[\\/]/.test(name);
-
-/** <folder>/<file>, for a single-file extra's source or target file, with the separator the folder already uses (a backslash on Windows). */
-const joinFile = (dir: string, file: string) => {
-  const sep = dir.lastIndexOf('\\') > dir.lastIndexOf('/') ? '\\' : '/';
-  return `${dir.replace(/[\\/]+$/, '')}${sep}${file}`;
-};
 
 const STATUS: Record<string, { tone: string; labelKey: string }> = {
   synced: { tone: 'ok', labelKey: 'extras.status.synced' },
@@ -432,12 +423,15 @@ function AddTargetRow({ onAdd, onCancel, extensions, known, file }: {
   );
 }
 
-function TargetTags({ target }: { target: ExtraTarget }) {
+function TargetTags({ target, total }: { target: ExtraTarget; total: number }) {
+  const t = useT();
+  const filtered = (target.include?.length ?? 0) + (target.exclude?.length ?? 0) > 0;
   return (
     <span className="flex w-[210px] shrink-0 items-center gap-1.5">
       {target.extension && <span className="ss-tag"><Puzzle size={11} />{target.extension}</span>}
       <span className="ss-tag">{target.mode}</span>
       {target.flatten && <span className="ss-tag">flatten</span>}
+      {filtered && <span className="ss-tag"><ListFilter size={11} />{t('extras.filteredFiles', { count: target.file_count, total })}</span>}
     </span>
   );
 }
@@ -487,6 +481,8 @@ export default function ExtrasPage() {
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
   const [removeExtra, setRemoveExtra] = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<{ name: string; path: string } | null>(null);
+  const [editing, setEditing] = useState<{ extra: Extra; target?: ExtraTarget } | null>(null);
+  const closeEdit = () => { setEditing(null); void invalidate(queryClient, 'extrasChanged'); };
 
   const openMenu = (e: React.MouseEvent<HTMLButtonElement>, items: ContextMenuItem[]) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -543,6 +539,7 @@ export default function ExtrasPage() {
   const extraMenu = (extra: Extra): ContextMenuItem[] => [
     { key: 'sync', label: t('extras.sync'), icon: <RefreshCw size={14} />, onSelect: () => void sync(extra.name, false) },
     { key: 'force', label: t('extras.forceSync'), icon: <Zap size={14} />, onSelect: () => void sync(extra.name, true) },
+    { key: 'edit', label: t('extras.editExtra'), icon: <Pencil size={14} />, onSelect: () => setEditing({ extra }) },
     { key: 'remove', label: t('extras.removeConfirm.title'), icon: <Trash2 size={14} />, danger: true, onSelect: () => setRemoveExtra(extra.name) },
   ];
 
@@ -559,6 +556,7 @@ export default function ExtrasPage() {
         onSelect: () => void changeTarget(extra.name, tg, { mode: m }, t('extras.toast.modeChanged', { mode: m })),
       })),
     },
+    { key: 'edit', label: t('extras.editTarget'), icon: <Pencil size={14} />, onSelect: () => setEditing({ extra, target: tg }) },
     ...(extra.targets.length > 1
       ? [{ key: 'remove', label: t('extras.removeTarget'), icon: <Trash2 size={14} />, danger: true, onSelect: () => setRemoveTarget({ name: extra.name, path: tg.path }) }]
       : []),
@@ -608,6 +606,7 @@ export default function ExtrasPage() {
           })),
         }]),
     // The last target can't go: an extra needs somewhere to sync to
+    { key: 'edit', label: t('extras.editTarget'), icon: <Pencil size={14} />, onSelect: () => setEditing({ extra, target: tg }) },
     ...(extra.targets.length > 1
       ? [{ key: 'remove', label: t('extras.removeTarget'), icon: <Trash2 size={14} />, danger: true, onSelect: () => setRemoveTarget({ name: extra.name, path: tg.path }) }]
       : []),
@@ -683,7 +682,7 @@ export default function ExtrasPage() {
                     <div key={tg.path} className="ss-r !min-h-[46px]">
                       <TargetMark path={tg.path} known={known} />
                       <span className="min-w-0 flex-1 truncate font-mono text-[13px]" title={dest}>{shortenHome(dest)}</span>
-                      <TargetTags target={tg} />
+                      <TargetTags target={tg} total={extra.file_count} />
                       <span className="w-[120px] shrink-0">
                         <span className={`ss-st ${status?.tone ?? ''}`}>{status ? t(status.labelKey) : tg.status}</span>
                       </span>
@@ -729,6 +728,23 @@ export default function ExtrasPage() {
           initial={prefill ?? undefined}
         />
       )}
+      {editing && (editing.target ? (
+        <EditTargetDialog
+          extra={editing.extra}
+          target={editing.target}
+          extensions={extensions}
+          markFor={(path) => <TargetMark path={path} known={known} />}
+          onClose={() => setEditing(null)}
+          onSaved={closeEdit}
+        />
+      ) : (
+        <EditExtraDialog
+          extra={editing.extra}
+          sharedDir={sharedDir}
+          onClose={() => setEditing(null)}
+          onSaved={closeEdit}
+        />
+      ))}
       <SkillContextMenu open={!!menu} anchorPoint={menu ?? undefined} items={menu?.items ?? []} onClose={() => setMenu(null)} />
       <ConfirmDialog
         open={removeExtra !== null}

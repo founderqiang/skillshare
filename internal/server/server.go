@@ -648,6 +648,9 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("DELETE /api/extras/{name}", s.handleExtrasDelete)
 	s.mux.HandleFunc("POST /api/extras/{name}/targets", s.handleExtrasAddTarget)
 	s.mux.HandleFunc("DELETE /api/extras/{name}/targets", s.handleExtrasRemoveTarget)
+	s.mux.HandleFunc("PUT /api/extras/{name}/targets", s.handleExtrasEditTarget)
+	s.mux.HandleFunc("POST /api/extras/{name}/preview", s.handleExtrasPreview)
+	s.mux.HandleFunc("PATCH /api/extras/{name}", s.handleExtrasEdit)
 
 	// Extensions (transform extensions management)
 	s.mux.HandleFunc("GET /api/extensions", s.handleExtensionsList)

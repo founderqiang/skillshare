@@ -296,6 +296,11 @@ type ExtraTargetConfig struct {
 	Flatten   bool   `yaml:"flatten,omitempty"`   // flatten subdirectories into target root
 	Extension string `yaml:"extension,omitempty"` // transform script applied during sync (implies copy)
 	As        string `yaml:"as,omitempty"`        // target filename for a single-file extra (default: the extra's file)
+	// Include and Exclude select which source files sync to this target, as
+	// .gitignore-style patterns on the path inside the source (directory
+	// extras with merge or copy mode only).
+	Include []string `yaml:"include,omitempty"`
+	Exclude []string `yaml:"exclude,omitempty"`
 }
 
 // ExtraConfig holds configuration for a non-skill resource type (rules, commands, etc.).

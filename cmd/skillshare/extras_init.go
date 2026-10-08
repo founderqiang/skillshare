@@ -15,7 +15,7 @@ import (
 func cmdExtrasInit(args []string) error {
 	start := time.Now()
 
-	mode, rest, err := parseModeArgs(args, "--target", "--mode", "--source", "--file", "--as")
+	mode, rest, err := parseModeArgs(args, "--target", "--mode", "--source", "--file", "--as", "--include", "--exclude")
 	if err != nil {
 		return err
 	}
@@ -35,6 +35,7 @@ func cmdExtrasInit(args []string) error {
 	var syncMode string
 	var sourceOverride string
 	var file, as string
+	var include, exclude []string
 	var force bool
 	var noTUI bool
 	var flatten bool
@@ -70,6 +71,16 @@ func cmdExtrasInit(args []string) error {
 			}
 			i++
 			as = rest[i]
+		case "--include", "--exclude":
+			if i+1 >= len(rest) {
+				return fmt.Errorf("%s requires a pattern", rest[i])
+			}
+			if rest[i] == "--include" {
+				include = append(include, rest[i+1])
+			} else {
+				exclude = append(exclude, rest[i+1])
+			}
+			i++
 		case "--flatten":
 			flatten = true
 		case "--force":
@@ -101,7 +112,7 @@ func cmdExtrasInit(args []string) error {
 
 	initTargets := make([]extrasInitTarget, 0, len(targets))
 	for _, t := range targets {
-		initTargets = append(initTargets, extrasInitTarget{path: t, mode: syncMode, flatten: flatten, as: as})
+		initTargets = append(initTargets, extrasInitTarget{path: t, mode: syncMode, flatten: flatten, as: as, include: include, exclude: exclude})
 	}
 	opts := extrasInitOptions{name: name, source: sourceOverride, file: file, targets: initTargets, force: force}
 	if err := validateExtrasInit(opts); err != nil {
@@ -130,7 +141,7 @@ type extrasInitOptions struct {
 func (o extrasInitOptions) extra() config.ExtraConfig {
 	extra := config.ExtraConfig{Name: o.name, Source: o.source, File: o.file}
 	for _, t := range o.targets {
-		et := config.ExtraTargetConfig{Path: t.path, Flatten: t.flatten, As: t.as}
+		et := config.ExtraTargetConfig{Path: t.path, Flatten: t.flatten, As: t.as, Include: t.include, Exclude: t.exclude}
 		if t.mode != "" {
 			et.Mode = t.mode
 		}
@@ -336,6 +347,8 @@ func printExtrasInitHelp() {
 			{"--as <filename>", "Target filename for every --target (requires --file; default: the --file name)"},
 			{"--mode <mode>", "Sync mode: merge (default), copy, symlink; import, prepend or append for single-file extras"},
 			{"--flatten", "Flatten files from subdirectories into target root (folder extras only)"},
+			{"--include <pattern>", "Sync only files matching this .gitignore pattern (repeatable; folder extras only)"},
+			{"--exclude <pattern>", "Skip files matching this .gitignore pattern (repeatable; folder extras only)"},
 			{"--force", "Overwrite if extra already exists"},
 			{"-p, --project", "Create in project mode (.skillshare/)"},
 			{"-g, --global", "Create in global mode (~/.config/skillshare/)"},
@@ -347,6 +360,7 @@ func printExtrasInitHelp() {
 			helpRow{"skillshare extras init rules --source ~/company-shared/rules --target ~/.claude/rules", ""},
 			helpRow{"skillshare extras init rules --target ~/.claude/rules --force", ""},
 			helpRow{"skillshare extras init agents --target ~/.claude/agents --flatten", ""},
+			helpRow{"skillshare extras init docs --target ~/.claude/docs --include index.md --include learning.md", ""},
 			helpRow{"skillshare extras init prompts --target .claude/prompts -p", ""},
 			helpRow{"skillshare extras init review -p --source .skillshare/extras/prompts \\", ""},
 			helpRow{"  --file review.md --target .claude/commands", ""},

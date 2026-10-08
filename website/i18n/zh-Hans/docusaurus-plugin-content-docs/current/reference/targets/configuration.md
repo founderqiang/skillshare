@@ -703,6 +703,8 @@ extras:
 | `targets[].mode` | 否 | `merge`（默认）、`copy` 或 `symlink`；`import` 仅用于单文件 extras |
 | `targets[].as` | 否 | 单文件 extra 在 target 中的文件名（默认：`file` 的名称） |
 | `targets[].flatten` | 否 | 为 `true` 时，将子目录文件直接 sync 到 Target 根目录（不能与 `symlink` 或 `file` 同时使用） |
+| `targets[].include` | 否 | 只同步匹配这些 `.gitignore` 风格 pattern 的 source 文件（不能与 `symlink` 或 `file` 同时使用）。参见[选择文件](../commands/extras.md#choosing-files) |
+| `targets[].exclude` | 否 | 跳过匹配这些 pattern 的 source 文件，在 `include` 之后应用（不能与 `symlink` 或 `file` 同时使用） |
 
 `extras_source` 会在 `skillshare init` 或首次 `extras init` 时自动填充为默认路径（`~/.config/skillshare/extras/`）。可覆盖它以对所有 extras 使用自定义位置。
 

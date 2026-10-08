@@ -65,6 +65,7 @@ export const queryKeys = {
   templates: ['templates'] as const,
   skillPreview: (req: object) => ['skill-preview', req] as const,
   extras: ['extras'] as const,
+  extrasPreview: (...parts: unknown[]) => ['extras-preview', ...parts] as const,
   // Under `extras`, so invalidating that key refreshes both.
   extrasExtensions: ['extras', 'extensions'] as const,
   extensions: ['extensions'] as const,

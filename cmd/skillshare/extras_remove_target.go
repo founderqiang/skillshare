@@ -195,6 +195,7 @@ func managedExtraTargetFiles(target config.ExtraTargetConfig, sourceDir, extensi
 	if err != nil {
 		return nil, err
 	}
+	files = sync.ExtraTargetFiles(files, target)
 
 	outputExt := ""
 	if target.Extension != "" {

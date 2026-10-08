@@ -28,6 +28,9 @@ vi.mock('../api/client', async (load) => {
         ],
       }),
       createExtra: vi.fn().mockResolvedValue({ success: true }),
+      previewExtraFilter: vi.fn().mockResolvedValue({ files: [{ file: 'index.md', status: 'synced' }, { file: 'draft.md', status: 'synced' }], unmatched: null }),
+      editExtraTarget: vi.fn().mockResolvedValue({ success: true }),
+      editExtra: vi.fn().mockResolvedValue({ success: true }),
       listExtraExtensions: vi.fn().mockResolvedValue({ extensions: [] }),
       availableTargets: vi.fn().mockResolvedValue({ targets: [] }),
       getOverview: vi.fn().mockResolvedValue({}),
@@ -132,6 +135,34 @@ describe('Extras page in a project', () => {
     await user.click(await within(dialog).findByRole('button', { name: 'conventions' }));
     expect(within(dialog).getByRole('textbox', { name: 'Source folder' })).toHaveValue('conventions');
     vi.mocked(api.getOverview).mockResolvedValue({} as never);
+  });
+
+  // Issue #435: a click on a preview row excludes that file from the target.
+  it('saves a file excluded from a target in Edit target', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'More actions for .claude/rules' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Edit target…' }));
+    const dialog = screen.getByRole('dialog');
+    await user.click(await within(dialog).findByRole('button', { name: /draft\.md/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(api.editExtraTarget).toHaveBeenCalledWith('rules', '.claude/rules', {
+      path: '.claude/rules', mode: 'merge', flatten: false, extension: '', as: '', include: [], exclude: ['draft.md'],
+    });
+  });
+
+  it('renames an extra in Edit extra', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'More actions for rules' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Edit extra…' }));
+    const name = within(screen.getByRole('dialog')).getByLabelText('Name');
+    await user.clear(name);
+    await user.type(name, 'docs');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(api.editExtra).toHaveBeenCalledWith('rules', { name: 'docs' });
   });
 
   // A target page's "Share with Extras" link.

@@ -703,6 +703,8 @@ extras:
 | `targets[].mode` | 否 | `merge`（預設）、`copy` 或 `symlink`；`import` 僅限單一檔案 Extra |
 | `targets[].as` | 否 | 單一檔案 Extra 在 Target 中的檔名（預設：`file` 的名稱） |
 | `targets[].flatten` | 否 | 為 `true` 時，把子目錄檔案直接同步到 Target 根目錄（不能與 `symlink` 或 `file` 併用） |
+| `targets[].include` | 否 | 只同步符合這些 `.gitignore` 風格 pattern 的 source 檔案（不能與 `symlink` 或 `file` 併用）。請見[挑選檔案](../commands/extras.md#choosing-files) |
+| `targets[].exclude` | 否 | 略過符合這些 pattern 的 source 檔案，在 `include` 之後套用（不能與 `symlink` 或 `file` 併用） |
 
 `extras_source` 會在執行 `skillshare init` 或第一次 `extras init` 時，自動填入預設路徑（`~/.config/skillshare/extras/`）。可覆寫它，讓所有 Extras 使用自訂位置。
 

@@ -5,6 +5,9 @@ export interface ExtraTarget {
   flatten: boolean;
   extension?: string;  // transform extension name; presence implies copy mode
   as?: string; // single-file extra: target filename
+  include?: string[];
+  exclude?: string[];
+  file_count: number; // source files this target syncs after include/exclude
   status: string;  // "synced" | "drift" | "modified" | "not synced" | "no source"
 }
 
@@ -16,6 +19,19 @@ export interface Extra {
   file_count: number;
   source_exists: boolean;
   targets: ExtraTarget[];
+}
+
+export interface ExtraFilterEntry {
+  file: string;
+  status: 'synced' | 'not_included' | 'excluded';
+  reason?: string; // the exclude pattern that dropped the file
+}
+
+/** What an edit that moves files returns: the sync it ran and any old-location cleanup errors. */
+export interface ExtraEditResult {
+  success: boolean;
+  extras?: ExtrasSyncResult[];
+  prune_errors?: string[];
 }
 
 export interface ExtensionInfo {

@@ -1,5 +1,5 @@
 import { apiFetch } from './http';
-import type { ExtensionInfo, Extra, ExtraDiffResult, ExtrasSyncResult } from './types/extras';
+import type { ExtensionInfo, Extra, ExtraDiffResult, ExtraEditResult, ExtraFilterEntry, ExtrasSyncResult } from './types/extras';
 
 export const extrasApi = {
   listExtras: () => apiFetch<{ extras: Extra[] }>('/extras'),
@@ -52,6 +52,23 @@ export const extrasApi = {
     apiFetch<{ success: boolean }>(`/extras/${encodeURIComponent(name)}/targets`, {
       method: 'POST',
       body: JSON.stringify(target),
+    }),
+  previewExtraFilter: (name: string, include: string[], exclude: string[]) =>
+    apiFetch<{ files: ExtraFilterEntry[]; unmatched: string[] | null }>(`/extras/${encodeURIComponent(name)}/preview`, {
+      method: 'POST',
+      body: JSON.stringify({ include, exclude }),
+    }),
+  // A new path or file name also clears the old place and syncs.
+  editExtraTarget: (name: string, path: string, target: { path: string; mode: string; flatten: boolean; extension: string; as: string; include: string[]; exclude: string[] }) =>
+    apiFetch<ExtraEditResult>(`/extras/${encodeURIComponent(name)}/targets`, {
+      method: 'PUT',
+      body: JSON.stringify({ path, target }),
+    }),
+  // source: omitted = unchanged, '' = the default folder; a new source relinks every target.
+  editExtra: (name: string, data: { name?: string; source?: string }) =>
+    apiFetch<ExtraEditResult>(`/extras/${encodeURIComponent(name)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
     }),
   removeExtraTarget: (name: string, path: string) =>
     apiFetch<{ success: boolean }>(`/extras/${encodeURIComponent(name)}/targets`, {

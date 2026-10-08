@@ -92,7 +92,7 @@ func runExtraTarget(extra config.ExtraConfig, t config.ExtraTargetConfig, source
 // sync just that file to <target>/<as or file>; others sync the directory.
 func SyncExtraTarget(extra config.ExtraConfig, target config.ExtraTargetConfig, sourceDir, targetPath, mode string, dryRun, force bool, projectRoot string, spec *ExtensionSpec) (*ExtraResult, error) {
 	if extra.File == "" {
-		return SyncExtra(sourceDir, targetPath, mode, dryRun, force, target.Flatten, projectRoot, spec)
+		return syncExtraDir(sourceDir, targetPath, mode, dryRun, force, target.Flatten, projectRoot, spec, target.Include, target.Exclude)
 	}
 	if spec != nil {
 		return nil, fmt.Errorf("extensions are not supported for single-file extras")

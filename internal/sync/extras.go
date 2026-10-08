@@ -86,6 +86,13 @@ func DiscoverExtraFiles(sourcePath string) ([]string, error) {
 // When dryRun is true the function counts what would happen but makes no
 // filesystem changes.
 func SyncExtra(sourcePath, targetPath, mode string, dryRun, force, flatten bool, projectRoot string, spec *ExtensionSpec) (*ExtraResult, error) {
+	return syncExtraDir(sourcePath, targetPath, mode, dryRun, force, flatten, projectRoot, spec, nil, nil)
+}
+
+// syncExtraDir is SyncExtra limited to the source files that pass include and
+// exclude (see FilterExtraFiles). Files filtered out count as absent, so merge
+// prunes their links like links to deleted source files.
+func syncExtraDir(sourcePath, targetPath, mode string, dryRun, force, flatten bool, projectRoot string, spec *ExtensionSpec, include, exclude []string) (*ExtraResult, error) {
 	if spec != nil {
 		// Transform extensions emit generated files into the target, so only
 		// copy semantics apply. Reject merge/symlink here so the API and the
@@ -93,7 +100,7 @@ func SyncExtra(sourcePath, targetPath, mode string, dryRun, force, flatten bool,
 		if mode != "" && mode != "copy" {
 			return nil, fmt.Errorf("extension %q requires copy mode, got %q", spec.Name, mode)
 		}
-		return syncExtraTransform(sourcePath, targetPath, spec, dryRun, force, flatten)
+		return syncExtraTransform(sourcePath, targetPath, spec, dryRun, force, flatten, include, exclude)
 	}
 	if mode == "" {
 		mode = "merge"
@@ -101,12 +108,15 @@ func SyncExtra(sourcePath, targetPath, mode string, dryRun, force, flatten bool,
 	if flatten && mode == "symlink" {
 		return nil, fmt.Errorf("flatten cannot be used with symlink mode")
 	}
+	if mode == "symlink" && (len(include) > 0 || len(exclude) > 0) {
+		return nil, fmt.Errorf("include and exclude cannot be used with symlink mode")
+	}
 
 	switch mode {
 	case "symlink":
 		return syncExtraSymlinkMode(sourcePath, targetPath, dryRun, force, projectRoot)
 	case "merge", "copy":
-		return syncExtraPerFile(sourcePath, targetPath, mode, dryRun, force, flatten, projectRoot)
+		return syncExtraPerFile(sourcePath, targetPath, mode, dryRun, force, flatten, projectRoot, include, exclude)
 	default:
 		return nil, fmt.Errorf("unsupported extras sync mode: %q", mode)
 	}
@@ -116,13 +126,14 @@ func SyncExtra(sourcePath, targetPath, mode string, dryRun, force, flatten bool,
 // transformed output into targetPath using copy semantics. Output files are
 // renamed per spec.OutputExt. It does not prune output-looking orphans because
 // copy targets do not carry ownership metadata.
-func syncExtraTransform(sourcePath, targetPath string, spec *ExtensionSpec, dryRun, force, flatten bool) (*ExtraResult, error) {
+func syncExtraTransform(sourcePath, targetPath string, spec *ExtensionSpec, dryRun, force, flatten bool, include, exclude []string) (*ExtraResult, error) {
 	result := &ExtraResult{}
 
-	files, err := DiscoverExtraFiles(sourcePath)
+	files, warnings, err := discoverExtraTargetFiles(sourcePath, include, exclude)
 	if err != nil {
 		return nil, err
 	}
+	result.Warnings = warnings
 	absSrc, err := filepath.Abs(sourcePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve source path: %w", err)
@@ -304,7 +315,7 @@ func syncExtraSymlinkMode(sourcePath, targetPath string, dryRun, force bool, pro
 // syncExtraPerFile handles merge (symlink) and copy modes on a per-file basis.
 // Merge copies instead when file links are unavailable; those copies are
 // tracked so later syncs keep them updated and pruned like links.
-func syncExtraPerFile(sourcePath, targetPath, mode string, dryRun, force, flatten bool, projectRoot string) (*ExtraResult, error) {
+func syncExtraPerFile(sourcePath, targetPath, mode string, dryRun, force, flatten bool, projectRoot string, include, exclude []string) (*ExtraResult, error) {
 	result := &ExtraResult{}
 
 	var copies *copyTracker
@@ -316,10 +327,11 @@ func syncExtraPerFile(sourcePath, targetPath, mode string, dryRun, force, flatte
 		}
 	}
 
-	files, err := DiscoverExtraFiles(sourcePath)
+	files, warnings, err := discoverExtraTargetFiles(sourcePath, include, exclude)
 	if err != nil {
 		return nil, err
 	}
+	result.Warnings = append(result.Warnings, warnings...)
 
 	absSrc, err := filepath.Abs(sourcePath)
 	if err != nil {
@@ -778,7 +790,8 @@ type ExtraCollectResult struct {
 // (identical content is still skipped).
 // When flatten is true, collected files are placed in the source root
 // (basename only) rather than preserving the target subdirectory structure.
-func CollectExtraFiles(sourceDir, targetDir, mode string, dryRun, force, flatten bool, projectRoot string) (*ExtraCollectResult, error) {
+// Files that include and exclude leave out of the target are skipped.
+func CollectExtraFiles(sourceDir, targetDir, mode string, dryRun, force, flatten bool, projectRoot string, include, exclude []string) (*ExtraCollectResult, error) {
 	result := &ExtraCollectResult{}
 	// Without file links the collected files stay in place, as copies.
 	if !canCreateFileLink() {
@@ -799,6 +812,7 @@ func CollectExtraFiles(sourceDir, targetDir, mode string, dryRun, force, flatten
 	// Source paths claimed this run: with flatten, two target files can share
 	// a basename, and the second must not overwrite the first.
 	claimed := make(map[string]bool)
+	filter := newExtraFilter(include, exclude)
 
 	err := filepath.Walk(targetDir, func(path string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil {
@@ -835,6 +849,12 @@ func CollectExtraFiles(sourceDir, targetDir, mode string, dryRun, force, flatten
 		destRel := rel
 		if flatten {
 			destRel = filepath.Base(rel)
+		}
+		// A file the target's filters leave out would be pruned again by the
+		// next sync, so it stays where it is.
+		if !filter.keeps(destRel) {
+			result.Skipped++
+			return nil
 		}
 		destPath := filepath.Join(sourceDir, destRel)
 		if claimed[destPath] {

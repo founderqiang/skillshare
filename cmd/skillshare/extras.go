@@ -19,7 +19,8 @@ func cmdExtras(args []string) error {
 	if hasFlag(args, "--remove-target") {
 		return cmdExtrasRemoveTarget(args)
 	}
-	if sub != "init" && (hasFlag(args, "--mode") || hasFlag(args, "--flatten") || hasFlag(args, "--no-flatten")) {
+	if sub != "init" && (hasFlag(args, "--mode") || hasFlag(args, "--flatten") || hasFlag(args, "--no-flatten") ||
+		hasFlag(args, "--add-include") || hasFlag(args, "--add-exclude") || hasFlag(args, "--remove-include") || hasFlag(args, "--remove-exclude")) {
 		return cmdExtrasMode(args)
 	}
 

@@ -22,6 +22,8 @@ type extrasInitTarget struct {
 	mode    string
 	flatten bool
 	as      string // single file: target filename ("" = the source file name)
+	include []string
+	exclude []string
 }
 
 // extrasInitAnswers is what the extras init questions collect.

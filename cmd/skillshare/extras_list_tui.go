@@ -1078,7 +1078,7 @@ func (m extrasListTUIModel) doCollect(name, targetPath string) (string, error) {
 	collected := 0
 	for _, t := range targets {
 		resolved := config.ExpandPath(t.Path)
-		result, err := sync.CollectExtraFiles(sourceDir, resolved, t.Mode, false, false, t.Flatten, m.projectRoot())
+		result, err := sync.CollectExtraFiles(sourceDir, resolved, t.Mode, false, false, t.Flatten, m.projectRoot(), t.Include, t.Exclude)
 		if err != nil {
 			return "", fmt.Errorf("collect from %s: %w", t.Path, err)
 		}

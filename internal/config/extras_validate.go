@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"path"
 	"regexp"
 	"slices"
 	"strings"
@@ -102,6 +103,20 @@ func validateExtraTarget(file string, t ExtraTargetConfig) error {
 	if err := ValidateExtraFlatten(t.Flatten, t.Mode); err != nil {
 		return err
 	}
+	if len(t.Include) > 0 || len(t.Exclude) > 0 {
+		if file != "" {
+			return fmt.Errorf("include and exclude cannot be used with a single-file extra")
+		}
+		if t.Mode == "symlink" {
+			return fmt.Errorf("include and exclude cannot be used with symlink mode (symlink links the entire directory)")
+		}
+		if err := validateExtraPatterns("include", t.Include); err != nil {
+			return err
+		}
+		if err := validateExtraPatterns("exclude", t.Exclude); err != nil {
+			return err
+		}
+	}
 	if file == "" {
 		if t.As != "" {
 			return fmt.Errorf("as requires file")
@@ -128,6 +143,20 @@ func validateExtraTarget(file string, t ExtraTargetConfig) error {
 func validateExtraFilename(field, name string) error {
 	if name == "." || name == ".." || strings.ContainsAny(name, `/\`) {
 		return fmt.Errorf("%s %q must be a plain filename", field, name)
+	}
+	return nil
+}
+
+// validateExtraPatterns rejects .gitignore-style patterns whose path segments
+// are not valid globs, so a typo fails at config time instead of matching
+// nothing during sync.
+func validateExtraPatterns(field string, patterns []string) error {
+	for _, p := range patterns {
+		for _, seg := range strings.Split(strings.TrimPrefix(strings.TrimSpace(p), "!"), "/") {
+			if _, err := path.Match(seg, ""); err != nil {
+				return fmt.Errorf("invalid %s pattern %q: %w", field, p, err)
+			}
+		}
 	}
 	return nil
 }

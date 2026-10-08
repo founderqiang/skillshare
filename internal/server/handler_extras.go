@@ -46,12 +46,15 @@ type extrasListEntry struct {
 
 // extrasTargetInfo is the per-target sync status inside an extra entry.
 type extrasTargetInfo struct {
-	Path      string `json:"path"`
-	Mode      string `json:"mode"`
-	Flatten   bool   `json:"flatten"`
-	Extension string `json:"extension,omitempty"`
-	As        string `json:"as,omitempty"` // single-file extra: target filename
-	Status    string `json:"status"`       // "synced", "drift", "modified", "not synced", "no source"
+	Path      string   `json:"path"`
+	Mode      string   `json:"mode"`
+	Flatten   bool     `json:"flatten"`
+	Extension string   `json:"extension,omitempty"`
+	As        string   `json:"as,omitempty"` // single-file extra: target filename
+	Include   []string `json:"include,omitempty"`
+	Exclude   []string `json:"exclude,omitempty"`
+	FileCount int      `json:"file_count"` // source files this target syncs after include/exclude
+	Status    string   `json:"status"`     // "synced", "drift", "modified", "not synced", "no source"
 }
 
 // extrasSourceDir returns the source directory for the named extra in the
@@ -143,7 +146,11 @@ func (s *Server) handleExtras(w http.ResponseWriter, r *http.Request) {
 				Flatten:   t.Flatten,
 				Extension: t.Extension,
 				As:        t.As,
+				Include:   t.Include,
+				Exclude:   t.Exclude,
 			}
+			targetFiles := syncpkg.ExtraTargetFiles(files, t)
+			ti.FileCount = len(targetFiles)
 
 			if extra.File != "" {
 				ti.Status = syncpkg.ExtraFileStatus(syncpkg.NewExtraFile(sourceDir, extra.File, targetPath, t.As, m))
@@ -184,7 +191,7 @@ func (s *Server) handleExtras(w http.ResponseWriter, r *http.Request) {
 						log.Printf("warning: extension %q for extra %q could not be resolved (%v); sync status may be inaccurate", t.Extension, extra.Name, serr)
 					}
 				}
-				ti.Status = syncpkg.CheckSyncStatus(files, sourceDir, targetPath, m, t.Flatten, outputExt)
+				ti.Status = syncpkg.CheckSyncStatus(targetFiles, sourceDir, targetPath, m, t.Flatten, outputExt)
 			}
 
 			entry.Targets = append(entry.Targets, ti)
@@ -302,7 +309,7 @@ func (s *Server) handleExtrasDiff(w http.ResponseWriter, r *http.Request) {
 			}
 
 			targetPath := resolveExtrasTargetPath(projectRoot, t.Path)
-			items := buildExtrasDiffItems(files, sourceDir, targetPath, m, t.Flatten, outputExt)
+			items := buildExtrasDiffItems(syncpkg.ExtraTargetFiles(files, t), sourceDir, targetPath, m, t.Flatten, outputExt)
 			synced := len(items) == 0
 
 			out = append(out, extrasDiffEntry{
