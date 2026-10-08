@@ -115,6 +115,18 @@ describe('Sync page last sync', () => {
     expect(screen.queryByRole('button', { name: 'Discard all' })).toBeNull();
   });
 
+  it('lists a skill and an agent with the same name as two changes', async () => {
+    vi.mocked(api.listTargets).mockResolvedValue({ targets: [target('codex')], sourceSkillCount: 1 });
+    vi.mocked(api.diff).mockResolvedValue({
+      diffs: [{ target: 'codex', items: [{ skill: 'reviewer', action: 'link', reason: 'new' }, { skill: 'reviewer', kind: 'agent', action: 'link', reason: 'new' }] }],
+      ignored_count: 0, ignored_skills: [], ignore_root: '', ignore_repos: [],
+    } as never);
+    renderPage();
+
+    expect(await screen.findByText(/Sync 2 changes/)).toBeInTheDocument();
+    expect(screen.getAllByText('reviewer', { selector: '.grid-cols-3 .truncate' })).toHaveLength(2);
+  });
+
   it('counts the failed targets when an older entry has no names', async () => {
     vi.mocked(api.listLog).mockResolvedValue({ entries: [{ ts: '2026-09-30T00:00:00Z', cmd: 'sync', status: 'partial', args: { targets_total: 3, targets_failed: 1 } }] } as never);
     renderPage();

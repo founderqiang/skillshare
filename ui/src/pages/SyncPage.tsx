@@ -207,16 +207,18 @@ export default function SyncPage() {
 
   /** Skill and agent changes as names by folder, three to a line: hundreds of rows stay readable. */
   const itemGrid = (rows: ChangeGroup['rows'], icons = true, from = '') => {
-    const byPath = new Map(rows.map((r) => [display(r), r]));
+    // A skill and an agent can share a display path, so a path holds a list.
+    const byPath = new Map<string, ChangeGroup['rows']>();
+    for (const r of rows) byPath.set(display(r), [...(byPath.get(display(r)) ?? []), r]);
     return groupByFolder([...byPath.keys()]).map(({ folder, items }) => {
       // The head already names the shared root, so a folder drops it.
       const label = (from && folder.startsWith(`${from}/`) && folder !== `${from}/` ? folder.slice(from.length + 1) : folder).replace(/\/$/, '');
+      const entries = items.flatMap((name) => byPath.get(folder + name)!.map((r) => ({ name, r })));
       return (
       <div key={folder} className="flex flex-col gap-1.5">
-        {folder && <div className="flex items-center gap-[7px] text-[12px] font-semibold text-ink-3"><Folder size={14} className="shrink-0" /><span className="font-mono">{label}</span> · {items.length}</div>}
+        {folder && <div className="flex items-center gap-[7px] text-[12px] font-semibold text-ink-3"><Folder size={14} className="shrink-0" /><span className="font-mono">{label}</span> · {entries.length}</div>}
         <div className={`grid grid-cols-3 gap-x-6 gap-y-1.5 font-mono text-[12.5px] ${folder ? 'pl-[21px]' : ''}`}>
-          {items.map((name) => {
-            const r = byPath.get(folder + name)!;
+          {entries.map(({ name, r }) => {
             const why = r.text ? t(r.text) : r.detail;
             return <span key={r.key} className="flex min-w-0 items-center gap-1.5" title={why ? `${folder + name} · ${why}` : folder + name}>{icons && rowIcon(r.icon, true)}<span className="truncate">{name}</span></span>;
           })}
