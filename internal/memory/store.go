@@ -36,14 +36,14 @@ type Note struct {
 // Extra reuses the existing named source, including its per-extra override.
 func Extra(extras []config.ExtraConfig) (config.ExtraConfig, bool, error) {
 	for _, extra := range extras {
-		if strings.EqualFold(extra.Name, "memory") {
+		if strings.EqualFold(extra.Name, config.MemoryExtraName) {
 			if extra.File != "" {
 				return extra, true, fmt.Errorf("extra %q must be a folder to manage memory notes", extra.Name)
 			}
 			return extra, true, nil
 		}
 	}
-	return config.ExtraConfig{Name: "memory"}, false, nil
+	return config.ExtraConfig{Name: config.MemoryExtraName}, false, nil
 }
 
 func GlobalRoot(cfg *config.Config) (string, error) {

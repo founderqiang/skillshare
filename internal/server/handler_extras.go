@@ -697,7 +697,7 @@ func (s *Server) syncExtras(name string, dryRun, force bool) []extraSyncResult {
 		ResolveExtension: s.resolveExtensionSpec,
 	}
 	for _, extra := range s.extrasConfig() {
-		if extra.Name == "agents" {
+		if extra.Name == config.AgentsExtraName {
 			opts.AgentTargetPaths = s.extrasAgentTargetPaths()
 			break
 		}

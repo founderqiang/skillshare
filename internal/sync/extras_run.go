@@ -65,8 +65,8 @@ func RunExtraTargets(extra config.ExtraConfig, sourceDir string, opts ExtraRunOp
 func runExtraTarget(extra config.ExtraConfig, t config.ExtraTargetConfig, sourceDir string, opts ExtraRunOptions) ExtraTargetRun {
 	tr := ExtraTargetRun{Target: t, Path: opts.ResolvePath(t.Path), Mode: EffectiveMode(t.Mode)}
 
-	if extra.Name == "agents" && opts.AgentTargetPaths[filepath.Clean(tr.Path)] {
-		tr.SkippedBy = "agents"
+	if extra.Name == config.AgentsExtraName && opts.AgentTargetPaths[filepath.Clean(tr.Path)] {
+		tr.SkippedBy = config.AgentsExtraName
 		return tr
 	}
 

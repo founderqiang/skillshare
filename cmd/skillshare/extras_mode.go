@@ -181,12 +181,9 @@ func cmdExtrasMode(args []string) error {
 			return filterErr
 		}
 	}
-	// Filters rule out single files and symlink mode, so check them whenever
-	// either side changes.
-	if _, updated := findExtraByName(extras, name); updated.File != "" || config.ManagedExtraMode(syncMode) || syncMode == "symlink" || filters.hasUpdates() {
-		if err := config.ValidateExtraConfig(updated); err != nil {
-			return err
-		}
+	_, updated := findExtraByName(extras, name)
+	if err := config.ValidateExtraConfig(updated); err != nil {
+		return err
 	}
 
 	if err := validateFn(); err != nil {

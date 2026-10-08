@@ -901,6 +901,35 @@ extras:
 	}
 }
 
+// TestExtras_Mode_FlattenFolderExtra verifies that a flatten-only change on a
+// plain folder extra passes the full extra validation.
+func TestExtras_Mode_FlattenFolderExtra(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+
+	rulesTarget := filepath.Join(sb.Home, ".claude", "rules")
+	os.MkdirAll(rulesTarget, 0755)
+
+	claudeTarget := sb.CreateTarget("claude")
+	sb.WriteConfig(`source: ` + sb.SourcePath + `
+targets:
+  claude:
+    path: ` + claudeTarget + `
+extras:
+  - name: rules
+    targets:
+      - path: ` + rulesTarget + `
+        mode: copy
+`)
+
+	result := sb.RunCLI("extras", "rules", "--flatten", "-g")
+
+	result.AssertSuccess(t)
+	if configContent := sb.ReadFile(sb.ConfigPath); !strings.Contains(configContent, "flatten: true") {
+		t.Errorf("expected config to contain 'flatten: true', got:\n%s", configContent)
+	}
+}
+
 // TestExtras_Mode_MultipleTargets_NoTarget verifies that "extras <name> --mode" errors
 // when the extra has multiple targets and --target is not specified.
 func TestExtras_Mode_MultipleTargets_NoTarget(t *testing.T) {
