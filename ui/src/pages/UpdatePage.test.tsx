@@ -52,7 +52,7 @@ async function findRow(name: string) {
 function cacheStatus(name: string, status: string) {
   localStorage.setItem(
     'skillshare.updateCheckCache.global',
-    JSON.stringify({ version: 1, items: { [name]: { status, checkedAt: new Date(Date.now() - 60_000).toISOString() } } }),
+    JSON.stringify({ version: 2, items: { [name]: { status, checkedAt: new Date(Date.now() - 60_000).toISOString() } } }),
   );
 }
 
@@ -146,7 +146,7 @@ describe('UpdatePage', () => {
     vi.mocked(api.listSkills).mockResolvedValue({
       resources: [nestedSkill],
     });
-    cacheStatus('agent-browser', 'update-available');
+    cacheStatus('tools/agent-browser', 'update-available');
 
     renderUpdatePage();
 
@@ -186,7 +186,7 @@ describe('UpdatePage', () => {
       resources: [{ ...nestedSkill, name: 'child', relPath: '_dev-skills/child', isInRepo: true }],
       linked_repos: [linked],
     });
-    cacheStatus('child', 'error');
+    cacheStatus('_dev-skills/child', 'error');
     renderUpdatePage();
 
     const row = await findRow('_dev-skills');
@@ -249,7 +249,7 @@ describe('UpdatePage', () => {
     vi.mocked(api.listSkills).mockResolvedValue({
       resources: [nestedSkill],
     });
-    cacheStatus('agent-browser', 'update-available');
+    cacheStatus('tools/agent-browser', 'update-available');
     vi.mocked(api.updateAllStream).mockImplementation((onStart, onResult, onDone) => {
       queueMicrotask(() => {
         onStart(1);
@@ -283,7 +283,7 @@ describe('UpdatePage', () => {
       isRepo: false,
     };
     vi.mocked(api.listSkills).mockResolvedValue({ resources: [nestedSkill] });
-    cacheStatus('agent-browser', 'update-available');
+    cacheStatus('tools/agent-browser', 'update-available');
     vi.mocked(api.updateAllStream).mockImplementation((onStart, onResult, onDone) => {
       queueMicrotask(() => {
         onStart(1);
@@ -310,7 +310,7 @@ describe('UpdatePage', () => {
   it('syncs the updated kind in place after an update', async () => {
     const updatedResult = { name: 'tools/agent-browser', action: 'updated', message: '', isRepo: false };
     vi.mocked(api.listSkills).mockResolvedValue({ resources: [nestedSkill] });
-    cacheStatus('agent-browser', 'update-available');
+    cacheStatus('tools/agent-browser', 'update-available');
     vi.mocked(api.updateAllStream).mockImplementation((onStart, onResult, onDone) => {
       queueMicrotask(() => {
         onStart(1);
@@ -349,7 +349,7 @@ describe('UpdatePage', () => {
   it('lists skills deleted upstream and prunes them', async () => {
     vi.mocked(api.listSkills).mockResolvedValue({ resources: [nestedSkill] });
     vi.mocked(api.batchUninstall).mockResolvedValue({ results: [] } as never);
-    cacheStatus('agent-browser', 'stale');
+    cacheStatus('tools/agent-browser', 'stale');
 
     const user = userEvent.setup();
     renderUpdatePage();
@@ -357,6 +357,26 @@ describe('UpdatePage', () => {
     await user.click(row.getByRole('button', { name: 'Prune' }));
 
     await waitFor(() => expect(api.batchUninstall).toHaveBeenCalledWith({ names: ['tools/agent-browser'], force: true }));
+  });
+
+  it('prunes only the skill deleted upstream when another folder has one of the same name', async () => {
+    const foo = (dir: string) => ({ ...nestedSkill, name: 'foo', flatName: `${dir}__foo`, relPath: `${dir}/foo`, sourcePath: `/skills/${dir}/foo`, source: `https://github.com/o/r/${dir}/foo` });
+    vi.mocked(api.listSkills).mockResolvedValue({ resources: [foo('a'), foo('b')] });
+    vi.mocked(api.batchUninstall).mockResolvedValue({ results: [] } as never);
+    vi.mocked(api.checkStream).mockImplementation((_a, _b, _c, onDone) => {
+      queueMicrotask(() => onDone({ tracked_repos: [], skills: [
+        { name: 'a/foo', source: 'https://github.com/o/r/a/foo', version: '1', status: 'up_to_date' },
+        { name: 'b/foo', source: 'https://github.com/o/r/b/foo', version: '1', status: 'stale' },
+      ] }));
+      return { close: vi.fn() } as unknown as EventSource;
+    });
+
+    const user = userEvent.setup();
+    renderUpdatePage();
+    await user.click(await screen.findByRole('button', { name: /check for updates/i }));
+    await user.click(await screen.findByRole('button', { name: 'Prune all' }));
+
+    await waitFor(() => expect(api.batchUninstall).toHaveBeenCalledWith({ names: ['b/foo'], force: true }));
   });
 });
 
@@ -372,7 +392,7 @@ describe('update failure message helpers', () => {
     }));
     const units = updateUnits(resources, 'skill', [{ name: '_dev', target: '/code/dev' }]);
     expect(units.map((unit) => unit.name)).toEqual(['_managed']);
-    expect(countUpdates(new Map(resources.map((item) => [item.name, { status: 'behind' as const }])), units)).toBe(1);
+    expect(countUpdates(new Map(resources.map((item) => [item.relPath, { status: 'behind' as const }])), units)).toBe(1);
   });
 
   it('offers force retry for failures force can actually resolve', () => {

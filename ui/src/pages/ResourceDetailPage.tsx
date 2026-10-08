@@ -34,7 +34,7 @@ import { SkillContextMenu, type ContextMenuItem } from '../components/TargetMenu
 import { useToast } from '../components/Toast';
 import { SkillEditor } from '../components/skill-editor';
 import { UninstallDialog } from '../components/resources/UninstallDialog';
-import { hasUpdate, updateUnits, useCheckStatuses } from './UpdatePage';
+import { checkKey, hasUpdate, updateUnits, useCheckStatuses } from './UpdatePage';
 import { useDiffQuery, useSkillsQuery } from '../hooks/useSharedQueries';
 import { invalidate } from '../lib/queryEvents';
 
@@ -110,7 +110,7 @@ export default function ResourceDetailPage() {
   const docName = isAgent ? resource.relPath.split('/').pop()! : 'SKILL.md';
   const unit = updateUnits(allSkills.data?.resources ?? [resource], resource.kind, allSkills.data?.linked_repos)
     .find((u) => u.items.some((i) => i.flatName === resource.flatName));
-  const check = statuses.get(resource.name) ?? { status: 'unchecked' as const };
+  const check = statuses.get(checkKey(resource)) ?? { status: 'unchecked' as const };
   const updateAvailable = hasUpdate(check);
   const audit = auditQuery.data?.result;
 
@@ -130,7 +130,7 @@ export default function ResourceDetailPage() {
 
   // The check result belongs to the whole update unit, so a repo marks every skill in it
   const markUpToDate = () => {
-    const names = unit?.items.map((i) => i.name) ?? [resource.name];
+    const names = (unit?.items ?? [resource]).map(checkKey);
     const checkedAt = new Date().toISOString();
     setStatuses((prev) => {
       const next = new Map(prev);

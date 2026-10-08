@@ -36,7 +36,8 @@ type CheckStatuses = Map<string, CheckItemStatus>;
 
 const CHECK_STATUS_VALUES: CheckStatus[] = ['unchecked', 'checking', 'behind', 'dirty', 'up-to-date', 'update-available', 'stale', 'error'];
 const UPDATE_CHECK_CACHE_KEY = 'skillshare.updateCheckCache.global';
-const UPDATE_CHECK_CACHE_VERSION = 1;
+// 2: statuses keyed by relative path; names collide across folders.
+const UPDATE_CHECK_CACHE_VERSION = 2;
 
 interface StoredCheckCache {
   version: number;
@@ -105,8 +106,11 @@ export function updateUnits(resources: Skill[], kind: Kind, linkedRepos: LinkedR
 }
 
 /** Repo status is copied to every item in the repo, so the first item speaks for the unit. */
+/** A skill's key in the check statuses: its relative path, since names repeat across folders. */
+export const checkKey = (item: Pick<Skill, 'relPath'>) => item.relPath;
+
 function unitCheck(statuses: CheckStatuses, unit: UpdateUnit): CheckItemStatus {
-  return statuses.get(unit.items[0].name) ?? { status: 'unchecked' };
+  return statuses.get(checkKey(unit.items[0])) ?? { status: 'unchecked' };
 }
 
 export function hasUpdate(status: CheckItemStatus) {
@@ -164,12 +168,12 @@ export default function UpdatePage({ kind }: { kind: Kind }) {
       prev ? { ...prev, linked_repos: result.linked_repos ?? prev.linked_repos } : prev);
     setStatuses((prev) => {
       const next = new Map(prev);
-      const pending = new Set(updatable.map((item) => item.name));
+      const pending = new Set(updatable.map(checkKey));
       const checkedAt = new Date().toISOString();
       for (const item of updatable) {
         if (item.kind === 'skill' && result.linked_repos?.some((repo) => item.relPath === repo.name || item.relPath.startsWith(`${repo.name}/`))) {
-          next.delete(item.name);
-          pending.delete(item.name);
+          next.delete(checkKey(item));
+          pending.delete(checkKey(item));
         }
       }
 
@@ -185,8 +189,8 @@ export default function UpdatePage({ kind }: { kind: Kind }) {
           : { status: 'up-to-date', message: repo.message, checkedAt };
         for (const item of updatable) {
           if (repoOf(item) !== repo.name) continue;
-          next.set(item.name, repoStatus);
-          pending.delete(item.name);
+          next.set(checkKey(item), repoStatus);
+          pending.delete(checkKey(item));
         }
       }
 
@@ -195,12 +199,12 @@ export default function UpdatePage({ kind }: { kind: Kind }) {
       for (const skill of result.skills) {
         const item = updatable.find((i) => !i.isInRepo && matchesCheckSkill(i, skill.name));
         if (!item) continue;
-        next.set(item.name, {
+        next.set(checkKey(item), {
           status: skill.status === 'update_available' ? 'update-available' : skill.status === 'stale' ? 'stale' : skill.status === 'error' ? 'error' : 'up-to-date',
           message: skill.message,
           checkedAt,
         });
-        pending.delete(item.name);
+        pending.delete(checkKey(item));
       }
 
       for (const name of pending) {
@@ -218,7 +222,7 @@ export default function UpdatePage({ kind }: { kind: Kind }) {
     setFinished(false);
     setStatuses((prev) => {
       const next = new Map(prev);
-      for (const item of updatable) next.set(item.name, { status: 'checking' });
+      for (const item of updatable) next.set(checkKey(item), { status: 'checking' });
       return next;
     });
     esRef.current = api.checkStream(
@@ -234,7 +238,7 @@ export default function UpdatePage({ kind }: { kind: Kind }) {
         setStatuses((prev) => {
           const next = new Map(prev);
           const checkedAt = new Date().toISOString();
-          for (const item of updatable) next.set(item.name, { status: 'error', checkedAt });
+          for (const item of updatable) next.set(checkKey(item), { status: 'error', checkedAt });
           return next;
         });
         setChecking(false);
@@ -260,7 +264,7 @@ export default function UpdatePage({ kind }: { kind: Kind }) {
           const hit = result.isRepo
             ? repoOf(item) === result.name
             : !item.isInRepo && matchesCheckSkill(item, result.name);
-          if (hit) next.set(item.name, { ...status, message: result.message });
+          if (hit) next.set(checkKey(item), { ...status, message: result.message });
         }
       }
       return next;
@@ -368,7 +372,7 @@ export default function UpdatePage({ kind }: { kind: Kind }) {
     setTimeout(() => {
       setStatuses((prev) => {
         const next = new Map(prev);
-        for (const item of gone.flatMap((u) => u.items)) next.delete(item.name);
+        for (const item of gone.flatMap((u) => u.items)) next.delete(checkKey(item));
         return next;
       });
       for (const u of gone) setPrune(u.name);
