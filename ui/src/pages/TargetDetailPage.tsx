@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDownToLine, CirclePause, Folder, Plus, Target as TargetIcon } from 'lucide-react';
+import { ArrowDownToLine, CirclePause, Folder, Info, Plus, Target as TargetIcon } from 'lucide-react';
 import { api, type Target } from '../api/client';
 import Button from '../components/Button';
 import CollectDialog from '../components/CollectDialog';
@@ -164,6 +164,10 @@ function TargetEditor({ target, targets }: { target: Target; targets: Target[] }
   const setFiltersFor = (next: { include: string[]; exclude: string[] }) =>
     setDraft(agent ? { ...draft, agentInclude: next.include, agentExclude: next.exclude } : { ...draft, ...next });
   const local = agent ? target.agentLocalCount ?? 0 : target.localCount;
+  // prefixed rewrites name: inside each copy, so it cannot outlive copy mode.
+  const prefixedOff = draft.mode !== 'copy';
+  const setSkillsMode = (m: string) =>
+    setDraft({ ...draft, mode: m, ...(m !== 'copy' && draft.naming === 'prefixed' && { naming: saved.naming === 'prefixed' ? 'flat' : saved.naming }) });
 
   const tabCount = (k: (typeof tabs)[number]) =>
     k === 'skill' && !skillsOn ? null : (k === 'mcp' ? mcp.data && serverCount(mcp.data, client)
@@ -311,18 +315,24 @@ function TargetEditor({ target, targets }: { target: Target; targets: Target[] }
             )}
             <div className="flex flex-col gap-3">
               <h2 className="ss-h2">{t('targetDetail.syncMode')}</h2>
-              <ModePicker kind={kind} mode={mode} onChange={(m) => setDraft(agent ? { ...draft, agentMode: m } : { ...draft, mode: m })} disabled={saving || (agent && draft.agentExtension !== '')} />
+              <ModePicker kind={kind} mode={mode} onChange={(m) => (agent ? setDraft({ ...draft, agentMode: m }) : setSkillsMode(m))} disabled={saving || (agent && draft.agentExtension !== '')} />
             </div>
 
             {!agent && draft.mode !== 'symlink' && (
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-4">
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="text-[13px] font-semibold">{t('targetDetail.naming')}</span>
+                    <span className="flex items-center gap-2 text-[13px] font-semibold">
+                      {t('targetDetail.naming')}
+                      {draft.naming !== saved.naming && <span className="ss-tag inf">{t('targetDetail.pending')}</span>}
+                    </span>
                     <span className="text-[13px] text-ink-2">{t(draft.naming === 'standard' ? 'targetDetail.namingStandard' : draft.naming === 'prefixed' ? 'targetDetail.namingPrefixed' : 'targetDetail.namingFlat')}</span>
                   </div>
-                  <SegmentedControl value={draft.naming} onChange={(naming) => setDraft({ ...draft, naming })} options={[{ value: 'flat', label: 'flat' }, { value: 'standard', label: 'standard' }, ...(draft.mode === 'copy' || draft.naming === 'prefixed' ? [{ value: 'prefixed', label: 'prefixed' }] : [])]} />
+                  <SegmentedControl value={draft.naming} onChange={(naming) => setDraft({ ...draft, naming })} options={[{ value: 'flat', label: 'flat' }, { value: 'standard', label: 'standard' }, { value: 'prefixed', label: 'prefixed', disabled: prefixedOff, title: prefixedOff ? t('targetDetail.prefixedNeedsCopyTitle') : undefined }]} />
                 </div>
+                {prefixedOff && (
+                  <span className="flex items-center gap-1.5 text-[13px] text-ink-3"><Info size={14} className="shrink-0" />{t('targetDetail.prefixedNeedsCopy')}</span>
+                )}
                 {saved.naming !== 'flat' && (target.skippedSkillCount ?? 0) > 0 && (
                   <span className="text-[13px] text-warn">{t(plural('targetDetail.skipped', target.skippedSkillCount), { count: target.skippedSkillCount })}</span>
                 )}
