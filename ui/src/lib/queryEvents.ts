@@ -28,7 +28,7 @@ const events = {
   sourceLinked: () => keys(...sourceLinks),
   sourceUnlinked: () => keys(...sourceLinks, k.trash),
   collected: (target?: string) => keys(k.skills.all, k.overview, k.targets.all, k.diff(), k.syncMatrix(), k.collectScan(target)),
-  configInstalled: () => keys(k.missingConfigEntries, k.skills.all, k.overview, k.diff()),
+  configInstalled: () => keys(k.missingConfigEntries, k.skills.all, k.overview, k.syncMatrixAll, k.diff()),
 
   // Targets, projects and sync
   targetsChanged: () => keys(...targets),

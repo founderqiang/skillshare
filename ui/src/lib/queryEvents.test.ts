@@ -80,7 +80,7 @@ const stale: Record<QueryEvent, Label[] | { args: string[]; stale: Label[] }> = 
   sourceLinked: [...S, 'overview', 'config', 'diff', 'syncMatrix'],
   sourceUnlinked: [...S, 'overview', 'config', 'diff', 'syncMatrix', 'trash'],
   collected: { args: ['claude'], stale: [...S, 'overview', ...T, 'diff', 'syncMatrix', 'collectScanClaude'] },
-  configInstalled: ['missingConfigEntries', ...S, 'overview', 'diff'],
+  configInstalled: ['missingConfigEntries', ...S, 'overview', ...SM, 'diff'],
 
   targetsChanged: TARGETS,
   synced: [...T, 'overview', 'diff'],
