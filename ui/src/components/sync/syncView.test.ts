@@ -64,6 +64,15 @@ describe('discardable', () => {
     const expected = (name: string) => (name === 'old' ? ['claude', 'codex'] : ['claude']);
     expect(discardable(groups, skills, expected).map((s) => s.flatName)).toEqual(['fresh', 'handmade']);
   });
+
+  it('leaves a tracked repo alone when only some of its skills are new', () => {
+    // Uninstalling a tracked repo takes all of it, so one new skill must not trash synced siblings.
+    const rows: DiffTarget[] = [{ target: 'claude', items: [{ skill: '_team__new', action: 'link', reason: 'new' }, { skill: '_solo__a', action: 'link', reason: 'new' }, { skill: '_solo__b', action: 'link', reason: 'new' }] }];
+    const { groups } = resourceGroups(rows, [target('claude')], new Set(['skill']), false);
+    const inRepo = (flatName: string, repoPath: string) => ({ ...skill(flatName), isInRepo: true, repoPath });
+    const skills = [inRepo('_team__new', '_team'), inRepo('_team__old', '_team'), inRepo('_solo__a', '_solo'), inRepo('_solo__b', '_solo')];
+    expect(discardable(groups, skills, () => ['claude']).map((s) => s.flatName)).toEqual(['_solo__a', '_solo__b']);
+  });
 });
 
 describe('extraGroups', () => {

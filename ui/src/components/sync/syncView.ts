@@ -195,6 +195,7 @@ export const receivesSkill = (e: SyncMatrixEntry) => e.status === 'synced' || e.
  * The skills Discard all moves to trash: never synced anywhere yet, so new in every target that should get them.
  * `expected` names the targets a skill syncs to (the sync matrix). A skill already in one of them was synced before
  * and stays, even when a new target is about to get it. Install times can't tell this: tracked repo skills have none.
+ * A tracked repo counts only as a whole, since uninstalling one skill of it removes the repo.
  */
 export function discardable(groups: ChangeGroup[], skills: Skill[], expected: (flatName: string) => string[]): Skill[] {
   const added = new Map<string, Set<string>>();
@@ -204,7 +205,10 @@ export function discardable(groups: ChangeGroup[], skills: Skill[], expected: (f
       added.set(r.name, (added.get(r.name) ?? new Set()).add(g.name));
     }
   }
-  return skills.filter((s) => s.kind === 'skill' && added.has(s.flatName) && expected(s.flatName).every((t) => added.get(s.flatName)!.has(t)));
+  const fresh = (s: Skill) => s.kind === 'skill' && added.has(s.flatName) && expected(s.flatName).every((t) => added.get(s.flatName)!.has(t));
+  // A tracked repo uninstalls whole, so it qualifies only when every skill in it is new.
+  const keptRepos = new Set(skills.filter((s) => s.kind === 'skill' && s.repoPath && !fresh(s)).map((s) => s.repoPath));
+  return skills.filter((s) => fresh(s) && !(s.repoPath && keptRepos.has(s.repoPath)));
 }
 
 export const countChanges = (groups: ChangeGroup[]) => groups.reduce((n, g) => n + g.rows.filter((r) => r.counts).length, 0);
