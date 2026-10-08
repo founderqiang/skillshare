@@ -792,7 +792,9 @@ function isStoredCheckStatus(value: unknown): value is CheckItemStatus {
   return typeof status === 'string'
     && CHECK_STATUS_VALUES.includes(status as CheckStatus)
     && status !== 'checking'
-    && status !== 'unchecked';
+    && status !== 'unchecked'
+    // Prune acts on stale, so it must come from a check this session, not an older or other project's cache.
+    && status !== 'stale';
 }
 
 function isStaleError(message?: string): boolean {

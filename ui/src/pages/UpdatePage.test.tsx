@@ -349,14 +349,27 @@ describe('UpdatePage', () => {
   it('lists skills deleted upstream and prunes them', async () => {
     vi.mocked(api.listSkills).mockResolvedValue({ resources: [nestedSkill] });
     vi.mocked(api.batchUninstall).mockResolvedValue({ results: [] } as never);
-    cacheStatus('tools/agent-browser', 'stale');
+    vi.mocked(api.checkStream).mockImplementation((_a, _b, _c, onDone) => {
+      queueMicrotask(() => onDone({ tracked_repos: [], skills: [{ name: 'tools/agent-browser', source: nestedSkill.source, version: '1', status: 'stale' }] }));
+      return { close: vi.fn() } as unknown as EventSource;
+    });
 
     const user = userEvent.setup();
     renderUpdatePage();
+    await user.click(await screen.findByRole('button', { name: /check for updates/i }));
     const row = await findRow('agent-browser');
-    await user.click(row.getByRole('button', { name: 'Prune' }));
+    await user.click(await row.findByRole('button', { name: 'Prune' }));
 
     await waitFor(() => expect(api.batchUninstall).toHaveBeenCalledWith({ names: ['tools/agent-browser'], force: true }));
+  });
+
+  it('does not offer prune from a stale status saved by an earlier session', async () => {
+    vi.mocked(api.listSkills).mockResolvedValue({ resources: [nestedSkill] });
+    cacheStatus('tools/agent-browser', 'stale');
+    renderUpdatePage();
+
+    await findRow('agent-browser');
+    expect(screen.queryByRole('button', { name: /^Prune/ })).not.toBeInTheDocument();
   });
 
   it('prunes only the skill deleted upstream when another folder has one of the same name', async () => {
