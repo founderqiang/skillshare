@@ -12,55 +12,28 @@ import (
 )
 
 // ParseSkillName reads the SKILL.md and extracts the top-level "name" from frontmatter.
-// It stops after the name value (a block scalar's indented lines included). The whole
-// block is read only for a flow mapping ({...}), a name that is an alias (*anchor), or
-// a merge key (<<) with no explicit name. Top-level keys share the first key's indent;
-// "name", 'name' and name : all count.
+// It reads line by line and stops at a plain top-level name line ("name", 'name' and
+// name : count; top-level keys share the first key's indent). Any other form YAML
+// allows (flow mapping, block scalar, alias, merge key, explicit key, ...) leaves the
+// scan without a name, and then the whole block is decoded.
 func ParseSkillName(skillPath string) (string, error) {
 	name, indent := "", -1
-	var flow []string   // the block's lines once it turns out to be a flow mapping
-	var scalar []string // the name line and its indented lines when name is a block scalar
-	alias := false      // name is an alias (*anchor) or may come from a merge key (<<), resolved from the whole block
 	path := filepath.Join(skillPath, "SKILL.md")
 	err := scanLenientBlock(path, func(raw []byte) bool {
 		line := string(raw)
 		trimmed := strings.TrimLeft(line, " \t")
-		if scalar != nil {
-			if trimmed == "" || len(line)-len(trimmed) > indent {
-				scalar = append(scalar, line)
-				return true
-			}
-			return false
-		}
-		if flow != nil {
-			flow = append(flow, line)
-			return true
-		}
 		if trimmed == "" || trimmed[0] == '#' {
 			return true
 		}
 		if indent < 0 {
-			if indent = len(line) - len(trimmed); trimmed[0] == '{' {
-				flow = []string{line}
-				return true
-			}
+			indent = len(line) - len(trimmed)
 		}
 		key, value, ok := strings.Cut(trimmed, ":")
-		if !ok || len(line)-len(trimmed) != indent {
+		if !ok || len(line)-len(trimmed) != indent || strings.Trim(strings.TrimSpace(key), `"'`) != "name" {
 			return true
 		}
-		if key = strings.Trim(strings.TrimSpace(key), `"'`); key == "<<" {
-			alias = true // keep scanning: an explicit name still overrides what the merge brings
-			return true
-		} else if key != "name" {
-			return true
-		}
-		if v := strings.TrimSpace(value); strings.HasPrefix(v, "*") {
-			alias = true // its anchor is defined elsewhere in the block
-			return false
-		} else if v != "" && (v[0] == '|' || v[0] == '>') {
-			scalar = []string{"name:" + value}
-			return true
+		if v := strings.TrimSpace(value); v != "" && strings.ContainsRune("*|>&!", rune(v[0])) {
+			return false // alias, block scalar, anchor or tag: decode the whole block
 		}
 		// The line alone decodes quotes and a trailing comment; a value YAML rejects is read as is.
 		var fm map[string]any
@@ -73,19 +46,14 @@ func ParseSkillName(skillPath string) (string, error) {
 		name = strings.Trim(strings.TrimSpace(value), `"'`)
 		return false
 	})
+	if err != nil || name != "" {
+		return name, err
+	}
+	raw, err := readLenientBlock(path)
 	if err != nil {
 		return "", err
 	}
-	if alias && name == "" {
-		raw, err := readLenientBlock(path)
-		if err != nil {
-			return "", err
-		}
-		name, _ = decodeFrontmatter(raw)["name"].(string)
-	}
-	if lines := append(flow, scalar...); lines != nil {
-		name, _ = decodeFrontmatter([]byte(strings.Join(lines, "\n")))["name"].(string)
-	}
+	name, _ = decodeFrontmatter(raw)["name"].(string)
 	return name, nil
 }
 
