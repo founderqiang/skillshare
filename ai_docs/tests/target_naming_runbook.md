@@ -14,7 +14,7 @@ entry migration from `flat` to `standard`, the symlink-mode ignore path, and
 - `standard` mode warns and skips target-visible collisions
 - `flat -> standard` migration renames provably managed merge/copy entries
 - Existing local bare-name entries block migration and preserve legacy managed entries
-- `target_naming` is ignored in `symlink` mode
+- `flat` and `standard` naming are ignored in `symlink` mode; `prefixed` fails validation there
 - `prefixed` names tracked-repo skills `<repo>-<name>` in folder and copied `name:`, leaving the source untouched
 - `flat -> prefixed -> standard` migrations rename managed copies in place and rewrite `name:`
 - `prefixed` on a merge target fails validation
