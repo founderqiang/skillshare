@@ -123,10 +123,10 @@ skillshare restore <target>
 
 ### `sync` keeps showing the same changes {#sync-keeps-showing-the-same-changes}
 
-**原因：** 两个 Target 以不同的 `include` 或 `exclude` 过滤器把 skills 同步到同一个文件夹。每次 sync 都会加入其中一个 Target 需要的内容，又移除另一个 Target 过滤掉的内容，所以这个文件夹永远无法稳定下来。`sync` 会指出是哪两个 Target：
+**原因：** 两个 Target 以不同的 `include`/`exclude` 过滤器、`mode` 或 `target_naming` 设置（两个 target 都用 `symlink` 模式时，会直接链接整个文件夹，筛选与命名都不影响）把 skills 同步到同一个文件夹。每次 sync 都会按其中一个 Target 的设置重写文件夹，抵消另一个 Target 的结果（加入或移除被过滤的 skills、改名，或在链接与副本之间切换），所以这个文件夹永远无法稳定下来。`sync` 会指出是哪两个 Target：
 
 ```
-! codex and universal sync skills to ~/.agents/skills with different filters, so each sync undoes the other
+! codex and universal sync skills to ~/.agents/skills with different settings, so each sync undoes the other
   keep one: skillshare target codex --skills=false
 ```
 
@@ -137,7 +137,7 @@ skillshare target codex --skills=false --dry-run
 skillshare target codex --skills=false
 ```
 
-在仪表板中，**Sync** 页面会显示同样的警告，并提供一个按钮，用来停止为该 Target 同步 skills。让两个 Target 使用相同的过滤器也同样可行。
+在仪表板中，**Sync** 页面会显示同样的警告，并提供一个按钮，用来停止为该 Target 同步 skills。让两个 Target 使用相同的过滤器、mode 和 target naming 也同样可行。
 
 ### `sync seems stuck or slow`
 

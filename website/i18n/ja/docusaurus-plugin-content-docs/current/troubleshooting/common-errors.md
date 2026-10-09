@@ -132,10 +132,10 @@ skillshare restore <target>
 
 ### `sync` が同じ変更を表示し続ける {#sync-keeps-showing-the-same-changes}
 
-**原因:** 2 つの Target が、異なる `include` または `exclude` フィルターで同じフォルダに Skill を Sync している。各 Sync が一方の Target の必要な Skill を追加し、もう一方のフィルターで除外される Skill を削除するため、フォルダの状態が安定しません。`sync` は該当する Target を表示します:
+**原因:** 2 つの Target が、`include` / `exclude` フィルター、`mode`、`target_naming` のいずれかが異なる状態で（両方の Target が `symlink` モードの場合はフォルダ全体をリンクするため、フィルターと命名は影響しません）同じフォルダに Skill を Sync している。各 Sync が一方の Target の設定どおりにフォルダを書き直し、もう一方の結果を打ち消す（フィルター対象の Skill の追加や削除、名前の変更、リンクとコピーの切り替え）ため、フォルダの状態が安定しません。`sync` は該当する Target を表示します:
 
 ```
-! codex and universal sync skills to ~/.agents/skills with different filters, so each sync undoes the other
+! codex and universal sync skills to ~/.agents/skills with different settings, so each sync undoes the other
   keep one: skillshare target codex --skills=false
 ```
 
@@ -146,7 +146,7 @@ skillshare target codex --skills=false --dry-run
 skillshare target codex --skills=false
 ```
 
-ダッシュボードの **Sync** ページにも同じ警告が表示され、その Target の Skill の Sync を停止するボタンがあります。両方の Target に同じフィルターを設定する方法でも解決できます。
+ダッシュボードの **Sync** ページにも同じ警告が表示され、その Target の Skill の Sync を停止するボタンがあります。両方の Target に同じフィルター、mode、target naming を設定する方法でも解決できます。
 
 ### `sync seems stuck or slow`
 

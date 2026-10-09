@@ -177,27 +177,34 @@ export function ModePicker({ kind, mode, onChange, disabled }: { kind: Kind; mod
 }
 
 // Stands in for the names in a sentence, which are then put back as links.
-const NAMES = '\u0000';
+export const NAMES = '\u0000';
+
+/** A sentence with its NAMES placeholder replaced by links to those targets. */
+export function TargetLinks({ sentence, names }: { sentence: string; names: string[] }) {
+  const t = useT();
+  const [before, after = ''] = sentence.split(NAMES);
+  return (
+    <p className="min-w-0">
+      {before}
+      {names.map((n, i) => (
+        <Fragment key={n}>
+          {i > 0 && t('instructions.shared.listSep')}
+          <Link to={`/targets/${encodeURIComponent(n)}`} className="font-semibold underline-offset-2 hover:underline">{n}</Link>
+        </Fragment>
+      ))}
+      {after}
+    </p>
+  );
+}
 
 /** Other targets tied to this folder, as a note so it does not read as a filter pattern. */
 function TargetRow({ sentence, names }: { sentence: string; names: string[] }) {
-  const t = useT();
-  const [before, after = ''] = sentence.split(NAMES);
   return (
     <div className="ss-note items-center">
       <span className="ss-stack shrink-0" aria-hidden="true">
         {names.slice(0, 5).map((n) => <span key={n} className="ss-at !h-6 !w-6"><AgentIcon target={n} size={13} /></span>)}
       </span>
-      <p className="min-w-0">
-        {before}
-        {names.map((n, i) => (
-          <Fragment key={n}>
-            {i > 0 && t('instructions.shared.listSep')}
-            <Link to={`/targets/${encodeURIComponent(n)}`} className="font-semibold underline-offset-2 hover:underline">{n}</Link>
-          </Fragment>
-        ))}
-        {after}
-      </p>
+      <TargetLinks sentence={sentence} names={names} />
     </div>
   );
 }
