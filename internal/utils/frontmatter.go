@@ -12,14 +12,15 @@ import (
 )
 
 // ParseSkillName reads the SKILL.md and extracts the top-level "name" from frontmatter.
-// It stops after the name value (a block scalar's indented lines included), so only a
-// flow-style block ({...}) or a name that is an alias (*anchor) is read whole. Top-level keys share the first key's indent;
+// It stops after the name value (a block scalar's indented lines included). The whole
+// block is read only for a flow mapping ({...}), a name that is an alias (*anchor), or
+// a merge key (<<) with no explicit name. Top-level keys share the first key's indent;
 // "name", 'name' and name : all count.
 func ParseSkillName(skillPath string) (string, error) {
 	name, indent := "", -1
 	var flow []string   // the block's lines once it turns out to be a flow mapping
 	var scalar []string // the name line and its indented lines when name is a block scalar
-	alias := false      // name is an alias (*anchor), resolved from the whole block
+	alias := false      // name is an alias (*anchor) or may come from a merge key (<<), resolved from the whole block
 	path := filepath.Join(skillPath, "SKILL.md")
 	err := scanLenientBlock(path, func(raw []byte) bool {
 		line := string(raw)
@@ -45,7 +46,13 @@ func ParseSkillName(skillPath string) (string, error) {
 			}
 		}
 		key, value, ok := strings.Cut(trimmed, ":")
-		if len(line)-len(trimmed) != indent || !ok || strings.Trim(strings.TrimSpace(key), `"'`) != "name" {
+		if !ok || len(line)-len(trimmed) != indent {
+			return true
+		}
+		if key = strings.Trim(strings.TrimSpace(key), `"'`); key == "<<" {
+			alias = true // keep scanning: an explicit name still overrides what the merge brings
+			return true
+		} else if key != "name" {
 			return true
 		}
 		if v := strings.TrimSpace(value); strings.HasPrefix(v, "*") {
@@ -69,7 +76,7 @@ func ParseSkillName(skillPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if alias {
+	if alias && name == "" {
 		raw, err := readLenientBlock(path)
 		if err != nil {
 			return "", err
