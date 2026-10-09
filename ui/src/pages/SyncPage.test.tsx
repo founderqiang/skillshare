@@ -17,9 +17,9 @@ vi.mock('../api/client', async (load) => ({
 vi.mock('../api/mcp', async (load) => ({ ...await load<typeof import('../api/mcp')>(), mcpApi: { list: vi.fn() } }));
 vi.mock('../api/hooks', async (load) => ({ ...await load<typeof import('../api/hooks')>(), hooksApi: { list: vi.fn(() => Promise.reject(new Error('offline'))) } }));
 
-const target = (name: string) => ({
+const target = (name: string, over: Partial<Target> = {}) => ({
   name, path: '/home/me/.agents/skills', mode: 'merge', targetNaming: 'flat', status: 'merged', linkedCount: 3, localCount: 0,
-  include: [], exclude: [], expectedSkillCount: 3, skillsEnabled: true,
+  include: [], exclude: [], expectedSkillCount: 3, skillsEnabled: true, ...over,
 }) as Target;
 
 describe('Sync page folder conflicts', () => {
@@ -44,10 +44,25 @@ describe('Sync page folder conflicts', () => {
         <QueryClientProvider client={new QueryClient()}><I18nProvider><ToastProvider><SyncPage /></ToastProvider></I18nProvider></QueryClientProvider>
       </MemoryRouter>,
     );
-    expect(await screen.findByText(/codex and universal sync skills to the same folder .*\.agents\/skills with different filters, so each sync undoes the other\./)).toBeInTheDocument();
+    expect(await screen.findByText(/codex and universal sync skills to the same folder .*\.agents\/skills with different settings, so each sync undoes the other\./)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Stop syncing skills for codex' }));
     await user.click(await screen.findByRole('button', { name: 'Stop syncing' }));
     await waitFor(() => expect(api.updateTarget).toHaveBeenCalledWith('codex', { skills_enabled: false }));
+  });
+
+  it('lists only the settings that differ, keep target first, and links the one to change', async () => {
+    vi.mocked(api.listTargets).mockResolvedValue({ targets: [target('codex', { mode: 'copy', exclude: ['feature-radar*'] }), target('universal')], sourceSkillCount: 3 });
+    render(
+      <MemoryRouter>
+        <QueryClientProvider client={new QueryClient()}><I18nProvider><ToastProvider><SyncPage /></ToastProvider></I18nProvider></QueryClientProvider>
+      </MemoryRouter>,
+    );
+    const columns = await screen.findAllByRole('columnheader');
+    expect(columns.map((c) => c.textContent)).toEqual(['universal · keeps writing', 'codex']);
+    expect(screen.getAllByRole('rowheader').map((r) => r.textContent)).toEqual(['Sync mode', 'Filters']);
+    const cells = screen.getAllByRole('cell').map((c) => c.textContent);
+    expect(cells).toEqual(['merge', 'copy', 'all skills', 'excludes feature-radar*']);
+    expect(screen.getByRole('link', { name: 'codex' })).toHaveAttribute('href', '/targets/codex');
   });
 });
 

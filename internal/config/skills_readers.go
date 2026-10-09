@@ -33,6 +33,27 @@ func SkillsAlsoReadBy(targets map[string]TargetConfig, name, projectRoot string)
 	return names
 }
 
+// SkillsSharedWith names the other targets with skills on that write to the
+// same skills folder as target name, or nil when name has skills off itself.
+func SkillsSharedWith(targets map[string]TargetConfig, name string) []string {
+	tc, ok := targets[name]
+	if !ok || !tc.SkillsConfig().IsEnabled() {
+		return nil
+	}
+	folder := skillsFolder(tc)
+	if folder == "" {
+		return nil
+	}
+	var names []string
+	for other, otc := range targets {
+		if other != name && otc.SkillsConfig().IsEnabled() && skillsFolder(otc) == folder {
+			names = append(names, other)
+		}
+	}
+	sort.Strings(names)
+	return names
+}
+
 // SkillsReadFrom names the configured targets with skills on whose skills
 // folder the built-in tool name reads. name need not be configured, so the
 // add-target list can say a tool already sees another target's skills.

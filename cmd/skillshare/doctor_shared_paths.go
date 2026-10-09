@@ -99,7 +99,7 @@ func checkSharedTargetPaths(cfg *config.Config, result *doctorResult, isProject 
 	})
 
 	conflicts := make(map[string]config.SkillsFolderConflict)
-	for _, c := range config.SkillsFolderConflicts(cfg.Targets) {
+	for _, c := range config.SkillsFolderConflicts(cfg.Targets, cfg.Mode) {
 		conflicts[c.Path] = c
 	}
 
@@ -109,7 +109,7 @@ func checkSharedTargetPaths(cfg *config.Config, result *doctorResult, isProject 
 		detail := fmt.Sprintf("%s ← %s", c.path, strings.Join(c.targets, ", "))
 		suggestion := sharedTargetPathsSuggestion(c.path, c.targets, isProject)
 		if conflict, ok := conflicts[c.path]; ok {
-			detail += " (different filters, so they undo each other on every sync)"
+			detail += " (different settings, so they undo each other on every sync)"
 			suggestion = folderConflictSuggestion(conflict, isProject)
 		}
 		ui.Warning("Shared path %s", detail)

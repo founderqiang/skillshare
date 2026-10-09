@@ -15,6 +15,7 @@ import { hookLabel, hookMessage, rootName } from '../components/hooks/hooksView'
 import MCPNotices from '../components/mcp/MCPNotices';
 import { describeMessage, mcpClient, targetLabel } from '../components/mcp/mcpView';
 import { changeSets, countChanges, countEdited, discardable, receivesSkill, tally, extraGroups, groupByFolder, groupInSync, HOOKS_CHANGED, hooksGroups, MCP_CHANGED, mcpGroups, otherWarnings, resourceGroups, runSync, type ChangeGroup, type Part, type RowIcon, type SyncFailure } from '../components/sync/syncView';
+import FolderConflictNotice from '../components/sync/FolderConflictNotice';
 import SyncResult from '../components/sync/SyncResult';
 import UnmatchedNotices from '../components/sync/UnmatchedNotices';
 import SyncError from '../components/sync/SyncError';
@@ -333,17 +334,7 @@ export default function SyncPage() {
               <Link to="/doctor" className="ss-btn sm">{t('sync.openDoctor')}</Link>
             </div>
           )}
-          {conflicts.map((c) => (
-            <div key={c.path} className="ss-note warn !items-center">
-              <TriangleAlert size={16} />
-              <span className="flex-1">{t('sync.folderConflict.text', { names: joinList(c.targets, locale), path: shortenHome(c.path) })}</span>
-              {c.stop.map((name) => (
-                <Button key={name} variant="secondary" size="sm" onClick={() => setStopping(name)}>
-                  {t('sync.folderConflict.stop', { name })}
-                </Button>
-              ))}
-            </div>
-          ))}
+          {conflicts.map((c) => <FolderConflictNotice key={c.path} conflict={c} targets={targetList} onStop={setStopping} />)}
 
           {!loading && !diff.error && groups.length > 0 && (
             <div className="flex items-center gap-3">
