@@ -172,11 +172,13 @@ func SetFrontmatterValue(filePath, key, value string) error {
 		lines = append(lines[:i], append([]string{line}, lines[j:]...)...)
 	} else {
 		at := fm.end
-		// A YAML document end marker (...) closes the mapping, so the key goes before it.
+		// A YAML document end marker (..., optionally followed by a comment) closes the
+		// mapping, so the key goes before it; blank and comment lines may follow it.
 		for i := fm.end - 1; i > fm.open; i-- {
-			if l := strings.TrimRight(lines[i], " \t\r"); l == "..." {
+			l := strings.TrimRight(lines[i], " \t\r")
+			if l == "..." || strings.HasPrefix(l, "... ") || strings.HasPrefix(l, "...\t") {
 				at = i
-			} else if l != "" {
+			} else if l != "" && !strings.HasPrefix(l, "#") {
 				break
 			}
 		}

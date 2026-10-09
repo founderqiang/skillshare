@@ -73,6 +73,11 @@ func TestSetFrontmatterValue(t *testing.T) {
 			want: "---\ndefaults: &d {name: prototype}\n<<: *d\nname: emil-design-prototype\n...\n---\nBody",
 		},
 		{
+			name: "document end marker with a comment, and a comment after it",
+			in:   "---\ndefaults: &d {name: prototype}\n<<: *d\n... # end\n# trailing\n---\nBody",
+			want: "---\ndefaults: &d {name: prototype}\n<<: *d\nname: emil-design-prototype\n... # end\n# trailing\n---\nBody",
+		},
+		{
 			name: "no frontmatter gets one",
 			in:   "# Just a body\n",
 			want: "---\nname: emil-design-prototype\n---\n# Just a body\n",
