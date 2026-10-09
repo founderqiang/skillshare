@@ -144,7 +144,7 @@ grep -Eq "partialclonefilter = blob:none|promisor = true" "$TRACK/.git/config"
 ### 8. Install tracked repo from GitHub subdir URL (primary Issue #46 case)
 
 ```bash
-ss install -g https://github.com/majiayu000/claude-skill-registry/tree/main/skills/documents/atlassian-search \
+ss install -g https://github.com/runkids/claude-skill-registry/tree/main/skills/documents/atlassian-search \
   --track --name issue46-track-subdir --force
 ```
 
