@@ -169,6 +169,10 @@ func SetFrontmatterValue(filePath, key, value string) error {
 		}
 		lines = append(lines[:fm.open+1], append(block, lines[fm.end:]...)...)
 	} else if i, j := fm.keySpan(m, key); i >= 0 {
+		if anchor := valueAnchor(m, key); anchor != "" {
+			// Aliases elsewhere may point at the replaced value's anchor.
+			line = strings.Replace(line, key+": ", key+": &"+anchor+" ", 1)
+		}
 		lines = append(lines[:i], append([]string{line}, lines[j:]...)...)
 	} else {
 		at := fm.end
@@ -229,6 +233,16 @@ func (fm frontmatterLines) keyLine(key string) int {
 	return -1
 }
 
+// valueAnchor returns the anchor on key's value in mapping node m, or "".
+func valueAnchor(m *yaml.Node, key string) string {
+	for k := 0; m != nil && k+1 < len(m.Content); k += 2 {
+		if m.Content[k].Value == key {
+			return m.Content[k+1].Anchor
+		}
+	}
+	return ""
+}
+
 // mapping parses the frontmatter into its top-level mapping node, or nil when
 // it does not parse to one.
 func (fm frontmatterLines) mapping() *yaml.Node {
@@ -240,11 +254,13 @@ func (fm frontmatterLines) mapping() *yaml.Node {
 	return doc.Content[0]
 }
 
-// setMappingScalar sets key in mapping node m to a plain scalar, appending it when absent.
+// setMappingScalar sets key in mapping node m to a plain scalar, appending it when
+// absent. A replaced value keeps its anchor, which aliases elsewhere may point at.
 func setMappingScalar(m *yaml.Node, key, value string) {
 	v := &yaml.Node{Kind: yaml.ScalarNode, Value: value}
 	for k := 0; k+1 < len(m.Content); k += 2 {
 		if m.Content[k].Value == key {
+			v.Anchor = m.Content[k+1].Anchor
 			m.Content[k+1] = v
 			return
 		}

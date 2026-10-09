@@ -78,6 +78,16 @@ func TestSetFrontmatterValue(t *testing.T) {
 			want: "---\ndefaults: &d {name: prototype}\n<<: *d\nname: emil-design-prototype\n... # end\n# trailing\n---\nBody",
 		},
 		{
+			name: "anchor on the name is kept for its aliases",
+			in:   "---\nname: &n prototype\ndescription: *n\n---\nBody",
+			want: "---\nname: &n emil-design-prototype\ndescription: *n\n---\nBody",
+		},
+		{
+			name: "anchor on the name is kept in a flow mapping",
+			in:   "---\n{name: &n prototype, description: *n}\n---\nBody",
+			want: "---\n{name: &n emil-design-prototype, description: *n}\n---\nBody",
+		},
+		{
 			name: "no frontmatter gets one",
 			in:   "# Just a body\n",
 			want: "---\nname: emil-design-prototype\n---\n# Just a body\n",
