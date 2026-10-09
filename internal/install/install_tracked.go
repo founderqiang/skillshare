@@ -2,16 +2,83 @@ package install
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"skillshare/internal/sourcefs"
 )
 
+// localFileURL builds the file:// URL for a local path. A Windows drive path
+// (C:/repo) needs the empty authority (file:///C:/repo), and characters such as
+// spaces, '#' and '%' must be escaped because git decodes the URL.
+func localFileURL(path string) string {
+	p := filepath.ToSlash(path)
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	return (&url.URL{Scheme: "file", Path: p}).String()
+}
+
+// localCloneSource returns the filesystem path a local source clones from: the
+// plain path, or the path a file:// URL names, or "" for a remote source.
+func localCloneSource(source *Source) string {
+	if source.Path != "" {
+		return source.Path
+	}
+	u, err := url.Parse(source.CloneURL)
+	if err != nil || u.Scheme != "file" {
+		return ""
+	}
+	p := u.Path
+	switch {
+	case u.Host != "" && !strings.EqualFold(u.Host, "localhost"):
+		p = "//" + u.Host + p // UNC: file://server/share/repo
+	case len(p) > 2 && p[0] == '/' && p[2] == ':':
+		p = p[1:] // file:///C:/repo
+	}
+	return filepath.FromSlash(p)
+}
+
+// pathWithin reports whether path is dir itself or lies below it, after
+// resolving links.
+func pathWithin(dir, path string) bool {
+	resolve := func(p string) string {
+		if abs, err := filepath.Abs(p); err == nil {
+			p = abs
+		}
+		if r, err := filepath.EvalSymlinks(p); err == nil {
+			p = r
+		}
+		return p
+	}
+	rel, err := filepath.Rel(resolve(dir), resolve(path))
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+// normalizeTrackSource turns a local path that is a git repository into the
+// file:// form that parseFileURL builds, and rejects other non-git sources.
+func normalizeTrackSource(source *Source) error {
+	if source.Type == SourceTypeLocalPath && IsLocalGitRepo(source.Path) {
+		source.Type = SourceTypeGitHTTPS
+		source.CloneURL = localFileURL(source.Path)
+		return validateCloneURL(source.CloneURL)
+	}
+	if source.IsGit() {
+		return nil
+	}
+	if source.Type == SourceTypeLocalPath {
+		return fmt.Errorf("--track requires a git repository source; %s is not a git repository root (use file:///path for a repository URL)", source.Path)
+	}
+	return fmt.Errorf("--track requires a git repository source")
+}
+
 func installTrackedRepoImpl(source *Source, sourceDir string, opts InstallOptions) (*TrackedRepoResult, error) {
-	if !source.IsGit() {
-		return nil, fmt.Errorf("--track requires a git repository source")
+	if err := normalizeTrackSource(source); err != nil {
+		return nil, err
 	}
 	if err := resolveWebRef(source); err != nil {
 		return nil, err
@@ -63,6 +130,7 @@ func installTrackedRepoImpl(source *Source, sourceDir string, opts InstallOption
 	}
 
 	// Check if already exists
+	replacing := false
 	if _, err := os.Stat(destPath); err == nil {
 		if opts.Update {
 			return updateTrackedRepo(destPath, result, opts)
@@ -80,16 +148,17 @@ func installTrackedRepoImpl(source *Source, sourceDir string, opts InstallOption
 			}
 			return nil, fmt.Errorf("tracked repo '%s' already exists. To overwrite: %s", trackedName, hint)
 		}
+		// A local source that is, or lies inside, the destination would be
+		// replaced under itself; a clone cannot carry its uncommitted work.
+		if p := localCloneSource(source); p != "" && pathWithin(destPath, p) {
+			return nil, fmt.Errorf("source %s is inside the install destination %s; nothing to install", p, destPath)
+		}
 		// Force mode - remove existing. A link is refused, even in a dry
 		// run: removing it would disconnect the repo it points to.
 		if err := src.CheckNoLink(destRel); err != nil {
 			return nil, err
 		}
-		if !opts.DryRun {
-			if err := src.RemoveAll(destRel); err != nil {
-				return nil, fmt.Errorf("failed to remove existing repo: %w", err)
-			}
-		}
+		replacing = true
 	}
 
 	if opts.DryRun {
@@ -104,28 +173,37 @@ func installTrackedRepoImpl(source *Source, sourceDir string, opts InstallOption
 	if cloneBranch == "" {
 		cloneBranch = source.Branch
 	}
+	// Clone beside the destination and move it in only after every check
+	// passed, so a failure never costs the existing repo, and cleanup never
+	// removes a destination another installer created meanwhile.
+	stamp := strconv.FormatInt(time.Now().UnixNano(), 36)
+	cloneRel := filepath.Join(filepath.Dir(destRel), ".skillshare-clone-"+stamp)
+	clonePath := filepath.Join(sourceDir, cloneRel)
+	installed := false
+	defer func() {
+		if !installed {
+			_ = src.RemoveAll(cloneRel)
+		}
+	}()
 	// A tag or commit SHA has no branch for `git pull` to follow. A SHA fails
 	// at clone (--branch rejects it); a tag clones but leaves HEAD detached.
-	if err := cloneTrackedRepoForSource(source, destPath, cloneBranch, opts.OnProgress); err != nil {
+	if err := cloneTrackedRepoForSource(source, clonePath, cloneBranch, opts.OnProgress); err != nil {
 		if IsCommitSHA(cloneBranch) {
 			return nil, errTrackedNeedsBranch(cloneBranch)
 		}
 		return nil, fmt.Errorf("failed to clone repository: %w", err)
 	}
-	if isDetachedHead(destPath) {
-		_ = src.RemoveAll(destRel)
+	if isDetachedHead(clonePath) {
 		return nil, errTrackedNeedsBranch(cloneBranch)
 	}
 	if source.Commit != "" {
-		if err := resetTrackedToCommit(destPath, source.Commit, source.authEnv()); err != nil {
-			_ = src.RemoveAll(destRel)
+		if err := resetTrackedToCommit(clonePath, source.Commit, source.authEnv()); err != nil {
 			return nil, err
 		}
 	}
 
 	if source.HasSubdir() {
-		if err := submoduleError(destPath, source.Subdir, source.authEnv()); err != nil {
-			_ = src.RemoveAll(destRel)
+		if err := submoduleError(clonePath, source.Subdir, source.authEnv()); err != nil {
 			return nil, err
 		}
 	}
@@ -133,15 +211,18 @@ func installTrackedRepoImpl(source *Source, sourceDir string, opts InstallOption
 	// Discover skills in the cloned repo. Include root SKILL.md so the count
 	// matches what `skillshare sync` will see: every SKILL.md inside a tracked
 	// repo (root and nested alike) becomes an independent skill on sync.
-	skills := discoverSkills(destPath, true)
+	skills := discoverSkills(clonePath, true)
 	result.SkillCount = len(skills)
 	for _, skill := range skills {
+		if skill.Path == "." {
+			skill.Name = trackedName // the root skill is named after its directory, not the staging one
+		}
 		result.Skills = append(result.Skills, skill.Name)
 	}
-	result.Warnings = append(result.Warnings, SubmoduleWarnings(destPath, source.authEnv())...)
+	result.Warnings = append(result.Warnings, SubmoduleWarnings(clonePath, source.authEnv())...)
 
 	// Also discover agents in the tracked repo
-	agents := discoverAgents(destPath, len(skills) > 0)
+	agents := discoverAgents(clonePath, len(skills) > 0)
 	result.AgentCount = len(agents)
 	if len(agents) > 0 {
 		for _, agent := range agents {
@@ -156,10 +237,32 @@ func installTrackedRepoImpl(source *Source, sourceDir string, opts InstallOption
 		// Only agents found — not a warning, just informational
 	}
 
-	// Security audit on the entire tracked repo
-	if err := auditTrackedRepo(destPath, result, opts); err != nil {
+	// Security audit on the entire tracked repo. Accepted findings are keyed by
+	// the final path, not the staging one.
+	opts.AuditAcceptRoot, opts.AuditAcceptPath = opts.auditAcceptTarget(destPath)
+	if err := auditTrackedRepo(clonePath, result, opts); err != nil {
 		return nil, err
 	}
+
+	if replacing {
+		// Keep the old repo until the new one is in place, as swapStagedIntoSource does.
+		backup := filepath.Join(filepath.Dir(destRel), ".skillshare-"+filepath.Base(destRel)+".old."+stamp)
+		if err := src.Rename(destRel, backup); err != nil {
+			return nil, fmt.Errorf("failed to move the existing repo aside: %w", err)
+		}
+		if err := src.Rename(cloneRel, destRel); err != nil {
+			if restoreErr := src.Rename(backup, destRel); restoreErr != nil {
+				return nil, fmt.Errorf("failed to move the new clone into place: %w; the previous repo is left at %s: %v", err, backup, restoreErr)
+			}
+			return nil, fmt.Errorf("failed to move the new clone into place: %w", err)
+		}
+		if err := src.RemoveAll(backup); err != nil {
+			result.Warnings = append(result.Warnings, fmt.Sprintf("failed to remove the previous repo %s: %v", backup, err))
+		}
+	} else if err := src.Rename(cloneRel, destRel); err != nil {
+		return nil, fmt.Errorf("failed to move the new clone into place: %w", err)
+	}
+	installed = true
 
 	// Auto-add to .gitignore to prevent committing tracked repo contents
 	gitignoreEntry := trackedName

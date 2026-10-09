@@ -42,6 +42,13 @@ type PullResult struct {
 	Failed   map[string]error
 }
 
+// HasSkillFile reports whether dir holds a regular SKILL.md file; a folder
+// without one (a scratch dir) is not a skill, and a FIFO would block a copy.
+func HasSkillFile(dir string) bool {
+	info, err := os.Stat(filepath.Join(dir, "SKILL.md"))
+	return err == nil && info.Mode().IsRegular()
+}
+
 // FindLocalSkills finds all local (non-symlinked) skills in a target directory.
 // syncMode should be the target's current sync mode ("merge", "copy", or "symlink").
 // In copy mode, skills listed in the manifest are considered managed and skipped.
@@ -105,6 +112,10 @@ func FindLocalSkills(targetPath, sourcePath, syncMode string) ([]LocalSkillInfo,
 
 		// Only process directories (skills are directories)
 		if !skillInfo.IsDir() {
+			continue
+		}
+
+		if !HasSkillFile(skillPath) {
 			continue
 		}
 

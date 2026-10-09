@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"skillshare/internal/install"
@@ -348,4 +349,63 @@ func TestInstall_Track_EmptyRepo_NextSteps(t *testing.T) {
 	result.AssertSuccess(t)
 
 	result.AssertOutputNotContains(t, "Run 'skillshare sync'")
+}
+
+// TestInstall_Track_LocalGitPath verifies --track accepts a local path that is
+// a git repository (also with --branch), the same as the file:// form.
+func TestInstall_Track_LocalGitPath(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	setupGlobalConfig(sb)
+
+	repo := filepath.Join(sb.Root, "local repo%20x")
+	run(t, "", "git", "init", "--initial-branch=main", repo)
+	os.WriteFile(filepath.Join(repo, "SKILL.md"), []byte("---\nname: local-repo\n---\n# s\n"), 0644)
+	run(t, repo, "git", "add", "-A")
+	run(t, repo, "git", "commit", "-m", "initial")
+
+	result := sb.RunCLI("install", repo, "--track", "--name", "local-repo", "--branch", "main", "--skip-audit")
+	result.AssertSuccess(t)
+
+	if !sb.FileExists(filepath.Join(sb.SourcePath, "_local-repo", "SKILL.md")) {
+		t.Fatalf("tracked repo should be cloned to _local-repo")
+	}
+}
+
+// TestInstall_Track_LocalBareRepoPath verifies --track also takes a local bare
+// repository path, as file:// does.
+func TestInstall_Track_LocalBareRepoPath(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	setupGlobalConfig(sb)
+
+	bare := strings.TrimPrefix(setupBareRepoWithRootSkill(t, sb, "bare-local"), "file://")
+
+	result := sb.RunCLI("install", bare, "--track", "--name", "bare-local", "--skip-audit")
+	result.AssertSuccess(t)
+
+	if !sb.FileExists(filepath.Join(sb.SourcePath, "_bare-local", "SKILL.md")) {
+		t.Fatalf("tracked repo should be cloned to _bare-local")
+	}
+}
+
+// TestInstall_Track_Force_KeepsLocalSourceInsideDestination verifies that
+// --force never removes the repository it is meant to clone from.
+func TestInstall_Track_Force_KeepsLocalSourceInsideDestination(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	setupGlobalConfig(sb)
+
+	dest := filepath.Join(sb.SourcePath, "_foo")
+	for _, repo := range []string{dest, filepath.Join(dest, "nested")} {
+		run(t, "", "git", "init", "--initial-branch=main", repo)
+		os.WriteFile(filepath.Join(repo, "SKILL.md"), []byte("---\nname: foo\n---\n# unpushed\n"), 0644)
+
+		result := sb.RunCLI("install", repo, "--track", "--name", "foo", "--force", "--skip-audit")
+		result.AssertFailure(t)
+		result.AssertAnyOutputContains(t, "inside the install destination")
+		if !sb.FileExists(filepath.Join(repo, "SKILL.md")) {
+			t.Fatalf("source %s must be left intact", repo)
+		}
+	}
 }
