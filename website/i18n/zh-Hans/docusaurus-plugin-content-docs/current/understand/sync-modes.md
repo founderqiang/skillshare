@@ -280,7 +280,7 @@ targets:
 
 **迁移**：在 `flat`、`standard` 和 `prefixed` 之间切换，会就地重命名现有受管理的条目。在 copy 模式下，manifest 会记录每个副本是由哪种命名方式生成的，因此即使 source 没有变化，被重命名的副本也会重新复制，使其 `name:` 与新的命名方式一致。如果某个本地 skill 已经占用了新名称，旧的受管理条目会被保留。
 
-**Symlink 模式**：`target_naming` 会被忽略 — 整个目录会按原样被链接。
+**Symlink 模式**：`flat` 和 `standard` 会被忽略 — 整个目录会按原样被链接。`prefixed` 则如上所述会校验失败。
 
 ---
 

@@ -281,7 +281,7 @@ targets:
 
 **移行**: `flat`、`standard`、`prefixed` の間で切り替えると、既存の管理対象エントリはその場でリネームされます。copy mode では manifest が各コピーを作成した naming を記録しているため、source が変更されていなくても、リネームされたコピーは再度コピーされ、その `name:` は新しい naming に一致します。ローカル Skill が既に新しい名前を占有している場合、古い管理対象エントリは保持されます。
 
-**Symlink mode**: `target_naming` は無視されます — ディレクトリ全体がそのままリンクされます。
+**Symlink mode**: `flat` と `standard` は無視されます — ディレクトリ全体がそのままリンクされます。`prefixed` は上記のとおり検証エラーになります。
 
 ---
 

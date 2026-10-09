@@ -280,7 +280,7 @@ targets:
 
 **Migration**: Switching between `flat`, `standard` and `prefixed` renames existing managed entries in place. In copy mode the manifest records which naming made each copy, so a renamed copy is copied again and its `name:` matches the new naming, even when the source did not change. If a local skill already occupies the new name, the old managed entry is preserved.
 
-**Symlink mode**: `target_naming` is ignored — the entire directory is linked as-is.
+**Symlink mode**: `flat` and `standard` are ignored — the entire directory is linked as-is. `prefixed` fails validation, as above.
 
 ---
 

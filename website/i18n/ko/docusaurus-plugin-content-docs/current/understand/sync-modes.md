@@ -280,7 +280,7 @@ targets:
 
 **마이그레이션**: `flat`, `standard`, `prefixed` 사이를 전환하면 기존에 관리되던 항목의 이름이 그 자리에서 변경됩니다. copy mode에서는 manifest가 각 복사본을 만든 naming을 기록하므로, source가 바뀌지 않았더라도 이름이 바뀐 복사본은 다시 복사되어 `name:`이 새 naming과 일치합니다. 로컬 skill이 이미 새 이름을 차지하고 있다면 기존 관리 항목이 보존됩니다.
 
-**Symlink mode**: `target_naming`은 무시됩니다 — 디렉터리 전체가 그대로 연결됩니다.
+**Symlink mode**: `flat`과 `standard`는 무시됩니다 — 디렉터리 전체가 그대로 연결됩니다. `prefixed`는 위에서 설명한 대로 검증에 실패합니다.
 
 ---
 

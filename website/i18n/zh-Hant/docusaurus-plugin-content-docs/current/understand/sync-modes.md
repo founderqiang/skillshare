@@ -280,7 +280,7 @@ targets:
 
 **Migration（遷移）**：在 `flat`、`standard` 與 `prefixed` 之間切換時，會就地重新命名既有的受管理項目。在 copy mode 下，manifest 會記錄每個複本是由哪種命名方式產生的，因此即使 source 沒有變動，被重新命名的複本也會重新複製，使其 `name:` 與新的命名方式一致。如果某個本機 skill 已佔用新名稱，原本的受管理項目會被保留。
 
-**Symlink mode**：`target_naming` 會被忽略 — 整個目錄會原封不動地被連結。
+**Symlink mode**：`flat` 和 `standard` 會被忽略 — 整個目錄會原封不動地被連結。`prefixed` 則如上所述會驗證失敗。
 
 ---
 
