@@ -48,6 +48,16 @@ func TestSetFrontmatterValue(t *testing.T) {
 			want: "---\nname: emil-design-prototype\n# next\ndescription: d\n---\nBody",
 		},
 		{
+			name: "flow-style mapping keeps its other fields",
+			in:   "---\n{name: prototype, description: text}\n---\nBody",
+			want: "---\n{name: emil-design-prototype, description: text}\n---\nBody",
+		},
+		{
+			name: "flow-style mapping with name last keeps the fields before it",
+			in:   "---\n{description: text, name: prototype}\n---\nBody",
+			want: "---\n{description: text, name: emil-design-prototype}\n---\nBody",
+		},
+		{
 			name: "no frontmatter gets one",
 			in:   "# Just a body\n",
 			want: "---\nname: emil-design-prototype\n---\n# Just a body\n",

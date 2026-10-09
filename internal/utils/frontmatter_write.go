@@ -137,8 +137,9 @@ func ToggleFrontmatterFlag(filePath, key string) (bool, error) {
 
 // SetFrontmatterValue sets a top-level frontmatter key to a plain scalar value,
 // adding the key (or the whole frontmatter block) when it is missing. Like
-// ToggleFrontmatterFlag it edits one line, so key order, comments, line endings
-// and the body are kept. value is written unquoted and must be a plain YAML scalar.
+// ToggleFrontmatterFlag it edits only the key's lines, so key order, comments, line
+// endings and the body are kept; a flow-style mapping ({...}) is rewritten whole.
+// value is written unquoted and must be a plain YAML scalar.
 func SetFrontmatterValue(filePath, key, value string) error {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
@@ -151,7 +152,20 @@ func SetFrontmatterValue(filePath, key, value string) error {
 	}
 
 	lines := fm.lines
-	if i, j := fm.keySpan(key); i >= 0 {
+	m := fm.mapping()
+	if m != nil && m.Style&yaml.FlowStyle != 0 {
+		// Flow-style keys share lines, so the mapping is written back whole.
+		setMappingScalar(m, key, value)
+		out, err := yaml.Marshal(m)
+		if err != nil {
+			return err
+		}
+		block := strings.Split(strings.TrimSuffix(string(out), "\n"), "\n")
+		for i := range block {
+			block[i] += fm.cr
+		}
+		lines = append(lines[:fm.open+1], append(block, lines[fm.end:]...)...)
+	} else if i, j := fm.keySpan(m, key); i >= 0 {
 		lines = append(lines[:i], append([]string{line}, lines[j:]...)...)
 	} else {
 		lines = append(lines[:fm.end], append([]string{line}, lines[fm.end:]...)...)
@@ -201,18 +215,39 @@ func (fm frontmatterLines) keyLine(key string) int {
 	return -1
 }
 
-// keySpan returns the lines [start, end) holding top-level key and its whole
-// value, located through YAML so "key": / key : / multi-line scalars count.
-// Blank and column-0 comment lines before the next key stay outside the span.
-// Frontmatter YAML cannot parse falls back to keyLine; start is -1 when absent.
-func (fm frontmatterLines) keySpan(key string) (int, int) {
+// mapping parses the frontmatter into its top-level mapping node, or nil when
+// it does not parse to one.
+func (fm frontmatterLines) mapping() *yaml.Node {
 	var doc yaml.Node
 	if yaml.Unmarshal([]byte(strings.Join(fm.lines[fm.open+1:fm.end], "\n")), &doc) != nil ||
 		len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
+		return nil
+	}
+	return doc.Content[0]
+}
+
+// setMappingScalar sets key in mapping node m to a plain scalar, appending it when absent.
+func setMappingScalar(m *yaml.Node, key, value string) {
+	v := &yaml.Node{Kind: yaml.ScalarNode, Value: value}
+	for k := 0; k+1 < len(m.Content); k += 2 {
+		if m.Content[k].Value == key {
+			m.Content[k+1] = v
+			return
+		}
+	}
+	m.Content = append(m.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: key}, v)
+}
+
+// keySpan returns the lines [start, end) holding top-level key and its whole
+// value in block mapping node mapping, so "key": / key : / multi-line scalars count.
+// Blank and column-0 comment lines before the next key stay outside the span.
+// A nil mapping (frontmatter YAML cannot parse) falls back to keyLine; start is -1 when absent.
+func (fm frontmatterLines) keySpan(mapping *yaml.Node, key string) (int, int) {
+	if mapping == nil {
 		i := fm.keyLine(key)
 		return i, i + 1
 	}
-	m := doc.Content[0].Content
+	m := mapping.Content
 	for k := 0; k+1 < len(m); k += 2 {
 		if m[k].Value != key {
 			continue
