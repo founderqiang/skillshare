@@ -17,7 +17,7 @@ import (
 // allows (flow mapping, block scalar, alias, merge key, explicit key, ...) leaves the
 // scan without a name, and then the whole block is decoded.
 func ParseSkillName(skillPath string) (string, error) {
-	name, indent := "", -1
+	name, literal, indent := "", "", -1
 	path := filepath.Join(skillPath, "SKILL.md")
 	err := scanLenientBlock(path, func(raw []byte) bool {
 		line := string(raw)
@@ -35,7 +35,9 @@ func ParseSkillName(skillPath string) (string, error) {
 		if v := strings.TrimSpace(value); v != "" && strings.ContainsRune("*|>&!", rune(v[0])) {
 			return false // alias, block scalar, anchor or tag: decode the whole block
 		}
-		// The line alone decodes quotes and a trailing comment; a value YAML rejects is read as is.
+		// The line alone decodes quotes and a trailing comment. When it does not decode to
+		// a string (a multi-line quoted scalar, a number), the whole block is decoded, and
+		// the line read as is is kept for frontmatter YAML rejects.
 		var fm map[string]any
 		if yaml.Unmarshal([]byte("name:"+value), &fm) == nil {
 			if v, isString := fm["name"].(string); isString {
@@ -43,7 +45,7 @@ func ParseSkillName(skillPath string) (string, error) {
 				return false
 			}
 		}
-		name = strings.Trim(strings.TrimSpace(value), `"'`)
+		literal = strings.Trim(strings.TrimSpace(value), `"'`)
 		return false
 	})
 	if err != nil || name != "" {
@@ -53,8 +55,10 @@ func ParseSkillName(skillPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	name, _ = decodeFrontmatter(raw)["name"].(string)
-	return name, nil
+	if name, isString := decodeFrontmatter(raw)["name"].(string); isString {
+		return name, nil
+	}
+	return literal, nil
 }
 
 // isYAMLBlockIndicator returns true for YAML block scalar indicators (>, >-, >+, |, |-, |+).

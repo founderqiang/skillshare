@@ -377,6 +377,7 @@ func TestParseSkillName_ValidYAMLForms(t *testing.T) {
 		"base: &n prototype\nname: *n",
 		"defaults: &d {name: prototype}\n<<: *d",
 		"? name\n: prototype",
+		"name: \"proto\\\n  type\"",
 		"name: prototype\nbad: [unclosed", // not YAML: the name: line is still read
 	} {
 		dir, _ := writeSkill(t, []byte("---\n"+fm+"\n---\nbody\n"))
