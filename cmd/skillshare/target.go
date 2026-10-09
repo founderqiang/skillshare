@@ -220,7 +220,7 @@ func targetAdd(args []string) error {
 		return fmt.Errorf("target '%s' already exists", name)
 	}
 
-	skills := &config.ResourceTargetConfig{Path: path}
+	skills := &config.ResourceTargetConfig{Path: path, Mode: config.NewTargetSkillsMode(cfg.TargetNaming, cfg.Mode)}
 	skills.SetEnabled(!noSkills)
 	cfg.Targets[name] = config.TargetConfig{Skills: skills}
 	if err := cfg.Save(); err != nil {

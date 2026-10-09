@@ -638,3 +638,28 @@ func TestHandleAddTarget_ProjectPrefixedNamingUsesCopyMode(t *testing.T) {
 		t.Fatalf("added target invalid: err = %v, invalid = %v", err, invalid)
 	}
 }
+
+func TestHandleAddTarget_GlobalPrefixedNamingUnderMergeUsesCopyMode(t *testing.T) {
+	s, _ := newTestServer(t)
+	s.cfg.Mode, s.cfg.TargetNaming = "merge", "prefixed" // valid while every target overrides copy
+	if err := s.saveConfig(); err != nil {
+		t.Fatal(err)
+	}
+	rr := httptest.NewRecorder()
+	body := `{"name":"cursor","path":"` + filepath.ToSlash(filepath.Join(t.TempDir(), "skills")) + `"}`
+	s.handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/api/targets", strings.NewReader(body)))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("add: got %d %s", rr.Code, rr.Body.String())
+	}
+	if tc := s.cfg.Targets["cursor"]; tc.SkillsConfig().Mode != "copy" {
+		mode := tc.SkillsConfig().Mode
+		t.Fatalf("new target mode = %q, want copy", mode)
+	}
+
+	rr = httptest.NewRecorder()
+	body = `{"name":"claude-work","agent":"claude","configDir":"` + filepath.ToSlash(filepath.Join(t.TempDir(), ".claude-work")) + `"}`
+	s.handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/api/targets", strings.NewReader(body)))
+	if tc := s.cfg.Targets["claude-work"]; rr.Code != http.StatusOK || tc.SkillsConfig().Mode != "copy" {
+		t.Fatalf("add config dir: got %d %s, mode %q; want copy", rr.Code, rr.Body.String(), tc.SkillsConfig().Mode)
+	}
+}

@@ -268,7 +268,7 @@ skillshare sync
 - Relative links to sibling skills (`../other-skill/`) are not rewritten, the same as `flat` in copy mode.
 - The name becomes what the tool shows; in Claude Code it is the slash command, e.g. `/mattpocock-skills-prototype`.
 
-`prefixed` needs copy mode because merge links point at the source, where `name:` cannot change. A target that resolves to `prefixed` in merge or symlink mode fails validation and is skipped by sync. In a project whose top-level `target_naming` is `prefixed`, `target add` gives the new target copy mode.
+`prefixed` needs copy mode because merge links point at the source, where `name:` cannot change. A target that resolves to `prefixed` in merge or symlink mode fails validation and is skipped by sync. When a new target would inherit `prefixed` in a mode other than copy (a project target defaults to merge), `target add` gives it copy mode.
 
 ```yaml
 targets:

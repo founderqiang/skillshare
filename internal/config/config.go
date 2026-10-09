@@ -62,6 +62,15 @@ func TargetNamingModeError(naming, mode string) error {
 	return fmt.Errorf("target naming %q requires copy mode, but the target syncs in %q mode", "prefixed", mode)
 }
 
+// NewTargetSkillsMode is the skills mode a new target is written with: copy when it
+// would otherwise inherit a naming its inherited mode cannot honour, else empty (inherit).
+func NewTargetSkillsMode(naming, mode string) string {
+	if TargetNamingModeError(naming, mode) != nil {
+		return "copy"
+	}
+	return ""
+}
+
 // ResourceTargetConfig holds per-resource-kind target configuration (skills, agents, etc.).
 type ResourceTargetConfig struct {
 	Path         string   `yaml:"path,omitempty"`

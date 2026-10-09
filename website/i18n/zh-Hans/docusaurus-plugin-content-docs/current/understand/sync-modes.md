@@ -268,7 +268,7 @@ skillshare sync
 - 指向同级 skill 的相对链接（`../other-skill/`）不会被改写，与 copy 模式下的 `flat` 相同。
 - 该名称就是工具中显示的名称；在 Claude Code 中它是 slash command，例如 `/mattpocock-skills-prototype`。
 
-`prefixed` 需要 copy 模式，因为 merge 链接指向 source，而 source 中的 `name:` 不能被修改。在 merge 或 symlink 模式下解析为 `prefixed` 的 target 会校验失败，并被 sync 跳过。项目顶层的 `target_naming` 为 `prefixed` 时，`target add` 会让新 target 使用 copy 模式。
+`prefixed` 需要 copy 模式，因为 merge 链接指向 source，而 source 中的 `name:` 不能被修改。在 merge 或 symlink 模式下解析为 `prefixed` 的 target 会校验失败，并被 sync 跳过。新 target 若会在 copy 以外的模式下继承 `prefixed`（项目 target 默认为 merge），`target add` 会让它使用 copy 模式。
 
 ```yaml
 targets:

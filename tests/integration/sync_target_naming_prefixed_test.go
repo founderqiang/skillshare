@@ -289,3 +289,14 @@ func TestDiff_TargetNamingChange_ReportsRename(t *testing.T) {
 		})
 	}
 }
+
+func TestTargetAdd_GlobalPrefixedNamingUnderMergeUsesCopyMode(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	targetPath := prefixedFixture(t, sb)
+	writeNamingConfig(sb, targetPath, "prefixed", "copy")
+	sb.WriteConfig(strings.Replace(sb.ReadFile(sb.ConfigPath), "targets:", "mode: merge\ntargets:", 1))
+
+	sb.RunCLI("target", "add", "cursor", sb.CreateTarget("cursor")).AssertSuccess(t)
+	sb.RunCLI("sync").AssertOutputNotContains(t, "requires copy mode")
+}
