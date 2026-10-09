@@ -310,7 +310,7 @@
             },
             "target_naming": {
               "type": "string",
-              "description": "Target entry naming strategy for skills. If omitted, inherits the top-level target_naming (defaults to flat). Ignored in symlink mode; 'prefixed' requires copy mode.",
+              "description": "Target entry naming strategy for skills. If omitted, inherits the top-level target_naming (defaults to flat). 'flat' and 'standard' are ignored in symlink mode; 'prefixed' requires copy mode.",
               "enum": ["flat", "standard", "prefixed"]
             },
             "include": {

@@ -200,7 +200,7 @@ export const fieldDocs: Record<string, FieldDoc> = {
     example: 'mode: symlink',
   },
   'targets.skills.target_naming': {
-    description: 'Target entry naming strategy for skills in this target. If omitted, inherits the top-level target_naming. Ignored in symlink mode; "prefixed" requires copy mode.',
+    description: 'Target entry naming strategy for skills in this target. If omitted, inherits the top-level target_naming. "flat" and "standard" are ignored in symlink mode; "prefixed" requires copy mode.',
     type: 'string',
     allowedValues: ['flat', 'standard', 'prefixed'],
     example: 'target_naming: standard',
