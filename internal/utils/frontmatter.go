@@ -12,14 +12,23 @@ import (
 )
 
 // ParseSkillName reads the SKILL.md and extracts the top-level "name" from frontmatter.
-// It stops at the name line, so only a flow-style block ({...}) is read whole. Top-level
-// keys share the first key's indent; "name", 'name' and name : all count.
+// It stops after the name value (a block scalar's indented lines included), so only a
+// flow-style block ({...}) is read whole. Top-level keys share the first key's indent;
+// "name", 'name' and name : all count.
 func ParseSkillName(skillPath string) (string, error) {
 	name, indent := "", -1
-	var flow []string // the block's lines once it turns out to be a flow mapping
+	var flow []string   // the block's lines once it turns out to be a flow mapping
+	var scalar []string // the name line and its indented lines when name is a block scalar
 	err := scanLenientBlock(filepath.Join(skillPath, "SKILL.md"), func(raw []byte) bool {
 		line := string(raw)
 		trimmed := strings.TrimLeft(line, " \t")
+		if scalar != nil {
+			if trimmed == "" || len(line)-len(trimmed) > indent {
+				scalar = append(scalar, line)
+				return true
+			}
+			return false
+		}
 		if flow != nil {
 			flow = append(flow, line)
 			return true
@@ -37,6 +46,10 @@ func ParseSkillName(skillPath string) (string, error) {
 		if len(line)-len(trimmed) != indent || !ok || strings.Trim(strings.TrimSpace(key), `"'`) != "name" {
 			return true
 		}
+		if v := strings.TrimSpace(value); v != "" && (v[0] == '|' || v[0] == '>') {
+			scalar = []string{"name:" + value}
+			return true
+		}
 		// The line alone decodes quotes and a trailing comment; a value YAML rejects is read as is.
 		var fm map[string]any
 		if yaml.Unmarshal([]byte("name:"+value), &fm) == nil {
@@ -51,8 +64,8 @@ func ParseSkillName(skillPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if flow != nil {
-		name, _ = decodeFrontmatter([]byte(strings.Join(flow, "\n")))["name"].(string)
+	if lines := append(flow, scalar...); lines != nil {
+		name, _ = decodeFrontmatter([]byte(strings.Join(lines, "\n")))["name"].(string)
 	}
 	return name, nil
 }
