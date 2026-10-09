@@ -94,6 +94,10 @@ func (s *Server) handlePatchConfig(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+		if err := s.cfg.ProjectNamingError(s.cfg.Projects, *body.Mode); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 		s.cfg.Mode = *body.Mode
 		args["mode"] = *body.Mode
 	}

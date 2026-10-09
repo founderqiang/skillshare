@@ -214,18 +214,19 @@ func (c *Config) ValidateProjects(projects map[string]ManagedProject) error {
 			}
 		}
 	}
-	if err := c.projectNamingError(projects); err != nil {
+	if err := c.ProjectNamingError(projects, c.Mode); err != nil {
 		return err
 	}
 	return probe.expandProjects()
 }
 
-// projectNamingError checks each project's effective skills naming against its
-// effective mode, which the targets it expands into will inherit.
-func (c *Config) projectNamingError(projects map[string]ManagedProject) error {
+// ProjectNamingError checks each project's effective skills naming against its
+// effective mode under global mode, which the targets it expands into will inherit.
+// It covers projects whose folder is missing, which expand into no target yet.
+func (c *Config) ProjectNamingError(projects map[string]ManagedProject, mode string) error {
 	for _, root := range slices.Sorted(maps.Keys(projects)) {
 		if sk := projects[root].Skills; sk != nil {
-			if err := TargetNamingModeError(cmp.Or(sk.TargetNaming, c.TargetNaming), cmp.Or(sk.Mode, c.Mode)); err != nil {
+			if err := TargetNamingModeError(cmp.Or(sk.TargetNaming, c.TargetNaming), cmp.Or(sk.Mode, mode)); err != nil {
 				return fmt.Errorf("projects: %s: %w", root, err)
 			}
 		}

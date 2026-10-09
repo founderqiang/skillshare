@@ -286,3 +286,20 @@ func TestHandlePutConfig_ProjectLinkOutOfTheProject_400(t *testing.T) {
 		t.Errorf("file outside the project was written:\n%s", data)
 	}
 }
+
+func TestHandlePatchConfig_ModeKeepsUnexpandedProjectPrefixedNamingValid(t *testing.T) {
+	s, _ := newTestServer(t)
+	// The project folder is missing, so the project expands into no target yet.
+	s.cfg.Mode = "copy"
+	s.cfg.Projects = map[string]config.ManagedProject{
+		filepath.Join(t.TempDir(), "gone"): {Skills: &config.ResourceTargetConfig{TargetNaming: "prefixed"}},
+	}
+	if err := s.saveConfig(); err != nil {
+		t.Fatal(err)
+	}
+	rr := httptest.NewRecorder()
+	s.handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPatch, "/api/config", strings.NewReader(`{"mode":"merge"}`)))
+	if rr.Code != http.StatusBadRequest || !strings.Contains(rr.Body.String(), "requires copy mode") {
+		t.Fatalf("global merge under a project inheriting prefixed: got %d %s, want 400", rr.Code, rr.Body.String())
+	}
+}
