@@ -103,6 +103,7 @@ func cmdStatusProjectJSON(root string) error {
 			Exclude:     sc.Exclude,
 
 			SkillsEnabled: sc.IsEnabled(),
+			Warning:       namingWarning(target, mode),
 		})
 	}
 
@@ -203,6 +204,9 @@ func printProjectTargetsStatus(runtime *projectRuntime, discovered []sync.Discov
 			mode = "merge"
 		}
 		res := getTargetStatusDetail(target, runtime.sourcePath, mode)
+		if err := target.NamingModeConfigError(mode); err != nil {
+			warnings = append(warnings, entry.Name+": "+err.Error())
+		}
 
 		// A target with skills off expects nothing, so it has no drift.
 		expected := 0

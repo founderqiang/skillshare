@@ -228,11 +228,16 @@ func targetAdd(args []string) error {
 		return err
 	}
 
-	reportTargetAdded(name, path, noSkills)
+	reportTargetAdded(name, path, noSkills, skills.Mode != "")
 	return nil
 }
 
-func reportTargetAdded(name, path string, noSkills bool) {
+// reportTargetAdded prints the result of target add. copyForced is set when the target
+// was given copy mode because the naming it inherits needs it.
+func reportTargetAdded(name, path string, noSkills, copyForced bool) {
+	if copyForced {
+		ui.Info("Target naming \"prefixed\" needs copy mode, so %s was added with mode copy", name)
+	}
 	if noSkills {
 		ui.Done(ui.MarkOK, fmt.Sprintf("Added target %s -> %s (skills off)", name, shortenPath(path)), 0)
 		ui.Next(fmt.Sprintf("skillshare target %s --skills=true", name), "sync skills to this target too")
@@ -276,7 +281,8 @@ func targetAddAgentConfigDir(name string, args []string, noSkills bool) error {
 	if err := cfg.Save(); err != nil {
 		return err
 	}
-	reportTargetAdded(name, path, noSkills)
+	target := cfg.Targets[name]
+	reportTargetAdded(name, path, noSkills, target.SkillsConfig().Mode != "")
 	return nil
 }
 
@@ -577,6 +583,7 @@ type targetListJSONItem struct {
 	AgentLocalCount    *int     `json:"agentLocalCount,omitempty"`
 	AgentExpectedCount *int     `json:"agentExpectedCount,omitempty"`
 	SkillsEnabled      bool     `json:"skillsEnabled"`
+	Warning            string   `json:"warning,omitempty"`
 }
 
 func targetList(jsonOutput bool) error {
