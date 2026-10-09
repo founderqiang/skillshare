@@ -13,13 +13,15 @@ import (
 
 // ParseSkillName reads the SKILL.md and extracts the top-level "name" from frontmatter.
 // It stops after the name value (a block scalar's indented lines included), so only a
-// flow-style block ({...}) is read whole. Top-level keys share the first key's indent;
+// flow-style block ({...}) or a name that is an alias (*anchor) is read whole. Top-level keys share the first key's indent;
 // "name", 'name' and name : all count.
 func ParseSkillName(skillPath string) (string, error) {
 	name, indent := "", -1
 	var flow []string   // the block's lines once it turns out to be a flow mapping
 	var scalar []string // the name line and its indented lines when name is a block scalar
-	err := scanLenientBlock(filepath.Join(skillPath, "SKILL.md"), func(raw []byte) bool {
+	alias := false      // name is an alias (*anchor), resolved from the whole block
+	path := filepath.Join(skillPath, "SKILL.md")
+	err := scanLenientBlock(path, func(raw []byte) bool {
 		line := string(raw)
 		trimmed := strings.TrimLeft(line, " \t")
 		if scalar != nil {
@@ -46,7 +48,10 @@ func ParseSkillName(skillPath string) (string, error) {
 		if len(line)-len(trimmed) != indent || !ok || strings.Trim(strings.TrimSpace(key), `"'`) != "name" {
 			return true
 		}
-		if v := strings.TrimSpace(value); v != "" && (v[0] == '|' || v[0] == '>') {
+		if v := strings.TrimSpace(value); strings.HasPrefix(v, "*") {
+			alias = true // its anchor is defined elsewhere in the block
+			return false
+		} else if v != "" && (v[0] == '|' || v[0] == '>') {
 			scalar = []string{"name:" + value}
 			return true
 		}
@@ -63,6 +68,13 @@ func ParseSkillName(skillPath string) (string, error) {
 	})
 	if err != nil {
 		return "", err
+	}
+	if alias {
+		raw, err := readLenientBlock(path)
+		if err != nil {
+			return "", err
+		}
+		name, _ = decodeFrontmatter(raw)["name"].(string)
 	}
 	if lines := append(flow, scalar...); lines != nil {
 		name, _ = decodeFrontmatter([]byte(strings.Join(lines, "\n")))["name"].(string)
