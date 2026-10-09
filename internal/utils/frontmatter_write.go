@@ -169,9 +169,18 @@ func SetFrontmatterValue(filePath, key, value string) error {
 		}
 		lines = append(lines[:fm.open+1], append(block, lines[fm.end:]...)...)
 	} else if i, j := fm.keySpan(m, key); i >= 0 {
-		if anchor := valueAnchor(m, key); anchor != "" {
-			// Aliases elsewhere may point at the replaced value's anchor.
-			line = strings.Replace(line, key+": ", key+": &"+anchor+" ", 1)
+		if v := mappingValue(m, key); v != nil {
+			// Keep everything before the value as written (the key, its anchor, quoting,
+			// spacing and indent) and replace only the value, keeping its own anchor for
+			// aliases elsewhere. Column counts characters and points at an anchor or tag.
+			i = fm.open + v.Line
+			before := []rune(lines[i])
+			before = before[:min(v.Column-1, len(before))]
+			anchor := ""
+			if v.Anchor != "" {
+				anchor = "&" + v.Anchor + " "
+			}
+			line = string(before) + anchor + value + fm.cr
 		}
 		lines = append(lines[:i], append([]string{line}, lines[j:]...)...)
 	} else {
@@ -233,14 +242,14 @@ func (fm frontmatterLines) keyLine(key string) int {
 	return -1
 }
 
-// valueAnchor returns the anchor on key's value in mapping node m, or "".
-func valueAnchor(m *yaml.Node, key string) string {
+// mappingValue returns key's value node in mapping node m, or nil.
+func mappingValue(m *yaml.Node, key string) *yaml.Node {
 	for k := 0; m != nil && k+1 < len(m.Content); k += 2 {
 		if m.Content[k].Value == key {
-			return m.Content[k+1].Anchor
+			return m.Content[k+1]
 		}
 	}
-	return ""
+	return nil
 }
 
 // mapping parses the frontmatter into its top-level mapping node, or nil when

@@ -35,12 +35,12 @@ func TestSetFrontmatterValue(t *testing.T) {
 		{
 			name: "quoted key is the same field",
 			in:   "---\n\"name\": prototype\n---\nBody",
-			want: "---\nname: emil-design-prototype\n---\nBody",
+			want: "---\n\"name\": emil-design-prototype\n---\nBody",
 		},
 		{
 			name: "space before the colon is the same field",
 			in:   "---\nname : prototype\n---\nBody",
-			want: "---\nname: emil-design-prototype\n---\nBody",
+			want: "---\nname : emil-design-prototype\n---\nBody",
 		},
 		{
 			name: "block scalar is replaced whole, comment before the next key kept",
@@ -86,6 +86,16 @@ func TestSetFrontmatterValue(t *testing.T) {
 			name: "anchor on the name is kept in a flow mapping",
 			in:   "---\n{name: &n prototype, description: *n}\n---\nBody",
 			want: "---\n{name: &n emil-design-prototype, description: *n}\n---\nBody",
+		},
+		{
+			name: "anchor on the name key is kept",
+			in:   "---\n&f name: prototype\ndescription: *f\n---\nBody",
+			want: "---\n&f name: emil-design-prototype\ndescription: *f\n---\nBody",
+		},
+		{
+			name: "explicit key keeps its key line",
+			in:   "---\n? name\n: prototype\ndescription: d\n---\nBody",
+			want: "---\n? name\n: emil-design-prototype\ndescription: d\n---\nBody",
 		},
 		{
 			name: "no frontmatter gets one",
