@@ -622,3 +622,19 @@ func TestHandleAvailableTargets_NamesTheConfigDir(t *testing.T) {
 		}
 	}
 }
+
+func TestHandleAddTarget_ProjectPrefixedNamingUsesCopyMode(t *testing.T) {
+	s, _ := newTestProjectServerWithExtras(t, nil)
+	s.projectCfg.TargetNaming = "prefixed"
+	if err := s.projectCfg.Save(s.projectRoot); err != nil { // requests reload the config from disk
+		t.Fatal(err)
+	}
+	rr := httptest.NewRecorder()
+	s.handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/api/targets", strings.NewReader(`{"name":"cursor"}`)))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("add: got %d %s", rr.Code, rr.Body.String())
+	}
+	if _, invalid, err := config.ValidateProjectConfigForSync(s.projectCfg, s.projectRoot); err != nil || invalid["cursor"] != nil {
+		t.Fatalf("added target invalid: err = %v, invalid = %v", err, invalid)
+	}
+}

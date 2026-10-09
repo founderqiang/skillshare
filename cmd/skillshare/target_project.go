@@ -98,6 +98,9 @@ func targetAddProject(args []string, root string) error {
 	if noSkills {
 		entry.EnsureSkills().SetEnabled(false)
 	}
+	if cfg.TargetNaming == "prefixed" {
+		entry.EnsureSkills().Mode = "copy" // a project target defaults to merge, which prefixed cannot sync
+	}
 
 	cfg.Targets = append(cfg.Targets, entry)
 	if err := cfg.Save(root); err != nil {

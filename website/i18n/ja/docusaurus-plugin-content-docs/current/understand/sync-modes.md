@@ -269,7 +269,7 @@ skillshare sync
 - 兄弟 Skill への相対リンク（`../other-skill/`）は書き換えられません。これは copy mode の `flat` と同じです。
 - この名前がツールに表示される名前になります。Claude Code ではスラッシュコマンドになります。例: `/mattpocock-skills-prototype`。
 
-`prefixed` は copy mode が必要です。merge のリンクは source を指しており、そこでは `name:` を変更できないためです。merge mode または symlink mode で `prefixed` に解決される Target は、バリデーションに失敗し、sync でスキップされます。
+`prefixed` は copy mode が必要です。merge のリンクは source を指しており、そこでは `name:` を変更できないためです。merge mode または symlink mode で `prefixed` に解決される Target は、バリデーションに失敗し、sync でスキップされます。プロジェクトのトップレベルの `target_naming` が `prefixed` の場合、`target add` は新しい Target を copy mode にします。
 
 ```yaml
 targets:

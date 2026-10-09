@@ -316,6 +316,9 @@ func (s *Server) handleAddTarget(w http.ResponseWriter, r *http.Request) {
 		if skillsOff {
 			entry.EnsureSkills().SetEnabled(false)
 		}
+		if s.projectCfg.TargetNaming == "prefixed" {
+			entry.EnsureSkills().Mode = "copy" // a project target defaults to merge, which prefixed cannot sync
+		}
 		s.projectCfg.Targets = append(s.projectCfg.Targets, entry)
 	}
 
