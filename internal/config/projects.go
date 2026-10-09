@@ -3,9 +3,11 @@ package config
 import (
 	"cmp"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -211,13 +213,24 @@ func (c *Config) ValidateProjects(projects map[string]ManagedProject) error {
 				return fmt.Errorf("invalid sync mode %q (valid: %s)", rc.Mode, strings.Join(ValidSyncModes, ", "))
 			}
 		}
-		if sk := project.Skills; sk != nil {
+	}
+	if err := c.projectNamingError(projects); err != nil {
+		return err
+	}
+	return probe.expandProjects()
+}
+
+// projectNamingError checks each project's effective skills naming against its
+// effective mode, which the targets it expands into will inherit.
+func (c *Config) projectNamingError(projects map[string]ManagedProject) error {
+	for _, root := range slices.Sorted(maps.Keys(projects)) {
+		if sk := projects[root].Skills; sk != nil {
 			if err := TargetNamingModeError(cmp.Or(sk.TargetNaming, c.TargetNaming), cmp.Or(sk.Mode, c.Mode)); err != nil {
-				return err
+				return fmt.Errorf("projects: %s: %w", root, err)
 			}
 		}
 	}
-	return probe.expandProjects()
+	return nil
 }
 
 // ConvertibleProject is a group of ordinary targets whose folders are the tool paths of

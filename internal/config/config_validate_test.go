@@ -566,3 +566,13 @@ func TestValidateProjectConfigForSync_InheritedPrefixedNamingRequiresCopyMode(t 
 		t.Fatalf("err = %v, invalid = %v; want claude invalid", err, invalid)
 	}
 }
+
+func TestValidateConfig_ProjectPrefixedNamingRequiresCopyMode(t *testing.T) {
+	// A raw config, as the dashboard saves it: projects are not expanded into targets.
+	cfg := &Config{Source: t.TempDir(), Mode: "merge", Projects: map[string]ManagedProject{
+		"~/work/app": {Skills: &ResourceTargetConfig{TargetNaming: "prefixed"}},
+	}}
+	if _, err := ValidateConfig(cfg); err == nil || !strings.Contains(err.Error(), `projects: ~/work/app: target naming "prefixed" requires copy mode`) {
+		t.Fatalf("err = %v, want the project's prefixed naming rejected", err)
+	}
+}

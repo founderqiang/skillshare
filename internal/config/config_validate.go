@@ -18,7 +18,8 @@ const errAgentsEnabled = "agents.enabled is not supported (only skills.enabled)"
 // Returns warnings (non-fatal) and error (fatal, should return 400).
 func ValidateConfig(cfg *Config) (warnings []string, err error) {
 	warnings, invalid, err := ValidateConfigForSync(cfg)
-	return warnings, joinTargetErrors(err, invalid)
+	// A raw config (the dashboard's config save) has not expanded projects into targets yet.
+	return warnings, errors.Join(joinTargetErrors(err, invalid), cfg.projectNamingError(cfg.Projects))
 }
 
 // ValidateConfigForSync validates a global config for sync, which runs every
