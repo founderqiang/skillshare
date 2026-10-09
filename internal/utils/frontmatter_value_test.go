@@ -68,6 +68,11 @@ func TestSetFrontmatterValue(t *testing.T) {
 			want: "---\n  description: d\n  name: emil-design-prototype\n---\nBody",
 		},
 		{
+			name: "inherited name is set before a document end marker",
+			in:   "---\ndefaults: &d {name: prototype}\n<<: *d\n...\n---\nBody",
+			want: "---\ndefaults: &d {name: prototype}\n<<: *d\nname: emil-design-prototype\n...\n---\nBody",
+		},
+		{
 			name: "no frontmatter gets one",
 			in:   "# Just a body\n",
 			want: "---\nname: emil-design-prototype\n---\n# Just a body\n",

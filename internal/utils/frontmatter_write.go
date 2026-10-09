@@ -171,7 +171,16 @@ func SetFrontmatterValue(filePath, key, value string) error {
 	} else if i, j := fm.keySpan(m, key); i >= 0 {
 		lines = append(lines[:i], append([]string{line}, lines[j:]...)...)
 	} else {
-		lines = append(lines[:fm.end], append([]string{line}, lines[fm.end:]...)...)
+		at := fm.end
+		// A YAML document end marker (...) closes the mapping, so the key goes before it.
+		for i := fm.end - 1; i > fm.open; i-- {
+			if l := strings.TrimRight(lines[i], " \t\r"); l == "..." {
+				at = i
+			} else if l != "" {
+				break
+			}
+		}
+		lines = append(lines[:at], append([]string{line}, lines[at:]...)...)
 	}
 	return os.WriteFile(filePath, []byte(strings.Join(lines, "\n")), 0644)
 }
