@@ -151,8 +151,8 @@ func SetFrontmatterValue(filePath, key, value string) error {
 	}
 
 	lines := fm.lines
-	if i := fm.keyLine(key); i >= 0 {
-		lines[i] = line
+	if i, j := fm.keySpan(key); i >= 0 {
+		lines = append(lines[:i], append([]string{line}, lines[j:]...)...)
 	} else {
 		lines = append(lines[:fm.end], append([]string{line}, lines[fm.end:]...)...)
 	}
@@ -199,6 +199,37 @@ func (fm frontmatterLines) keyLine(key string) int {
 		}
 	}
 	return -1
+}
+
+// keySpan returns the lines [start, end) holding top-level key and its whole
+// value, located through YAML so "key": / key : / multi-line scalars count.
+// Blank and column-0 comment lines before the next key stay outside the span.
+// Frontmatter YAML cannot parse falls back to keyLine; start is -1 when absent.
+func (fm frontmatterLines) keySpan(key string) (int, int) {
+	var doc yaml.Node
+	if yaml.Unmarshal([]byte(strings.Join(fm.lines[fm.open+1:fm.end], "\n")), &doc) != nil ||
+		len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
+		i := fm.keyLine(key)
+		return i, i + 1
+	}
+	m := doc.Content[0].Content
+	for k := 0; k+1 < len(m); k += 2 {
+		if m[k].Value != key {
+			continue
+		}
+		start, end := fm.open+m[k].Line, fm.end // Line is 1-based from the line after "---"
+		if k+2 < len(m) {
+			end = fm.open + m[k+2].Line
+		}
+		for end > start+1 {
+			if l := strings.TrimSpace(fm.lines[end-1]); l != "" && !strings.HasPrefix(fm.lines[end-1], "#") {
+				break
+			}
+			end--
+		}
+		return start, end
+	}
+	return -1, -1
 }
 
 // prepend returns the content with a new frontmatter block holding line.

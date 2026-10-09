@@ -33,6 +33,21 @@ func TestSetFrontmatterValue(t *testing.T) {
 			want: "---\r\nname: emil-design-prototype\r\ndescription: d\r\n---\r\nBody\r\n",
 		},
 		{
+			name: "quoted key is the same field",
+			in:   "---\n\"name\": prototype\n---\nBody",
+			want: "---\nname: emil-design-prototype\n---\nBody",
+		},
+		{
+			name: "space before the colon is the same field",
+			in:   "---\nname : prototype\n---\nBody",
+			want: "---\nname: emil-design-prototype\n---\nBody",
+		},
+		{
+			name: "block scalar is replaced whole, comment before the next key kept",
+			in:   "---\nname: >-\n  proto\n\n  type\n# next\ndescription: d\n---\nBody",
+			want: "---\nname: emil-design-prototype\n# next\ndescription: d\n---\nBody",
+		},
+		{
 			name: "no frontmatter gets one",
 			in:   "# Just a body\n",
 			want: "---\nname: emil-design-prototype\n---\n# Just a body\n",
