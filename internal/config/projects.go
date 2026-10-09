@@ -151,7 +151,8 @@ func (c *Config) expandProjects() error {
 			// ponytail: every target syncs skills, so an agents-only project excludes
 			// them all and is left with an empty skills folder. Teach the sync loops
 			// to skip skills if that folder ever matters.
-			skills := ResourceTargetConfig{Exclude: []string{"*"}}
+			// It syncs no skill, so it takes a naming every mode accepts rather than inherit one.
+			skills := ResourceTargetConfig{Exclude: []string{"*"}, TargetNaming: "flat"}
 			if project.Skills != nil {
 				skills = *project.Skills
 			}
