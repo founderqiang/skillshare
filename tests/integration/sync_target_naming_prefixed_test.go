@@ -300,3 +300,24 @@ func TestTargetAdd_GlobalPrefixedNamingUnderMergeUsesCopyMode(t *testing.T) {
 	sb.RunCLI("target", "add", "cursor", sb.CreateTarget("cursor")).AssertSuccess(t)
 	sb.RunCLI("sync").AssertOutputNotContains(t, "requires copy mode")
 }
+
+func TestDiff_StaleRecordedNamingIsModified(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	targetPath := prefixedFixture(t, sb)
+	writeNamingConfig(sb, targetPath, "prefixed", "copy")
+	sb.RunCLI("sync").AssertSuccess(t)
+
+	// As if a sync renamed the entry and saved the manifest, then stopped before re-copying it.
+	manifest := readSyncManifest(t, sb, targetPath)
+	manifest.Naming["emil-design-prototype"] = "standard"
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sb.WriteFile(filepath.Join(targetPath, ssync.ManifestFile), string(data))
+
+	result := sb.RunCLI("diff", "--no-tui")
+	result.AssertSuccess(t)
+	result.AssertRowContains(t, "Modified", "emil-design-prototype")
+}

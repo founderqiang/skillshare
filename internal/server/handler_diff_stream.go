@@ -145,6 +145,9 @@ func (s *Server) computeTargetDiff(name string, target config.TargetConfig, disc
 					dt.Items = append(dt.Items, diffItem{Skill: resolved.TargetName, Action: "update", Reason: "cannot access target entry", Kind: kindSkill})
 				} else if !targetInfo.IsDir() {
 					dt.Items = append(dt.Items, diffItem{Skill: resolved.TargetName, Action: "update", Reason: "target entry is not a directory", Kind: kindSkill})
+				} else if recorded := manifest.Naming[resolved.TargetName]; recorded != "" && recorded != resolution.Naming {
+					// A copy made under another naming carries another name:, so sync re-copies it.
+					dt.Items = append(dt.Items, diffItem{Skill: resolved.TargetName, Action: "update", Reason: ssync.NamingChangedReason, Kind: kindSkill})
 				} else {
 					oldMtime := manifest.Mtimes[resolved.TargetName]
 					currentMtime, mtimeErr := ssync.DirMaxMtimeWithIgnore(skill.SourcePath, ignorePatterns)

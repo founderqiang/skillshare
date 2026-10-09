@@ -186,6 +186,10 @@ func RenamedFrom(legacy map[string]ResolvedTargetSkill) map[string]string {
 	return renamed
 }
 
+// NamingChangedReason is the diff reason for a managed copy made under another
+// target naming, which sync copies again so its name: follows the current naming.
+const NamingChangedReason = "target naming changed"
+
 // RenameReason is the diff reason for an entry sync renames after a target
 // naming change.
 func RenameReason(old string) string {

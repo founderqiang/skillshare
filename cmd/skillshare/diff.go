@@ -592,7 +592,7 @@ func collectTargetDiff(name string, target config.TargetConfig, source, mode str
 	}
 	legacyNames := resolution.LegacyNames(mode, sc.Path, manifest)
 	if mode == "copy" {
-		collectCopyDiff(&r, name, sc.Path, resolution.Skills, sourceSkills, legacyNames, manifest, ignorePatterns, dp)
+		collectCopyDiff(&r, name, sc.Path, resolution.Skills, resolution.Naming, sourceSkills, legacyNames, manifest, ignorePatterns, dp)
 	} else {
 		// Merge mode (instant)
 		collectMergeDiff(&r, sc.Path, sourceSkills, sourceMap, legacyNames)
@@ -629,7 +629,7 @@ func collectSymlinkDiff(r *targetDiffResult, targetPath, source string) {
 	}
 }
 
-func collectCopyDiff(r *targetDiffResult, targetName, targetPath string, filtered []sync.ResolvedTargetSkill, sourceSkills map[string]bool, legacyNames map[string]sync.ResolvedTargetSkill, manifest *sync.Manifest, ignorePatterns []string, dp *diffProgress) {
+func collectCopyDiff(r *targetDiffResult, targetName, targetPath string, filtered []sync.ResolvedTargetSkill, naming string, sourceSkills map[string]bool, legacyNames map[string]sync.ResolvedTargetSkill, manifest *sync.Manifest, ignorePatterns []string, dp *diffProgress) {
 	renamedFrom := sync.RenamedFrom(legacyNames)
 	for _, resolved := range filtered {
 		skill := resolved.Skill
@@ -665,6 +665,11 @@ func collectCopyDiff(r *targetDiffResult, targetName, targetPath string, filtere
 		}
 		if !targetInfo.IsDir() {
 			r.items = append(r.items, copyDiffEntry{action: "modify", name: resolved.TargetName, reason: "target entry is not a directory", isSync: true, srcDir: srcDir, dstDir: dstDir})
+			continue
+		}
+		// A copy made under another naming carries another name:, so sync re-copies it.
+		if recorded := manifest.Naming[resolved.TargetName]; recorded != "" && recorded != naming {
+			r.items = append(r.items, copyDiffEntry{action: "modify", name: resolved.TargetName, reason: sync.NamingChangedReason, isSync: true, srcDir: srcDir, dstDir: dstDir})
 			continue
 		}
 		// mtime fast-path
@@ -825,7 +830,7 @@ func categorizeItems(items []copyDiffEntry) []actionCategory {
 			add("new", "new", "New", item.name)
 		case item.reason == "deleted from target":
 			add("restore", "new", "Restore", item.name)
-		case item.reason == "content changed":
+		case item.reason == "content changed" || item.reason == sync.NamingChangedReason:
 			add("modified", "modified", "Modified", item.name)
 		case strings.HasPrefix(item.reason, "renamed from "):
 			add("renamed", "modified", "Renamed", item.name)
