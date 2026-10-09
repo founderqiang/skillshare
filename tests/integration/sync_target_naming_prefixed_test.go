@@ -321,3 +321,18 @@ func TestDiff_StaleRecordedNamingIsModified(t *testing.T) {
 	result.AssertSuccess(t)
 	result.AssertRowContains(t, "Modified", "emil-design-prototype")
 }
+
+func TestSync_TargetNamingPrefixed_ReportsCollisionsOnlyThePrefixCreates(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	// Different names, but _a's b-c becomes a-b-c, the local skill's name.
+	sb.CreateNestedSkill("_a/b-c", map[string]string{"SKILL.md": "---\nname: b-c\n---\n# A"})
+	sb.CreateSkill("a-b-c", map[string]string{"SKILL.md": "---\nname: a-b-c\n---\n# Local"})
+	targetPath := sb.CreateTarget("claude")
+	writeNamingConfig(sb, targetPath, "prefixed", "copy")
+
+	result := sb.RunCLI("sync")
+	result.AssertSuccess(t)
+	result.AssertOutputContains(t, "duplicate skill names")
+	result.AssertOutputContains(t, "_a/ vs a-b-c/")
+}

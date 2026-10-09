@@ -746,7 +746,8 @@ func backupTargetsBeforeSync(cfg *config.Config) {
 
 func reportCollisions(skills []sync.DiscoveredSkill, targets map[string]config.TargetConfig) {
 	global, perTarget := sync.CheckNameCollisionsForTargets(skills, targets)
-	if len(global) == 0 {
+	// A target's naming can make distinct names collide (prefixed _a/b-c vs a-b-c).
+	if len(global) == 0 && len(perTarget) == 0 {
 		return
 	}
 
