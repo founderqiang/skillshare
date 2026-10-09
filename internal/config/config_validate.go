@@ -161,6 +161,7 @@ func ValidateProjectConfigForSync(cfg *ProjectConfig, projectRoot string) (warni
 
 	problems := map[string][]string{}
 	for _, entry := range cfg.Targets {
+		entry.defaultTargetNaming = cfg.TargetNaming // a raw config has not been through LoadProject
 		problems[entry.Name] = append(problems[entry.Name], validateProjectTarget(entry, projectRoot, sourcePath, agentsSourcePath)...)
 	}
 	invalid = map[string]error{}

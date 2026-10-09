@@ -557,3 +557,12 @@ func TestValidateProjectConfigForSync_PrefixedNamingRequiresCopyMode(t *testing.
 		t.Fatalf("err = %v, invalid = %v; want only claude invalid", err, invalid)
 	}
 }
+
+func TestValidateProjectConfigForSync_InheritedPrefixedNamingRequiresCopyMode(t *testing.T) {
+	// Not loaded through LoadProject, like the dashboard's raw-config save.
+	cfg := &ProjectConfig{TargetNaming: "prefixed", Targets: []ProjectTargetEntry{{Name: "claude"}}}
+	_, invalid, err := ValidateProjectConfigForSync(cfg, t.TempDir())
+	if err != nil || invalid["claude"] == nil || !strings.Contains(invalid["claude"].Error(), `target naming "prefixed" requires copy mode`) {
+		t.Fatalf("err = %v, invalid = %v; want claude invalid", err, invalid)
+	}
+}
