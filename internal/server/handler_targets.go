@@ -495,7 +495,8 @@ func (s *Server) handleUpdateTarget(w http.ResponseWriter, r *http.Request) {
 		}
 		target.Skills.TargetNaming = *body.TargetNaming
 	}
-	if body.Mode != nil || body.TargetNaming != nil {
+	// Turning skills on counts too: an off target may keep a pair its mode cannot sync.
+	if body.Mode != nil || body.TargetNaming != nil || body.SkillsEnabled != nil && *body.SkillsEnabled {
 		if err := config.TargetNamingModeError(target.SkillsConfig().TargetNaming, cmp.Or(target.Skills.Mode, s.cfg.Mode)); err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return

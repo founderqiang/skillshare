@@ -663,3 +663,19 @@ func TestHandleAddTarget_GlobalPrefixedNamingUnderMergeUsesCopyMode(t *testing.T
 		t.Fatalf("add config dir: got %d %s, mode %q; want copy", rr.Code, rr.Body.String(), tc.SkillsConfig().Mode)
 	}
 }
+
+func TestHandleUpdateTarget_ReenablingSkillsChecksPrefixedNaming(t *testing.T) {
+	s, _ := newTestServer(t)
+	skills := &config.ResourceTargetConfig{Path: filepath.Join(t.TempDir(), "skills"), TargetNaming: "prefixed"}
+	skills.SetEnabled(false) // allowed while off: it syncs no skill
+	s.cfg.Mode = "merge"
+	s.cfg.Targets = map[string]config.TargetConfig{"claude": {Skills: skills}}
+	if err := s.saveConfig(); err != nil {
+		t.Fatal(err)
+	}
+	rr := httptest.NewRecorder()
+	s.handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPatch, "/api/targets/claude", strings.NewReader(`{"skills_enabled":true}`)))
+	if rr.Code != http.StatusBadRequest || !strings.Contains(rr.Body.String(), "requires copy mode") {
+		t.Fatalf("re-enable under merge: got %d %s, want 400", rr.Code, rr.Body.String())
+	}
+}
