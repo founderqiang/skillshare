@@ -31,7 +31,7 @@ const events = {
   configInstalled: () => keys(k.missingConfigEntries, k.skills.all, k.overview, k.syncMatrixAll, k.diff()),
 
   // Targets, projects and sync
-  targetsChanged: () => keys(...targets),
+  targetsChanged: () => keys(...targets, k.instructions.all),
   synced: () => keys(k.targets.all, k.overview, k.diff()),
   syncRan: () => keys(...targets, k.extrasDiff(), k.extras, k.mcp, k.hooks, k.logAll),
   projectSynced: () => keys(...targets, k.mcp, k.hooks, k.logAll),
@@ -42,7 +42,7 @@ const events = {
   targetFileRemoved: (target: string): InvalidateQueryFilters[] => [{ queryKey: k.targetFiles.list(target), exact: true }],
 
   // Config
-  configSaved: () => keys(k.config, k.mcp, k.overview, k.targets.all, k.skills.all, k.extras, k.extrasDiff(), k.diff(), k.syncMatrix(), k.doctor),
+  configSaved: () => keys(k.config, k.mcp, k.overview, k.targets.all, k.skills.all, k.extras, k.extrasDiff(), k.diff(), k.syncMatrix(), k.doctor, k.instructions.all),
   settingsSaved: () => keys(k.config),
   skillignoreSaved: () => keys(k.skillignore, ...ignoreFile),
   agentignoreSaved: () => keys(k.agentignore, ...ignoreFile),

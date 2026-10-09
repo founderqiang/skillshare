@@ -82,7 +82,7 @@ const stale: Record<QueryEvent, Label[] | { args: string[]; stale: Label[] }> = 
   collected: { args: ['claude'], stale: [...S, 'overview', ...T, 'diff', 'syncMatrix', 'collectScanClaude'] },
   configInstalled: ['missingConfigEntries', ...S, 'overview', ...SM, 'diff'],
 
-  targetsChanged: TARGETS,
+  targetsChanged: [...TARGETS, 'instructions'],
   synced: [...T, 'overview', 'diff'],
   syncRan: [...TARGETS, 'extrasDiff', ...X, ...M, ...H, 'log'],
   projectSynced: [...TARGETS, ...M, ...H, 'log'],
@@ -91,7 +91,7 @@ const stale: Record<QueryEvent, Label[] | { args: string[]; stale: Label[] }> = 
   targetFilesChanged: { args: ['claude'], stale: ['targetFiles', 'targetFile'] },
   targetFileRemoved: { args: ['claude'], stale: ['targetFiles'] },
 
-  configSaved: ['config', ...M, 'overview', ...T, ...S, ...X, 'extrasDiff', 'diff', 'syncMatrix', 'doctor'],
+  configSaved: ['config', ...M, 'overview', ...T, ...S, ...X, 'extrasDiff', 'diff', 'syncMatrix', 'doctor', 'instructions'],
   settingsSaved: ['config'],
   skillignoreSaved: ['skillignore', 'diff', 'overview', ...S, 'doctor'],
   agentignoreSaved: ['agentignore', 'diff', 'overview', ...S, 'doctor'],
