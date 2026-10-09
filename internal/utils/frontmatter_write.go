@@ -137,8 +137,9 @@ func ToggleFrontmatterFlag(filePath, key string) (bool, error) {
 
 // SetFrontmatterValue sets a top-level frontmatter key to a plain scalar value,
 // adding the key (or the whole frontmatter block) when it is missing. Like
-// ToggleFrontmatterFlag it edits only the key's lines, so key order, comments, line
-// endings and the body are kept; a flow-style mapping ({...}) is rewritten whole.
+// ToggleFrontmatterFlag it edits only the key's lines (a missing key goes before the
+// first one), so key order, comments, line endings and the body are kept; a
+// flow-style mapping ({...}) is rewritten whole.
 // value is written unquoted and must be a plain YAML scalar.
 func SetFrontmatterValue(filePath, key, value string) error {
 	data, err := os.ReadFile(filePath)
@@ -153,9 +154,6 @@ func SetFrontmatterValue(filePath, key, value string) error {
 
 	lines := fm.lines
 	m := fm.mapping()
-	if m != nil && len(m.Content) > 0 {
-		line = strings.Repeat(" ", m.Content[0].Column-1) + line // a root mapping may be indented as a whole
-	}
 	if m != nil && m.Style&yaml.FlowStyle != 0 {
 		// Flow-style keys share lines, so the mapping is written back whole.
 		setMappingScalar(m, key, value)
@@ -183,19 +181,15 @@ func SetFrontmatterValue(filePath, key, value string) error {
 			line = string(before) + anchor + value + fm.cr
 		}
 		lines = append(lines[:i], append([]string{line}, lines[j:]...)...)
+	} else if m != nil && len(m.Content) > 0 {
+		// Before the first key, with that line's indent: inside the mapping whatever
+		// follows it (a "..." end marker, comments), and an explicit key still
+		// overrides one a merge key (<<) brings in, wherever it stands.
+		at := fm.open + m.Content[0].Line
+		indent := lines[at][:len(lines[at])-len(strings.TrimLeft(lines[at], " \t"))]
+		lines = append(lines[:at], append([]string{indent + line}, lines[at:]...)...)
 	} else {
-		at := fm.end
-		// A YAML document end marker (..., optionally followed by a comment) closes the
-		// mapping, so the key goes before it; blank and comment lines may follow it.
-		for i := fm.end - 1; i > fm.open; i-- {
-			l := strings.TrimRight(lines[i], " \t\r")
-			if l == "..." || strings.HasPrefix(l, "... ") || strings.HasPrefix(l, "...\t") {
-				at = i
-			} else if l != "" && !strings.HasPrefix(l, "#") {
-				break
-			}
-		}
-		lines = append(lines[:at], append([]string{line}, lines[at:]...)...)
+		lines = append(lines[:fm.end], append([]string{line}, lines[fm.end:]...)...)
 	}
 	return os.WriteFile(filePath, []byte(strings.Join(lines, "\n")), 0644)
 }

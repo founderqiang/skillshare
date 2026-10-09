@@ -25,7 +25,7 @@ func TestSetFrontmatterValue(t *testing.T) {
 		{
 			name: "nested key of the same name is not the field",
 			in:   "---\nmetadata:\n  name: prototype\n---\nBody",
-			want: "---\nmetadata:\n  name: prototype\nname: emil-design-prototype\n---\nBody",
+			want: "---\nname: emil-design-prototype\nmetadata:\n  name: prototype\n---\nBody",
 		},
 		{
 			name: "CRLF line endings are kept",
@@ -65,17 +65,17 @@ func TestSetFrontmatterValue(t *testing.T) {
 		{
 			name: "indented root mapping without name gets it at the same indent",
 			in:   "---\n  description: d\n---\nBody",
-			want: "---\n  description: d\n  name: emil-design-prototype\n---\nBody",
+			want: "---\n  name: emil-design-prototype\n  description: d\n---\nBody",
 		},
 		{
-			name: "inherited name is set before a document end marker",
+			name: "inherited name is set inside the mapping, before a document end marker",
 			in:   "---\ndefaults: &d {name: prototype}\n<<: *d\n...\n---\nBody",
-			want: "---\ndefaults: &d {name: prototype}\n<<: *d\nname: emil-design-prototype\n...\n---\nBody",
+			want: "---\nname: emil-design-prototype\ndefaults: &d {name: prototype}\n<<: *d\n...\n---\nBody",
 		},
 		{
-			name: "document end marker with a comment, and a comment after it",
-			in:   "---\ndefaults: &d {name: prototype}\n<<: *d\n... # end\n# trailing\n---\nBody",
-			want: "---\ndefaults: &d {name: prototype}\n<<: *d\nname: emil-design-prototype\n... # end\n# trailing\n---\nBody",
+			name: "document end marker with a comment, and indented comments after it",
+			in:   "---\n# head\ndefaults: &d {name: prototype}\n<<: *d\n... # end\n  # trailing\n---\nBody",
+			want: "---\n# head\nname: emil-design-prototype\ndefaults: &d {name: prototype}\n<<: *d\n... # end\n  # trailing\n---\nBody",
 		},
 		{
 			name: "anchor on the name is kept for its aliases",
@@ -96,6 +96,11 @@ func TestSetFrontmatterValue(t *testing.T) {
 			name: "explicit key keeps its key line",
 			in:   "---\n? name\n: prototype\ndescription: d\n---\nBody",
 			want: "---\n? name\n: emil-design-prototype\ndescription: d\n---\nBody",
+		},
+		{
+			name: "inherited name under an explicit first key gets the root indent",
+			in:   "---\n? defaults\n: &d {name: prototype}\n<<: *d\n---\nBody",
+			want: "---\nname: emil-design-prototype\n? defaults\n: &d {name: prototype}\n<<: *d\n---\nBody",
 		},
 		{
 			name: "no frontmatter gets one",
