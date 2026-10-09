@@ -91,10 +91,10 @@ cursor
 |-------|---------|--------|
 | New | source에 있지만 target에 없음 | `sync`가 추가함 |
 | Restore | target에 있었으나 삭제됨 | `sync`가 복원함 |
-| Modified | 콘텐츠 또는 target naming이 변경됨(copy mode) | `sync`가 업데이트함 |
+| Modified | 콘텐츠 또는 target naming이 변경됨(copy mode), 또는 merge sync가 링크로 교체하는, 편집되지 않은 copy mode 복사본 | `sync`가 업데이트함 |
 | Renamed | 관리 항목이 이전 `target_naming`이 준 이름을 아직 사용함 | `sync`가 이름을 변경함 |
 | Local only, skill kept under old name | 현재 `target_naming`이 skill에 주는 이름을 로컬 폴더가 사용 중이라 skill이 이전 관리 항목에 남음(`name (stays at old-name)`으로 표시) | 폴더 이름을 바꾸거나 삭제한 뒤 `sync` |
-| Local override | symlink 대신 local 사본 | `sync --force`로 교체 |
+| Local override | symlink 대신 local 사본(편집된 copy mode 복사본 포함) | `sync --force`로 교체 |
 | Orphan | manifest에는 있지만 source에는 없음 | `sync`가 제거함 |
 | Local only | target에만 존재, source에는 없음 | `collect`로 가져오기 |
 

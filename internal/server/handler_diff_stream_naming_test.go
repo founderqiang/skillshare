@@ -90,3 +90,31 @@ func TestComputeTargetDiff_LocalFolderOnNewNameKeepsLegacyEntry(t *testing.T) {
 		t.Fatalf("items = %+v, want the local folder reported with the kept legacy entry", dt.Items)
 	}
 }
+
+func TestComputeTargetDiff_MergeModeCopyModeCopyIsReplacedWithLink(t *testing.T) {
+	source, target := t.TempDir(), t.TempDir()
+	for _, dir := range []string{filepath.Join(source, "alpha"), filepath.Join(target, "alpha")} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: alpha\n---\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	checksum, err := ssync.DirChecksumWithIgnore(filepath.Join(source, "alpha"), ssync.DefaultFileIgnorePatterns())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ssync.WriteManifest(target, &ssync.Manifest{Managed: map[string]string{"alpha": checksum}}); err != nil {
+		t.Fatal(err)
+	}
+	discovered, err := ssync.DiscoverSourceSkills(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dt := (&Server{}).computeTargetDiff("claude", config.TargetConfig{Skills: &config.ResourceTargetConfig{Path: target, Mode: "merge"}}, discovered, "merge", source, nil)
+	if len(dt.Items) != 1 || dt.Items[0].Action != "update" || dt.Items[0].Reason != ssync.CopyToLinkReason {
+		t.Fatalf("items = %+v, want one update replacing the copy with a link", dt.Items)
+	}
+}

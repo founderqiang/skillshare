@@ -793,7 +793,11 @@ func collectMergeDiff(r *targetDiffResult, targetPath string, sourceSkills map[s
 		} else if old, ok := renamedFrom[skill]; ok && !targetSymlinks[skill] {
 			r.items = append(r.items, copyDiffEntry{action: "remove", name: skill, reason: sync.KeptLegacyReason(old), keptAt: old})
 		} else if !targetSymlinks[skill] {
-			r.items = append(r.items, copyDiffEntry{action: "modify", name: skill, reason: "local copy (sync --force to replace)", isSync: true, srcDir: srcDir, dstDir: dstDir})
+			reason := "local copy (sync --force to replace)"
+			if manifest.OwnsCopy(skill, dstDir) {
+				reason = sync.CopyToLinkReason
+			}
+			r.items = append(r.items, copyDiffEntry{action: "modify", name: skill, reason: reason, isSync: true, srcDir: srcDir, dstDir: dstDir})
 			r.syncCount++
 		}
 	}
@@ -863,7 +867,7 @@ func categorizeItems(items []copyDiffEntry) []actionCategory {
 			add("new", "new", "New", item.name)
 		case item.reason == "deleted from target":
 			add("restore", "new", "Restore", item.name)
-		case item.reason == "content changed" || item.reason == sync.NamingChangedReason:
+		case item.reason == "content changed" || item.reason == sync.NamingChangedReason || item.reason == sync.CopyToLinkReason:
 			add("modified", "modified", "Modified", item.name)
 		case strings.HasPrefix(item.reason, "renamed from "):
 			add("renamed", "modified", "Renamed", item.name)
