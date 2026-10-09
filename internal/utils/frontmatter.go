@@ -11,20 +11,48 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ParseSkillName reads the SKILL.md and extracts the "name" from frontmatter.
+// ParseSkillName reads the SKILL.md and extracts the top-level "name" from frontmatter.
+// It stops at the name line, so only a flow-style block ({...}) is read whole. Top-level
+// keys share the first key's indent; "name", 'name' and name : all count.
 func ParseSkillName(skillPath string) (string, error) {
-	name := ""
+	name, indent := "", -1
+	var flow []string // the block's lines once it turns out to be a flow mapping
 	err := scanLenientBlock(filepath.Join(skillPath, "SKILL.md"), func(raw []byte) bool {
-		line := strings.TrimSpace(string(raw))
-		if !strings.HasPrefix(line, "name:") {
+		line := string(raw)
+		trimmed := strings.TrimLeft(line, " \t")
+		if flow != nil {
+			flow = append(flow, line)
 			return true
 		}
-		// Extract value: "name: my-skill" -> "my-skill", without quotes
-		name = strings.Trim(strings.TrimSpace(strings.SplitN(line, ":", 2)[1]), `"'`)
+		if trimmed == "" || trimmed[0] == '#' {
+			return true
+		}
+		if indent < 0 {
+			if indent = len(line) - len(trimmed); trimmed[0] == '{' {
+				flow = []string{line}
+				return true
+			}
+		}
+		key, value, ok := strings.Cut(trimmed, ":")
+		if len(line)-len(trimmed) != indent || !ok || strings.Trim(strings.TrimSpace(key), `"'`) != "name" {
+			return true
+		}
+		// The line alone decodes quotes and a trailing comment; a value YAML rejects is read as is.
+		var fm map[string]any
+		if yaml.Unmarshal([]byte("name:"+value), &fm) == nil {
+			if v, isString := fm["name"].(string); isString {
+				name = v
+				return false
+			}
+		}
+		name = strings.Trim(strings.TrimSpace(value), `"'`)
 		return false
 	})
 	if err != nil {
 		return "", err
+	}
+	if flow != nil {
+		name, _ = decodeFrontmatter([]byte(strings.Join(flow, "\n")))["name"].(string)
 	}
 	return name, nil
 }
