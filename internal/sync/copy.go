@@ -273,7 +273,13 @@ func copySkillToTarget(src, dst, newName string, ignorePatterns []string) error 
 	if newName == "" {
 		return nil
 	}
-	if err := utils.SetFrontmatterValue(filepath.Join(dst, "SKILL.md"), "name", newName); err != nil {
+	skillFile := filepath.Join(dst, "SKILL.md")
+	// The copy keeps the source's mode; lift a read-only one for the rewrite only.
+	if info, err := os.Stat(skillFile); err == nil && info.Mode().Perm()&0o200 == 0 {
+		os.Chmod(skillFile, info.Mode().Perm()|0o200)
+		defer os.Chmod(skillFile, info.Mode().Perm())
+	}
+	if err := utils.SetFrontmatterValue(skillFile, "name", newName); err != nil {
 		// dst was just created by this copy; left behind without a manifest
 		// entry, it would pass for a user's folder and never be refreshed.
 		os.RemoveAll(dst)

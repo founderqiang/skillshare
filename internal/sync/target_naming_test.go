@@ -99,3 +99,22 @@ func TestCopySkillToTarget_RemovesCopyWhenNameRewriteFails(t *testing.T) {
 		t.Fatalf("copy left behind: %v", err)
 	}
 }
+
+func TestCopySkillToTarget_RewritesReadOnlySkillFile(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("a read-only file is still writable as root")
+	}
+	src := t.TempDir()
+	if err := os.WriteFile(filepath.Join(src, "SKILL.md"), []byte("---\nname: skill\n---\n"), 0o444); err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(t.TempDir(), "repo-skill")
+
+	if err := copySkillToTarget(src, dst, "repo-skill", nil); err != nil {
+		t.Fatalf("copySkillToTarget: %v", err)
+	}
+	info, err := os.Stat(filepath.Join(dst, "SKILL.md"))
+	if err != nil || info.Mode().Perm() != 0o444 {
+		t.Fatalf("copied SKILL.md mode = %v, err = %v; want the source's 0444 kept", info, err)
+	}
+}
