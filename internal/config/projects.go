@@ -226,7 +226,7 @@ func (c *Config) ValidateProjects(projects map[string]ManagedProject) error {
 // It covers projects whose folder is missing, which expand into no target yet.
 func (c *Config) ProjectNamingError(projects map[string]ManagedProject, mode string) error {
 	for _, root := range slices.Sorted(maps.Keys(projects)) {
-		if sk := projects[root].Skills; sk != nil {
+		if sk := projects[root].Skills; sk != nil && sk.IsEnabled() {
 			if err := TargetNamingModeError(cmp.Or(sk.TargetNaming, c.TargetNaming), cmp.Or(sk.Mode, mode)); err != nil {
 				return fmt.Errorf("projects: %s: %w", root, err)
 			}

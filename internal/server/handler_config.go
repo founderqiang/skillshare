@@ -89,7 +89,7 @@ func (s *Server) handlePatchConfig(w http.ResponseWriter, r *http.Request) {
 		// Targets that inherit the mode must still be able to honour their naming.
 		for name, t := range s.cfg.Targets {
 			sc := t.SkillsConfig()
-			if err := config.TargetNamingModeError(sc.TargetNaming, cmp.Or(sc.Mode, *body.Mode)); err != nil {
+			if err := config.TargetNamingModeError(sc.TargetNaming, cmp.Or(sc.Mode, *body.Mode)); err != nil && sc.IsEnabled() {
 				writeError(w, http.StatusBadRequest, "target "+name+": "+err.Error())
 				return
 			}
