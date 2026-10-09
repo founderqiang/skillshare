@@ -29,6 +29,7 @@ list-open-tracked|skillshare list|Type `/`;Type `review`;Enter;Enter
 list-open-agent|skillshare list|Tab;Enter
 target|skillshare target list|
 target-edit|skillshare target list|Type `e`
+target-naming|skillshare target list|Type `e`;Down;Enter
 target-confirm|skillshare target list|Type `d`
 extras|skillshare extras list|
 extras-edit|skillshare extras list|Type `e`

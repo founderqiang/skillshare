@@ -114,10 +114,11 @@ func (s *Server) computeTargetDiff(name string, target config.TargetConfig, disc
 	dt.CollisionCount = len(resolution.Collisions)
 	dt.SkippedCount = len(filtered) - len(resolution.Skills)
 	validNames := resolution.ValidTargetNames()
-	legacyNames := resolution.LegacyFlatNames()
+	manifest, _ := ssync.ReadManifest(sc.Path)
+	legacyNames := resolution.LegacyNames(mode, sc.Path, manifest)
+	renamedFrom := ssync.RenamedFrom(legacyNames)
 
 	if mode == "copy" {
-		manifest, _ := ssync.ReadManifest(sc.Path)
 		for _, resolved := range resolution.Skills {
 			skill := resolved.Skill
 			oldChecksum, isManaged := manifest.Managed[resolved.TargetName]
@@ -129,6 +130,8 @@ func (s *Server) computeTargetDiff(name string, target config.TargetConfig, disc
 					} else {
 						dt.Items = append(dt.Items, diffItem{Skill: resolved.TargetName, Action: "update", Reason: "target entry is not a directory", Kind: kindSkill})
 					}
+				} else if old, ok := renamedFrom[resolved.TargetName]; ok && os.IsNotExist(statErr) {
+					dt.Items = append(dt.Items, diffItem{Skill: resolved.TargetName, Action: "update", Reason: ssync.RenameReason(old), Kind: kindSkill})
 				} else if os.IsNotExist(statErr) {
 					dt.Items = append(dt.Items, diffItem{Skill: resolved.TargetName, Action: "link", Reason: "source only", Kind: kindSkill})
 				} else {
@@ -142,6 +145,9 @@ func (s *Server) computeTargetDiff(name string, target config.TargetConfig, disc
 					dt.Items = append(dt.Items, diffItem{Skill: resolved.TargetName, Action: "update", Reason: "cannot access target entry", Kind: kindSkill})
 				} else if !targetInfo.IsDir() {
 					dt.Items = append(dt.Items, diffItem{Skill: resolved.TargetName, Action: "update", Reason: "target entry is not a directory", Kind: kindSkill})
+				} else if recorded := manifest.Naming[resolved.TargetName]; recorded != "" && recorded != resolution.Naming {
+					// A copy made under another naming carries another name:, so sync re-copies it.
+					dt.Items = append(dt.Items, diffItem{Skill: resolved.TargetName, Action: "update", Reason: ssync.NamingChangedReason, Kind: kindSkill})
 				} else {
 					oldMtime := manifest.Mtimes[resolved.TargetName]
 					currentMtime, mtimeErr := ssync.DirMaxMtimeWithIgnore(skill.SourcePath, ignorePatterns)
@@ -174,7 +180,9 @@ func (s *Server) computeTargetDiff(name string, target config.TargetConfig, disc
 		targetSkillPath := filepath.Join(sc.Path, resolved.TargetName)
 		_, err := os.Lstat(targetSkillPath)
 		if err != nil {
-			if os.IsNotExist(err) {
+			if old, ok := renamedFrom[resolved.TargetName]; ok && os.IsNotExist(err) {
+				dt.Items = append(dt.Items, diffItem{Skill: resolved.TargetName, Action: "update", Reason: ssync.RenameReason(old), Kind: kindSkill})
+			} else if os.IsNotExist(err) {
 				dt.Items = append(dt.Items, diffItem{Skill: resolved.TargetName, Action: "link", Reason: "source only", Kind: kindSkill})
 			}
 			continue
@@ -197,7 +205,6 @@ func (s *Server) computeTargetDiff(name string, target config.TargetConfig, disc
 
 	// Orphan check
 	entries, _ := os.ReadDir(sc.Path)
-	manifest, _ := ssync.ReadManifest(sc.Path)
 	for _, entry := range entries {
 		eName := entry.Name()
 		if manifest.SkipsHidden(eName) {

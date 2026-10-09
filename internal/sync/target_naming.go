@@ -2,9 +2,13 @@ package sync
 
 import (
 	"fmt"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
+	"unicode"
+
+	"golang.org/x/text/unicode/norm"
 
 	"skillshare/internal/config"
 	"skillshare/internal/skillpkg"
@@ -99,12 +103,22 @@ func ResolveTargetSkillsForTarget(targetName string, sc config.ResourceTargetCon
 			continue
 		}
 
+		entryName := skillName
+		if naming == "prefixed" {
+			entryName = PrefixedTargetName(skill, skillName)
+			if reason := skillpkg.ValidateName(entryName, entryName); reason != "" {
+				result.Warnings = append(result.Warnings,
+					fmt.Sprintf("Target '%s': skipped %s because its prefixed name is invalid: %s", targetName, skill.RelPath, reason))
+				continue
+			}
+		}
+
 		candidates = append(candidates, ResolvedTargetSkill{
 			Skill:      skill,
-			TargetName: skillName,
+			TargetName: entryName,
 			SkillName:  skillName,
 		})
-		collisionMap[skillName] = append(collisionMap[skillName], skill.RelPath)
+		collisionMap[entryName] = append(collisionMap[entryName], skill.RelPath)
 	}
 
 	collisionNames := make(map[string]bool)
@@ -147,20 +161,87 @@ func (r *TargetSkillResolution) ValidTargetNames() map[string]bool {
 	return names
 }
 
-// LegacyFlatNames returns the old flat names for skills that now use a
-// different target-visible name under standard naming.
-func (r *TargetSkillResolution) LegacyFlatNames() map[string]ResolvedTargetSkill {
+// LegacyNames returns the entries in targetPath that a skill still holds under
+// the name another target naming gave it, keyed by that name. Sync renames such
+// an entry unless the new name is taken, so prune and diff must not treat it
+// as an orphan.
+func (r *TargetSkillResolution) LegacyNames(mode, targetPath string, manifest *Manifest) map[string]ResolvedTargetSkill {
 	legacy := make(map[string]ResolvedTargetSkill)
-	if r == nil || r.Naming != "standard" {
+	if r == nil {
 		return legacy
 	}
+	taken := r.ValidTargetNames()
 	for _, skill := range r.Skills {
-		if skill.TargetName == skill.Skill.FlatName {
-			continue
+		if old, err := findLegacyTargetEntry(mode, targetPath, skill, taken, manifest); err == nil && old.name != "" {
+			legacy[old.name] = skill
 		}
-		legacy[skill.Skill.FlatName] = skill
 	}
 	return legacy
+}
+
+// RenamedFrom inverts LegacyNames: for each target name sync will move a
+// legacy entry into, the entry's current name.
+func RenamedFrom(legacy map[string]ResolvedTargetSkill) map[string]string {
+	renamed := make(map[string]string, len(legacy))
+	for old, skill := range legacy {
+		renamed[skill.TargetName] = old
+	}
+	return renamed
+}
+
+// NamingChangedReason is the diff reason for a managed copy made under another
+// target naming, which sync copies again so its name: follows the current naming.
+const NamingChangedReason = "target naming changed"
+
+// RenameReason is the diff reason for an entry sync renames after a target
+// naming change.
+func RenameReason(old string) string {
+	return "renamed from " + old + " (target naming changed)"
+}
+
+// namedTarget is the entry name a skill gets under one target naming.
+type namedTarget struct{ naming, name string }
+
+// targetNameCandidates returns the entry name a skill gets under each target
+// naming, in the order a manifest without naming records is checked. The
+// standard and prefixed names come from the folder name, which standard naming
+// requires name: to match, so no SKILL.md has to be read.
+func targetNameCandidates(skill DiscoveredSkill) []namedTarget {
+	base := filepath.Base(filepath.Clean(skill.SourcePath))
+	return []namedTarget{
+		{"flat", skill.FlatName},
+		{"standard", base},
+		{"prefixed", PrefixedTargetName(skill, base)},
+	}
+}
+
+// PrefixedTargetName returns "<repo>-<name>" for a skill inside a tracked repo,
+// where <repo> is the repo folder without its leading "_", reduced to the
+// characters a skill name allows. Other skills, and names that already start
+// with the repo, keep their name.
+func PrefixedTargetName(skill DiscoveredSkill, skillName string) string {
+	if !skill.IsInRepo {
+		return skillName
+	}
+	repo := normalizeSpecName(strings.TrimPrefix(path.Base(filepath.ToSlash(skill.RepoRelPath)), "_"))
+	if repo == "" || skillName == repo || strings.HasPrefix(skillName, repo+"-") {
+		return skillName
+	}
+	return repo + "-" + skillName
+}
+
+// normalizeSpecName applies NFKC and lowercases s, as skillpkg.ValidateName reads a
+// name, turns every character other than a letter or number (in any script) into
+// "-", collapses repeated hyphens and trims them from both ends.
+func normalizeSpecName(s string) string {
+	mapped := strings.Map(func(r rune) rune {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) {
+			return r
+		}
+		return '-'
+	}, strings.ToLower(norm.NFKC.String(s)))
+	parts := strings.FieldsFunc(mapped, func(r rune) bool { return r == '-' })
+	return strings.Join(parts, "-")
 }
 
 func validateStandardTargetSkill(skill DiscoveredSkill, skillName string) string {

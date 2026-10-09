@@ -238,6 +238,7 @@ targets:
 |--------|----------|
 | `flat`（預設） | 巢狀 skills 以 `__` 分隔符扁平化：`frontend/dev` → `frontend__dev` |
 | `standard` | 使用 SKILL.md 的 `name` 欄位：`frontend/dev` → `dev` |
+| `prefixed` | 僅限 copy mode。在 `standard` 的基礎上，前面加上 tracked repo 名稱：`_mattpocock-skills/skills/prototype` → `mattpocock-skills-prototype` |
 
 可全域設定或依 target 個別設定：
 
@@ -258,9 +259,28 @@ skillshare sync
 
 **Standard mode** 遵循 [Agent Skills specification](https://agentskills.io/specification)，該規範要求 SKILL.md 的 `name` 欄位須與父層目錄名稱相符。合法的名稱最多 64 個字元，只能包含小寫字母（任何文字系統皆可）、數字與單一連字號，且不能以 `-` 開頭或結尾；不允許底線。名稱不合法或有名稱衝突的 skills 會顯示警告並被略過。
 
-**Migration（遷移）**：從 `flat` 切換到 `standard` 時，會自動就地重新命名既有的受管理項目。如果某個裸名稱已被本機 skill 佔用，原本的 flat 項目會被保留。
+**Prefixed mode** 適用於含有同名 skill 的 tracked repo。在 `standard` 下，來自不同 repo 的兩個 `prototype` skill 會衝突而都被略過；在 `prefixed` 下，tracked repo 內的每個 skill 都會變成 `<repo>-<name>`，因此兩者都能送達工具。`<repo>` 是 tracked repo 資料夾名稱去掉開頭的 `_`、轉為小寫，並把字母與數字（任何文字系統）以外的字元替換為 `-` 的結果。加上前綴的名稱既用作資料夾名稱，也會寫入複製出的 `SKILL.md` 的 `name:`；source 不會被修改。
 
-**Symlink mode**：`target_naming` 會被忽略 — 整個目錄會原封不動地被連結。
+- 名稱已經以 repo 名稱開頭時，不會重複加前綴：`_bmad/skills/bmad-ux` 仍是 `bmad-ux`。
+- 不在 tracked repo 內的 skill 維持原名。
+- source skill 必須先通過 `standard` 檢查。加上前綴後的名稱超過 64 個字元時會顯示警告並被略過，仍然衝突的名稱與 `standard` 一樣被略過。
+- 想要更短的前綴，可以用較短的名稱 track repo：`skillshare install <repo> --track --name mp` 會得到 `mp-prototype`。
+- 指向同層 skill 的相對連結（`../other-skill/`）不會被改寫，與 copy mode 下的 `flat` 相同。
+- 該名稱就是工具中顯示的名稱；在 Claude Code 中它是 slash command，例如 `/mattpocock-skills-prototype`。
+
+`prefixed` 需要 copy mode，因為 merge 連結指向 source，而 source 中的 `name:` 不能被修改。在 merge 或 symlink mode 下解析為 `prefixed` 的 target 會驗證失敗，並被 sync 略過。新 target 若會在 copy 以外的 mode 下繼承 `prefixed`（專案 target 預設為 merge），`target add` 會讓它使用 copy mode。
+
+```yaml
+targets:
+  universal:
+    skills:
+      mode: copy
+      target_naming: prefixed
+```
+
+**Migration（遷移）**：在 `flat`、`standard` 與 `prefixed` 之間切換時，會就地重新命名既有的受管理項目。在 copy mode 下，manifest 會記錄每個複本是由哪種命名方式產生的，因此即使 source 沒有變動，被重新命名的複本也會重新複製，使其 `name:` 與新的命名方式一致。如果某個本機 skill 已佔用新名稱，原本的受管理項目會被保留。
+
+**Symlink mode**：`flat` 和 `standard` 會被忽略 — 整個目錄會原封不動地被連結。`prefixed` 則如上所述會驗證失敗。
 
 ---
 

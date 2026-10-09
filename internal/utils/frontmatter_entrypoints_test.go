@@ -365,3 +365,24 @@ func TestFrontmatterEntryPoints_KeyReadersStopAtTheKey(t *testing.T) {
 		})
 	}
 }
+
+func TestParseSkillName_ValidYAMLForms(t *testing.T) {
+	for _, fm := range []string{
+		`"name": prototype`,
+		`name : prototype`,
+		`name: prototype # upstream`,
+		`{name: prototype, description: d}`,
+		"metadata:\n  name: other\nname: prototype",
+		"name: >-\n  prototype\ndescription: d",
+		"base: &n prototype\nname: *n",
+		"defaults: &d {name: prototype}\n<<: *d",
+		"? name\n: prototype",
+		"name: \"proto\\\n  type\"",
+		"name: prototype\nbad: [unclosed", // not YAML: the name: line is still read
+	} {
+		dir, _ := writeSkill(t, []byte("---\n"+fm+"\n---\nbody\n"))
+		if got, err := ParseSkillName(dir); err != nil || got != "prototype" {
+			t.Errorf("%q: ParseSkillName = %q, %v; want prototype", fm, got, err)
+		}
+	}
+}

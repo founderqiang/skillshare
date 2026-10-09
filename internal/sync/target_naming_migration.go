@@ -8,25 +8,18 @@ import (
 	"skillshare/internal/utils"
 )
 
-func selectActiveTargetNameForSync(mode, targetPath string, skill ResolvedTargetSkill, manifest *Manifest, dryRun bool) (string, error) {
+// selectActiveTargetNameForSync returns the entry name a skill syncs to. When
+// the skill still has a managed entry under the name an earlier target naming
+// gave it, that entry is renamed in place, unless the new name is taken.
+// taken holds the names other skills sync to in this run.
+func selectActiveTargetNameForSync(mode, targetPath string, skill ResolvedTargetSkill, taken map[string]bool, manifest *Manifest, dryRun bool) (string, error) {
 	desiredName := skill.TargetName
-	legacyName := skill.Skill.FlatName
-	if desiredName == "" || desiredName == legacyName {
-		return desiredName, nil
+	legacy, err := findLegacyTargetEntry(mode, targetPath, skill, taken, manifest)
+	if err != nil || legacy.name == "" {
+		return desiredName, err
 	}
-
+	legacyName, legacyNaming := legacy.name, legacy.naming
 	legacyPath := filepath.Join(targetPath, legacyName)
-	info, err := os.Lstat(legacyPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return desiredName, nil
-		}
-		return "", fmt.Errorf("failed to inspect legacy target entry %s: %w", legacyName, err)
-	}
-
-	if !isManagedLegacyTargetEntry(mode, legacyPath, info, skill, manifest) {
-		return desiredName, nil
-	}
 
 	desiredPath := filepath.Join(targetPath, desiredName)
 	if _, err := os.Lstat(desiredPath); err == nil {
@@ -46,26 +39,77 @@ func selectActiveTargetNameForSync(mode, targetPath string, skill ResolvedTarget
 	if err := os.Rename(legacyPath, desiredPath); err != nil {
 		return "", fmt.Errorf("failed to rename managed target entry %s -> %s: %w", legacyName, desiredName, err)
 	}
-	renameManifestEntry(manifest, legacyName, desiredName)
+	renameManifestEntry(manifest, legacyName, desiredName, legacyNaming)
+	// Record the rename now: if a later skill fails, the manifest must still
+	// name this entry, or the next sync would take it for a user folder.
+	if err := WriteManifest(targetPath, manifest); err != nil {
+		renameManifestEntry(manifest, desiredName, legacyName, legacyNaming)
+		if rbErr := os.Rename(desiredPath, legacyPath); rbErr != nil {
+			return "", fmt.Errorf("failed to record rename %s -> %s: %w (rename back also failed: %v)", legacyName, desiredName, err, rbErr)
+		}
+		return "", fmt.Errorf("failed to record rename %s -> %s: %w", legacyName, desiredName, err)
+	}
 	return desiredName, nil
 }
 
-func isManagedLegacyTargetEntry(mode, legacyPath string, info os.FileInfo, skill ResolvedTargetSkill, manifest *Manifest) bool {
+// findLegacyTargetEntry returns the managed entry a skill holds under the name
+// another target naming gave it, with that naming, or a zero value when there is none:
+// when the skill already has its current name, or the old name is one another
+// skill syncs to (taken), there is nothing to migrate.
+func findLegacyTargetEntry(mode, targetPath string, skill ResolvedTargetSkill, taken map[string]bool, manifest *Manifest) (namedTarget, error) {
+	prev := ""
+	for _, c := range targetNameCandidates(skill.Skill) {
+		if c.name == "" || c.name == prev || c.name == skill.TargetName || taken[c.name] {
+			continue
+		}
+		prev = c.name
+		legacyPath := filepath.Join(targetPath, c.name)
+		info, err := os.Lstat(legacyPath)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return namedTarget{}, fmt.Errorf("failed to inspect legacy target entry %s: %w", c.name, err)
+		}
+		if !isManagedTargetEntry(mode, legacyPath, info, skill, manifest, c) {
+			continue
+		}
+		desiredPath := filepath.Join(targetPath, skill.TargetName)
+		if info, err := os.Lstat(desiredPath); err == nil && isManagedTargetEntry(mode, desiredPath, info, skill, manifest, namedTarget{name: skill.TargetName}) {
+			return namedTarget{}, nil
+		}
+		return c, nil
+	}
+	return namedTarget{}, nil
+}
+
+// isManagedTargetEntry reports whether the entry c.name at entryPath is the
+// skill's managed entry. With c.naming set, a copy must also have been made
+// under that naming.
+func isManagedTargetEntry(mode, entryPath string, info os.FileInfo, skill ResolvedTargetSkill, manifest *Manifest, c namedTarget) bool {
 	switch mode {
 	case "merge":
-		return utils.IsSymlinkOrJunction(legacyPath) && isSymlinkToSource(legacyPath, skill.Skill.SourcePath)
+		return utils.IsSymlinkOrJunction(entryPath) && isSymlinkToSource(entryPath, skill.Skill.SourcePath)
 	case "copy":
-		if manifest == nil || !info.IsDir() || utils.IsSymlinkOrJunction(legacyPath) {
+		if manifest == nil || !info.IsDir() || utils.IsSymlinkOrJunction(entryPath) {
 			return false
 		}
-		_, managed := manifest.Managed[skill.Skill.FlatName]
-		return managed
+		if _, managed := manifest.Managed[c.name]; !managed {
+			return false
+		}
+		// A recorded naming says exactly which naming made the entry; older
+		// manifests have none, so the first managed candidate wins.
+		recorded := manifest.Naming[c.name]
+		return c.naming == "" || recorded == "" || recorded == c.naming
 	default:
 		return false
 	}
 }
 
-func renameManifestEntry(manifest *Manifest, oldName, newName string) {
+// renameManifestEntry moves an entry's records to newName. The naming record
+// becomes oldNaming, the naming that produced the entry, so copy sync sees the
+// naming change and refreshes the copy.
+func renameManifestEntry(manifest *Manifest, oldName, newName, oldNaming string) {
 	if manifest == nil || oldName == newName {
 		return
 	}
@@ -74,6 +118,9 @@ func renameManifestEntry(manifest *Manifest, oldName, newName string) {
 	}
 	if manifest.Mtimes == nil {
 		manifest.Mtimes = make(map[string]int64)
+	}
+	if manifest.Naming == nil {
+		manifest.Naming = make(map[string]string)
 	}
 
 	if managed, ok := manifest.Managed[oldName]; ok {
@@ -84,4 +131,6 @@ func renameManifestEntry(manifest *Manifest, oldName, newName string) {
 		manifest.Mtimes[newName] = mtime
 		delete(manifest.Mtimes, oldName)
 	}
+	delete(manifest.Naming, oldName)
+	manifest.Naming[newName] = oldNaming
 }

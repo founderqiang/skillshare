@@ -98,6 +98,9 @@ func targetAddProject(args []string, root string) error {
 	if noSkills {
 		entry.EnsureSkills().SetEnabled(false)
 	}
+	if mode := config.NewTargetSkillsMode(cfg.TargetNaming, ""); mode != "" {
+		entry.EnsureSkills().Mode = mode // a project target defaults to merge
+	}
 
 	cfg.Targets = append(cfg.Targets, entry)
 	if err := cfg.Save(root); err != nil {
@@ -479,6 +482,9 @@ func updateTargetModeProject(cfg *config.ProjectConfig, idx int, newMode string,
 	if oldMode == "" {
 		oldMode = "merge"
 	}
+	if err := config.TargetNamingModeError(entry.SkillsConfig().TargetNaming, newMode); err != nil {
+		return fmt.Errorf("%w; change the target naming first", err)
+	}
 
 	entry.EnsureSkills().Mode = newMode
 	if err := cfg.Save(root); err != nil {
@@ -524,10 +530,13 @@ func updateTargetAgentModeProject(cfg *config.ProjectConfig, idx int, newMode st
 
 func updateTargetNamingProject(cfg *config.ProjectConfig, idx int, newNaming string, root string) error {
 	if !config.IsValidTargetNaming(newNaming) {
-		return fmt.Errorf("invalid target naming '%s'. Use 'flat' or 'standard'", newNaming)
+		return fmt.Errorf("invalid target naming '%s'. Use 'flat', 'standard', or 'prefixed'", newNaming)
 	}
 
 	entry := &cfg.Targets[idx]
+	if err := config.TargetNamingModeError(newNaming, entry.SkillsConfig().Mode); err != nil {
+		return fmt.Errorf("%w; set --mode copy first", err)
+	}
 	oldNaming := config.EffectiveTargetNaming(entry.SkillsConfig().TargetNaming)
 
 	entry.EnsureSkills().TargetNaming = newNaming

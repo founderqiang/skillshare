@@ -17,7 +17,7 @@ import (
 var ValidSyncModes = []string{"merge", "symlink", "copy"}
 
 // ValidTargetNamings lists all valid target naming values.
-var ValidTargetNamings = []string{"flat", "standard"}
+var ValidTargetNamings = []string{"flat", "standard", "prefixed"}
 
 // ValidGitRoots lists all valid git_root scope keywords. Empty is also accepted
 // (meaning "skills"); see ValidGitRoot.
@@ -47,6 +47,28 @@ func EffectiveTargetNaming(naming string) string {
 		return "flat"
 	}
 	return naming
+}
+
+// TargetNamingModeError reports a target naming the skills sync mode cannot
+// honour: prefixed rewrites name: in each copy, so it needs copy mode. mode is
+// the effective mode; empty counts as the merge default.
+func TargetNamingModeError(naming, mode string) error {
+	if mode == "" {
+		mode = "merge"
+	}
+	if EffectiveTargetNaming(naming) != "prefixed" || mode == "copy" {
+		return nil
+	}
+	return fmt.Errorf("target naming %q requires copy mode, but the target syncs in %q mode", "prefixed", mode)
+}
+
+// NewTargetSkillsMode is the skills mode a new target is written with: copy when it
+// would otherwise inherit a naming its inherited mode cannot honour, else empty (inherit).
+func NewTargetSkillsMode(naming, mode string) string {
+	if TargetNamingModeError(naming, mode) != nil {
+		return "copy"
+	}
+	return ""
 }
 
 // ResourceTargetConfig holds per-resource-kind target configuration (skills, agents, etc.).

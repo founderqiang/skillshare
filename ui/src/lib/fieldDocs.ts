@@ -140,9 +140,9 @@ export const fieldDocs: Record<string, FieldDoc> = {
     example: 'mode: merge',
   },
   target_naming: {
-    description: 'Default target entry naming strategy for merge/copy sync. "flat" keeps flattened parent directory prefixes; "standard" uses the SKILL.md name and enforces the Agent Skills naming rules.',
+    description: 'Default target entry naming strategy for merge/copy sync. "flat" keeps flattened parent directory prefixes; "standard" uses the SKILL.md name and enforces the Agent Skills naming rules; "prefixed" (copy mode only) is standard plus the tracked repo name in front, "<repo>-<name>", for folder and name: in the copy.',
     type: 'string',
-    allowedValues: ['flat', 'standard'],
+    allowedValues: ['flat', 'standard', 'prefixed'],
     example: 'target_naming: standard',
   },
   git_root: {
@@ -200,9 +200,9 @@ export const fieldDocs: Record<string, FieldDoc> = {
     example: 'mode: symlink',
   },
   'targets.skills.target_naming': {
-    description: 'Target entry naming strategy for skills in this target. If omitted, inherits the top-level target_naming. Ignored in symlink mode.',
+    description: 'Target entry naming strategy for skills in this target. If omitted, inherits the top-level target_naming. "flat" and "standard" are ignored in symlink mode; "prefixed" requires copy mode.',
     type: 'string',
-    allowedValues: ['flat', 'standard'],
+    allowedValues: ['flat', 'standard', 'prefixed'],
     example: 'target_naming: standard',
   },
   'targets.skills.include': {

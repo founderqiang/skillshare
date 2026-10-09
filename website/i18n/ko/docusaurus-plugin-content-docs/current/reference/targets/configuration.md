@@ -83,7 +83,7 @@ source: ~/.config/skillshare/skills
 # 새 Target의 기본 Sync 모드
 mode: merge
 
-# 기본 Target 네이밍 (flat 또는 standard)
+# 기본 Target 네이밍 (flat, standard 또는 prefixed)
 # target_naming: flat
 
 # Targets (AI CLI skill 디렉터리)
@@ -294,8 +294,11 @@ target_naming: flat
 |-------|----------|
 | `flat` | 중첩된 skill이 `__` 구분자로 평탄화됨 (예: `frontend__dev`). **(기본값)** |
 | `standard` | SKILL.md의 `name` 필드를 그대로 사용 (예: `dev`). [Agent Skills spec](https://agentskills.io/specification)을 따름. |
+| `prefixed` | Copy mode 전용. `standard`와 같지만 tracked repo 안의 skill은 `<repo>-<name>`으로 이름이 지정되며, 복사본의 폴더 이름과 `name:` 모두 해당됩니다(예: `_mattpocock-skills`의 `prototype` → `mattpocock-skills-prototype`). 다른 skill은 이름을 그대로 유지합니다. [Target Naming](/docs/understand/sync-modes#target-naming) 참고. |
 
-두 mode 모두에서 `include` / `exclude`는 계속 flat 이름(`frontend__dev`)을 기준으로 매칭하므로, `standard`에서는 filter 이름과 `sync`가 만드는 폴더 이름이 다릅니다. [include / exclude](#include--exclude-target-filters) 참고.
+merge 또는 symlink mode에서 `prefixed`로 결정되는 target은 검증에 실패하며 sync에서 건너뛰어집니다. 링크는 source를 가리키고, 그곳의 `name:`은 바꿀 수 없기 때문입니다.
+
+모든 naming에서 `include` / `exclude`는 계속 flat 이름(`frontend__dev`)을 기준으로 매칭하므로, `standard`에서는 filter 이름과 `sync`가 만드는 폴더 이름이 다릅니다. [include / exclude](#include--exclude-target-filters) 참고.
 
 ### `targets`
 
@@ -642,7 +645,7 @@ projects:
     targets: [<target>, ...] # 이 프로젝트에서 사용하는 tool
     skills:                  # 있으면 skill 동기화, 비어 있으면 전체
       mode: <mode>
-      target_naming: <flat|standard>
+      target_naming: <flat|standard|prefixed>
       include: [<glob>, ...]
       exclude: [<glob>, ...]
     agents:                  # 있으면 agent 동기화, 비어 있으면 전체

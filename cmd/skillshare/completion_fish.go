@@ -263,7 +263,7 @@ complete -c skillshare -n '__fish_skillshare_using_command target' -l json -d 'J
 complete -c skillshare -n '__fish_skillshare_using_command target' -l no-tui -d 'Skip interactive TUI'
 complete -c skillshare -n '__fish_skillshare_using_command target' -l mode -s m -r -a 'merge copy symlink' -d 'Set sync mode'
 complete -c skillshare -n '__fish_skillshare_using_command target' -l agent-mode -r -a 'merge copy symlink' -d 'Set agents sync mode'
-complete -c skillshare -n '__fish_skillshare_using_command target' -l target-naming -r -a 'flat standard' -d 'Set naming'
+complete -c skillshare -n '__fish_skillshare_using_command target' -l target-naming -r -a 'flat standard prefixed' -d 'Set naming'
 complete -c skillshare -n '__fish_skillshare_using_command target' -l add-include -r -d 'Add include filter'
 complete -c skillshare -n '__fish_skillshare_using_command target' -l add-exclude -r -d 'Add exclude filter'
 complete -c skillshare -n '__fish_skillshare_using_command target' -l remove-include -r -d 'Remove include filter'

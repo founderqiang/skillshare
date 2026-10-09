@@ -11,22 +11,54 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ParseSkillName reads the SKILL.md and extracts the "name" from frontmatter.
+// ParseSkillName reads the SKILL.md and extracts the top-level "name" from frontmatter.
+// It reads line by line and stops at a plain top-level name line ("name", 'name' and
+// name : count; top-level keys share the first key's indent). Any other form YAML
+// allows (flow mapping, block scalar, alias, merge key, explicit key, ...) leaves the
+// scan without a name, and then the whole block is decoded.
 func ParseSkillName(skillPath string) (string, error) {
-	name := ""
-	err := scanLenientBlock(filepath.Join(skillPath, "SKILL.md"), func(raw []byte) bool {
-		line := strings.TrimSpace(string(raw))
-		if !strings.HasPrefix(line, "name:") {
+	name, literal, indent := "", "", -1
+	path := filepath.Join(skillPath, "SKILL.md")
+	err := scanLenientBlock(path, func(raw []byte) bool {
+		line := string(raw)
+		trimmed := strings.TrimLeft(line, " \t")
+		if trimmed == "" || trimmed[0] == '#' {
 			return true
 		}
-		// Extract value: "name: my-skill" -> "my-skill", without quotes
-		name = strings.Trim(strings.TrimSpace(strings.SplitN(line, ":", 2)[1]), `"'`)
+		if indent < 0 {
+			indent = len(line) - len(trimmed)
+		}
+		key, value, ok := strings.Cut(trimmed, ":")
+		if !ok || len(line)-len(trimmed) != indent || strings.Trim(strings.TrimSpace(key), `"'`) != "name" {
+			return true
+		}
+		if v := strings.TrimSpace(value); v != "" && strings.ContainsRune("*|>&!", rune(v[0])) {
+			return false // alias, block scalar, anchor or tag: decode the whole block
+		}
+		// The line alone decodes quotes and a trailing comment. When it does not decode to
+		// a string (a multi-line quoted scalar, a number), the whole block is decoded, and
+		// the line read as is is kept for frontmatter YAML rejects.
+		var fm map[string]any
+		if yaml.Unmarshal([]byte("name:"+value), &fm) == nil {
+			if v, isString := fm["name"].(string); isString {
+				name = v
+				return false
+			}
+		}
+		literal = strings.Trim(strings.TrimSpace(value), `"'`)
 		return false
 	})
+	if err != nil || name != "" {
+		return name, err
+	}
+	raw, err := readLenientBlock(path)
 	if err != nil {
 		return "", err
 	}
-	return name, nil
+	if name, isString := decodeFrontmatter(raw)["name"].(string); isString {
+		return name, nil
+	}
+	return literal, nil
 }
 
 // isYAMLBlockIndicator returns true for YAML block scalar indicators (>, >-, >+, |, |-, |+).

@@ -18,6 +18,7 @@ type Manifest struct {
 	Managed   map[string]string `json:"managed"`           // flatName → "symlink" (merge) or SHA-256 checksum (copy)
 	Mtimes    map[string]int64  `json:"mtimes,omitempty"`  // flatName → source dir max mtime (UnixNano), copy mode only
 	Sources   map[string]string `json:"sources,omitempty"` // output name → SHA-256 of the source it was converted from, extension outputs only
+	Naming    map[string]string `json:"naming,omitempty"`  // entry name → target_naming that produced it, copy mode only
 	UpdatedAt time.Time         `json:"updated_at"`
 }
 
@@ -28,7 +29,7 @@ func ReadManifest(targetPath string) (*Manifest, error) {
 	data, err := os.ReadFile(p)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return &Manifest{Managed: make(map[string]string), Mtimes: make(map[string]int64)}, nil
+			return &Manifest{Managed: make(map[string]string), Mtimes: make(map[string]int64), Naming: make(map[string]string)}, nil
 		}
 		return nil, err
 	}
@@ -36,7 +37,7 @@ func ReadManifest(targetPath string) (*Manifest, error) {
 	var m Manifest
 	if err := json.Unmarshal(data, &m); err != nil {
 		// Corrupt manifest — treat as empty so next sync rebuilds it.
-		return &Manifest{Managed: make(map[string]string), Mtimes: make(map[string]int64)}, nil
+		return &Manifest{Managed: make(map[string]string), Mtimes: make(map[string]int64), Naming: make(map[string]string)}, nil
 	}
 	if m.Managed == nil {
 		m.Managed = make(map[string]string)
@@ -44,7 +45,17 @@ func ReadManifest(targetPath string) (*Manifest, error) {
 	if m.Mtimes == nil {
 		m.Mtimes = make(map[string]int64)
 	}
+	if m.Naming == nil {
+		m.Naming = make(map[string]string)
+	}
 	return &m, nil
+}
+
+// Remove forgets every record of the entry name.
+func (m *Manifest) Remove(name string) {
+	delete(m.Managed, name)
+	delete(m.Mtimes, name)
+	delete(m.Naming, name)
 }
 
 // SkipsHidden reports whether a target scan should skip name. Hidden entries

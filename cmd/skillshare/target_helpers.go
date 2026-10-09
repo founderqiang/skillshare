@@ -135,7 +135,7 @@ func parseTargetSettingFlags(args []string) (parsedTargetSettingFlags, error) {
 			i++
 		case "--target-naming":
 			if i+1 >= len(args) {
-				return settings, fmt.Errorf("--target-naming requires a value (flat or standard)")
+				return settings, fmt.Errorf("--target-naming requires a value (flat, standard, or prefixed)")
 			}
 			settings.Naming = args[i+1]
 			i++

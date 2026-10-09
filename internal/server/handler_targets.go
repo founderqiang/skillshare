@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
@@ -303,6 +304,9 @@ func (s *Server) handleAddTarget(w http.ResponseWriter, r *http.Request) {
 
 	skillsOff := body.SkillsEnabled != nil && !*body.SkillsEnabled
 	tc := config.TargetConfig{Skills: &config.ResourceTargetConfig{Path: body.Path}, Instructions: body.Instructions}
+	if !s.IsProjectMode() {
+		tc.Skills.Mode = config.NewTargetSkillsMode(s.cfg.TargetNaming, s.cfg.Mode)
+	}
 	tc.Skills.SetEnabled(!skillsOff)
 	if body.AgentPath != "" {
 		tc.Agents = &config.ResourceTargetConfig{Path: body.AgentPath}
@@ -314,6 +318,9 @@ func (s *Server) handleAddTarget(w http.ResponseWriter, r *http.Request) {
 		entry := config.ProjectTargetEntry{Name: body.Name, Instructions: body.Instructions}
 		if skillsOff {
 			entry.EnsureSkills().SetEnabled(false)
+		}
+		if mode := config.NewTargetSkillsMode(s.projectCfg.TargetNaming, ""); mode != "" {
+			entry.EnsureSkills().Mode = mode // a project target defaults to merge
 		}
 		s.projectCfg.Targets = append(s.projectCfg.Targets, entry)
 	}
@@ -483,10 +490,17 @@ func (s *Server) handleUpdateTarget(w http.ResponseWriter, r *http.Request) {
 
 	if body.TargetNaming != nil {
 		if !config.IsValidTargetNaming(*body.TargetNaming) {
-			writeError(w, http.StatusBadRequest, "invalid target_naming: "+*body.TargetNaming+"; must be flat or standard")
+			writeError(w, http.StatusBadRequest, "invalid target_naming: "+*body.TargetNaming+"; must be flat, standard, or prefixed")
 			return
 		}
 		target.Skills.TargetNaming = *body.TargetNaming
+	}
+	// Turning skills on counts too: an off target may keep a pair its mode cannot sync.
+	if body.Mode != nil || body.TargetNaming != nil || body.SkillsEnabled != nil && *body.SkillsEnabled {
+		if err := config.TargetNamingModeError(target.SkillsConfig().TargetNaming, cmp.Or(target.Skills.Mode, s.cfg.Mode)); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 	}
 
 	if body.AgentMode != nil {

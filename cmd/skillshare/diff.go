@@ -578,7 +578,6 @@ func collectTargetDiff(name string, target config.TargetConfig, source, mode str
 	for _, resolved := range resolution.Skills {
 		sourceMap[resolved.TargetName] = resolved.Skill.SourcePath
 	}
-	legacyNames := resolution.LegacyFlatNames()
 
 	if utils.IsSymlinkOrJunction(sc.Path) {
 		r.mode = "symlink"
@@ -587,9 +586,13 @@ func collectTargetDiff(name string, target config.TargetConfig, source, mode str
 		return r
 	}
 
+	var manifest *sync.Manifest // only copy-mode legacy lookups read it
 	if mode == "copy" {
-		manifest, _ := sync.ReadManifest(sc.Path)
-		collectCopyDiff(&r, name, sc.Path, resolution.Skills, sourceSkills, legacyNames, manifest, ignorePatterns, dp)
+		manifest, _ = sync.ReadManifest(sc.Path)
+	}
+	legacyNames := resolution.LegacyNames(mode, sc.Path, manifest)
+	if mode == "copy" {
+		collectCopyDiff(&r, name, sc.Path, resolution.Skills, resolution.Naming, sourceSkills, legacyNames, manifest, ignorePatterns, dp)
 	} else {
 		// Merge mode (instant)
 		collectMergeDiff(&r, sc.Path, sourceSkills, sourceMap, legacyNames)
@@ -626,7 +629,8 @@ func collectSymlinkDiff(r *targetDiffResult, targetPath, source string) {
 	}
 }
 
-func collectCopyDiff(r *targetDiffResult, targetName, targetPath string, filtered []sync.ResolvedTargetSkill, sourceSkills map[string]bool, legacyNames map[string]sync.ResolvedTargetSkill, manifest *sync.Manifest, ignorePatterns []string, dp *diffProgress) {
+func collectCopyDiff(r *targetDiffResult, targetName, targetPath string, filtered []sync.ResolvedTargetSkill, naming string, sourceSkills map[string]bool, legacyNames map[string]sync.ResolvedTargetSkill, manifest *sync.Manifest, ignorePatterns []string, dp *diffProgress) {
+	renamedFrom := sync.RenamedFrom(legacyNames)
 	for _, resolved := range filtered {
 		skill := resolved.Skill
 		dp.update(targetName, resolved.TargetName)
@@ -641,6 +645,8 @@ func collectCopyDiff(r *targetDiffResult, targetName, targetPath string, filtere
 				} else {
 					r.items = append(r.items, copyDiffEntry{action: "modify", name: resolved.TargetName, reason: "target entry is not a directory", isSync: true, srcDir: srcDir, dstDir: dstDir})
 				}
+			} else if old, ok := renamedFrom[resolved.TargetName]; ok && os.IsNotExist(err) {
+				r.items = append(r.items, copyDiffEntry{action: "modify", name: resolved.TargetName, reason: sync.RenameReason(old), isSync: true, srcDir: srcDir, dstDir: filepath.Join(targetPath, old)})
 			} else if os.IsNotExist(err) {
 				r.items = append(r.items, copyDiffEntry{action: "add", name: resolved.TargetName, reason: "source only", isSync: true, srcDir: srcDir, dstDir: dstDir})
 			} else {
@@ -659,6 +665,11 @@ func collectCopyDiff(r *targetDiffResult, targetName, targetPath string, filtere
 		}
 		if !targetInfo.IsDir() {
 			r.items = append(r.items, copyDiffEntry{action: "modify", name: resolved.TargetName, reason: "target entry is not a directory", isSync: true, srcDir: srcDir, dstDir: dstDir})
+			continue
+		}
+		// A copy made under another naming carries another name:, so sync re-copies it.
+		if recorded := manifest.Naming[resolved.TargetName]; recorded != "" && recorded != naming {
+			r.items = append(r.items, copyDiffEntry{action: "modify", name: resolved.TargetName, reason: sync.NamingChangedReason, isSync: true, srcDir: srcDir, dstDir: dstDir})
 			continue
 		}
 		// mtime fast-path
@@ -738,10 +749,14 @@ func collectMergeDiff(r *targetDiffResult, targetPath string, sourceSkills map[s
 	}
 
 	// Skills only in source (not synced)
+	renamedFrom := sync.RenamedFrom(legacyNames)
 	for skill := range sourceSkills {
 		srcDir := sourceMap[skill]
 		dstDir := filepath.Join(targetPath, skill)
-		if !targetSkills[skill] {
+		if old, ok := renamedFrom[skill]; ok && !targetSkills[skill] {
+			r.items = append(r.items, copyDiffEntry{action: "modify", name: skill, reason: sync.RenameReason(old), isSync: true, srcDir: srcDir, dstDir: filepath.Join(targetPath, old)})
+			r.syncCount++
+		} else if !targetSkills[skill] {
 			r.items = append(r.items, copyDiffEntry{action: "add", name: skill, reason: "source only", isSync: true, srcDir: srcDir, dstDir: dstDir})
 			r.syncCount++
 		} else if !targetSymlinks[skill] {
@@ -815,8 +830,10 @@ func categorizeItems(items []copyDiffEntry) []actionCategory {
 			add("new", "new", "New", item.name)
 		case item.reason == "deleted from target":
 			add("restore", "new", "Restore", item.name)
-		case item.reason == "content changed":
+		case item.reason == "content changed" || item.reason == sync.NamingChangedReason:
 			add("modified", "modified", "Modified", item.name)
+		case strings.HasPrefix(item.reason, "renamed from "):
+			add("renamed", "modified", "Renamed", item.name)
 		case strings.Contains(item.reason, "local copy"):
 			add("override", "override", "Local Override", item.name)
 		case strings.Contains(item.reason, "orphan"):

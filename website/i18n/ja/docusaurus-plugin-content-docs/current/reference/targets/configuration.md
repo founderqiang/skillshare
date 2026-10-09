@@ -85,7 +85,7 @@ source: ~/.config/skillshare/skills
 # 新しい Target のデフォルト Sync モード
 mode: merge
 
-# デフォルトの Target 命名（flat または standard）
+# デフォルトの Target 命名（flat、standard、または prefixed）
 # target_naming: flat
 
 # Target（AI CLI の Skill ディレクトリ）
@@ -296,8 +296,11 @@ target_naming: flat
 |-------|----------|
 | `flat` | ネストされた Skill が `__` セパレータでフラット化される（例: `frontend__dev`）。**（デフォルト）** |
 | `standard` | SKILL.md の `name` フィールドをそのまま使う（例: `dev`）。[Agent Skills spec](https://agentskills.io/specification) に準拠。 |
+| `prefixed` | copy mode 専用。`standard` と同じだが、tracked repo 内の Skill は `<repo>-<name>` という名前になり、コピー先のフォルダー名と `name:` の両方に反映される（例: `_mattpocock-skills` の `prototype` → `mattpocock-skills-prototype`）。それ以外の Skill は名前をそのまま保つ。[Target の命名規則](/docs/understand/sync-modes#target-naming) を参照。 |
 
-`include` / `exclude` はどちらの mode でも flat 名（`frontend__dev`）にマッチし続けるため、`standard` ではフィルターの名前と `sync` が作るフォルダー名が異なります。[include / exclude](#include--exclude-target-filters) を参照してください。
+merge mode または symlink mode で `prefixed` に解決される Target は、バリデーションに失敗し、sync でスキップされます。リンクは source を指しており、そこでは `name:` を変更できないためです。
+
+`include` / `exclude` はどの naming でも flat 名（`frontend__dev`）にマッチし続けるため、`standard` ではフィルターの名前と `sync` が作るフォルダー名が異なります。[include / exclude](#include--exclude-target-filters) を参照してください。
 
 ### `targets`
 
@@ -666,7 +669,7 @@ projects:
     targets: [<target>, ...] # この project で使うツール
     skills:                  # 存在すれば Skill を sync、空なら全部
       mode: <mode>
-      target_naming: <flat|standard>
+      target_naming: <flat|standard|prefixed>
       include: [<glob>, ...]
       exclude: [<glob>, ...]
     agents:                  # 存在すれば Agent を sync、空なら全部

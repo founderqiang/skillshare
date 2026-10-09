@@ -172,7 +172,11 @@ func (c *Config) AddAgentConfigDirTarget(name, agent, dir, cli string) (string, 
 	if c.Targets == nil {
 		c.Targets = map[string]TargetConfig{}
 	}
-	c.Targets[name] = TargetConfig{Agent: agent, ConfigDir: dir, CLI: cli, defaultTargetNaming: c.TargetNaming}
+	tc := TargetConfig{Agent: agent, ConfigDir: dir, CLI: cli, defaultTargetNaming: c.TargetNaming}
+	if mode := NewTargetSkillsMode(c.TargetNaming, c.Mode); mode != "" {
+		tc.Skills = &ResourceTargetConfig{Mode: mode}
+	}
+	c.Targets[name] = tc
 	if err := c.expandAgentConfigDirs(); err != nil {
 		delete(c.Targets, name)
 		return "", err

@@ -71,3 +71,65 @@ describe('Target page shared skills folder', () => {
     expect(screen.queryByText(/each sync would undo the other/)).toBeNull();
   });
 });
+
+const needsCopy = 'prefixed needs copy mode, because it rewrites the name inside each copy.';
+
+describe('Target page naming', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  // Both targets share the folder with the same settings, so no shared-folder warning interferes.
+  const renderAlone = (mode: string, targetNaming: string) => renderPage({ mode, targetNaming }, { mode, targetNaming });
+
+  it('keeps prefixed visible but disabled outside copy mode, and says why', async () => {
+    renderAlone('merge', 'flat');
+
+    const prefixed = await screen.findByRole('button', { name: 'prefixed' });
+    expect(prefixed).toBeDisabled();
+    expect(prefixed).toHaveAttribute('title', 'Needs copy mode');
+    expect(screen.getByText(needsCopy)).toBeInTheDocument();
+  });
+
+  it('enables prefixed in copy mode and marks the unsaved naming as pending', async () => {
+    const user = userEvent.setup();
+    renderAlone('copy', 'flat');
+
+    const prefixed = await screen.findByRole('button', { name: 'prefixed' });
+    expect(prefixed).toBeEnabled();
+    expect(screen.queryByText(needsCopy)).not.toBeInTheDocument();
+    expect(screen.queryByText('pending')).not.toBeInTheDocument();
+
+    await user.click(prefixed);
+    expect(prefixed).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('pending')).toBeInTheDocument();
+  });
+
+  it('puts the saved naming back when leaving copy mode with prefixed drafted', async () => {
+    const user = userEvent.setup();
+    renderAlone('copy', 'standard');
+
+    await user.click(await screen.findByRole('button', { name: 'prefixed' }));
+    await user.click(screen.getByRole('radio', { name: /merge/ }));
+
+    expect(screen.getByRole('button', { name: 'standard' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByText('pending')).not.toBeInTheDocument();
+  });
+
+  it('falls back to flat when leaving copy mode with prefixed already saved', async () => {
+    const user = userEvent.setup();
+    renderAlone('copy', 'prefixed');
+
+    await user.click(await screen.findByRole('radio', { name: /merge/ }));
+
+    expect(screen.getByRole('button', { name: 'flat' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('pending')).toBeInTheDocument();
+  });
+
+  it('drops prefixed when taking the other target\'s mode from the shared-folder warning', async () => {
+    const user = userEvent.setup();
+    renderPage({ mode: 'copy', targetNaming: 'prefixed' });
+
+    await user.click(await screen.findByRole('button', { name: 'Use merge like universal' }));
+
+    expect(screen.getByRole('button', { name: 'flat' })).toHaveAttribute('aria-pressed', 'true');
+  });
+});

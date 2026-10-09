@@ -224,3 +224,15 @@ func TestTargetProject_RemoveCopyMode_CleansManifest(t *testing.T) {
 		t.Error("manifest should be removed after target remove")
 	}
 }
+
+func TestTargetProject_AddUnderPrefixedNamingUsesCopyMode(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	projectRoot := sb.SetupProjectDir("claude")
+	cfgPath := filepath.Join(projectRoot, ".skillshare", "config.yaml")
+	sb.WriteFile(cfgPath, "target_naming: prefixed\n"+sb.ReadFile(cfgPath))
+
+	sb.RunCLIInDir(projectRoot, "target", "add", "cursor", "-p").AssertSuccess(t)
+	// A project target defaults to merge, which prefixed naming cannot sync.
+	sb.RunCLIInDir(projectRoot, "sync", "-p").AssertOutputNotContains(t, "cursor    invalid config")
+}

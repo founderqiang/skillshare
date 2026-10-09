@@ -2,7 +2,8 @@
 
 Validates `target_naming` for flat-only clients, including global default,
 per-target override, standard-only validation and collision handling, managed
-entry migration from `flat` to `standard`, and the symlink-mode ignore path.
+entry migration from `flat` to `standard`, the symlink-mode ignore path, and
+`prefixed` naming for copy targets with migrations between all three namings.
 
 ## Scope
 
@@ -13,7 +14,10 @@ entry migration from `flat` to `standard`, and the symlink-mode ignore path.
 - `standard` mode warns and skips target-visible collisions
 - `flat -> standard` migration renames provably managed merge/copy entries
 - Existing local bare-name entries block migration and preserve legacy managed entries
-- `target_naming` is ignored in `symlink` mode
+- `flat` and `standard` naming are ignored in `symlink` mode; `prefixed` fails validation there
+- `prefixed` names tracked-repo skills `<repo>-<name>` in folder and copied `name:`, leaving the source untouched
+- `flat -> prefixed -> standard` migrations rename managed copies in place and rewrite `name:`
+- `prefixed` on a merge target fails validation
 
 ## Environment
 
@@ -305,12 +309,122 @@ Expected:
 - SYMLINK_MODE_POINTS_TO_SOURCE=OK
 - SYMLINK_MODE_NO_MIGRATION_WARN=OK
 
+### Step 7: Sync two tracked repos with a same-named skill under flat copy naming
+
+```bash
+SRC="$HOME/.e2e-target-naming/prefixed-source"
+rm -rf "$SRC" "$HOME/.e2e-target-naming/copy-prefixed" "$HOME/.e2e-target-naming/merge-prefixed"
+for dir in _emil-design/skills/prototype _emil-design/skills/solo _mattpocock-skills/skills/engineering/prototype my-skill; do
+  mkdir -p "$SRC/$dir"
+  name=$(basename "$dir")
+  printf '%s\n' '---' "name: $name" "description: $dir" '---' "# $dir" > "$SRC/$dir/SKILL.md"
+done
+
+printf '%s\n' \
+  'source: ~/.e2e-target-naming/prefixed-source' \
+  'targets:' \
+  '  copy-prefixed:' \
+  '    skills:' \
+  '      path: ~/.e2e-target-naming/copy-prefixed' \
+  '      mode: copy' \
+  > "$HOME/.config/skillshare/config.yaml"
+
+ss sync -g >/dev/null 2>&1
+ls "$HOME/.e2e-target-naming/copy-prefixed"
+```
+
+Expected:
+- exit_code: 0
+- _emil-design__skills__prototype
+- _mattpocock-skills__skills__engineering__prototype
+- my-skill
+
+### Step 8: Switch to prefixed and verify in-place renames and rewritten names
+
+```bash
+SRC="$HOME/.e2e-target-naming/prefixed-source"
+DIR="$HOME/.e2e-target-naming/copy-prefixed"
+printf '%s\n' \
+  'source: ~/.e2e-target-naming/prefixed-source' \
+  'targets:' \
+  '  copy-prefixed:' \
+  '    skills:' \
+  '      path: ~/.e2e-target-naming/copy-prefixed' \
+  '      mode: copy' \
+  '      target_naming: prefixed' \
+  > "$HOME/.config/skillshare/config.yaml"
+
+ss sync -g >/dev/null 2>&1
+grep -qx 'name: emil-design-prototype' "$DIR/emil-design-prototype/SKILL.md" && echo "PREFIXED_EMIL=OK" || echo "PREFIXED_EMIL=FAIL"
+grep -qx 'name: mattpocock-skills-prototype' "$DIR/mattpocock-skills-prototype/SKILL.md" && echo "PREFIXED_MATT=OK" || echo "PREFIXED_MATT=FAIL"
+grep -qx 'name: my-skill' "$DIR/my-skill/SKILL.md" && echo "PREFIXED_UNTRACKED_KEPT=OK" || echo "PREFIXED_UNTRACKED_KEPT=FAIL"
+grep -qx 'name: prototype' "$SRC/_emil-design/skills/prototype/SKILL.md" && echo "SOURCE_UNTOUCHED=OK" || echo "SOURCE_UNTOUCHED=FAIL"
+test ! -e "$DIR/_emil-design__skills__prototype" && echo "FLAT_ENTRY_RENAMED=OK" || echo "FLAT_ENTRY_RENAMED=FAIL"
+jq -r '.naming["emil-design-solo"]' "$DIR/.skillshare-manifest.json"
+```
+
+Expected:
+- exit_code: 0
+- PREFIXED_EMIL=OK
+- PREFIXED_MATT=OK
+- PREFIXED_UNTRACKED_KEPT=OK
+- SOURCE_UNTOUCHED=OK
+- FLAT_ENTRY_RENAMED=OK
+- prefixed
+
+### Step 9: Switch to standard and verify the prefixed copies go back
+
+```bash
+DIR="$HOME/.e2e-target-naming/copy-prefixed"
+sed -i 's/target_naming: prefixed/target_naming: standard/' "$HOME/.config/skillshare/config.yaml"
+
+ss sync -g >/dev/null 2>&1
+grep -qx 'name: solo' "$DIR/solo/SKILL.md" && echo "STANDARD_SOLO_RENAMED=OK" || echo "STANDARD_SOLO_RENAMED=FAIL"
+test ! -e "$DIR/emil-design-solo" && echo "PREFIXED_SOLO_GONE=OK" || echo "PREFIXED_SOLO_GONE=FAIL"
+test ! -e "$DIR/prototype" && test ! -e "$DIR/emil-design-prototype" && echo "COLLIDING_PROTOTYPES_SKIPPED=OK" || echo "COLLIDING_PROTOTYPES_SKIPPED=FAIL"
+jq -r '.naming.solo' "$DIR/.skillshare-manifest.json"
+```
+
+Expected:
+- exit_code: 0
+- STANDARD_SOLO_RENAMED=OK
+- PREFIXED_SOLO_GONE=OK
+- COLLIDING_PROTOTYPES_SKIPPED=OK
+- standard
+
+### Step 10: Verify prefixed is rejected on a merge target
+
+```bash
+printf '%s\n' \
+  'source: ~/.e2e-target-naming/prefixed-source' \
+  'targets:' \
+  '  merge-prefixed:' \
+  '    skills:' \
+  '      path: ~/.e2e-target-naming/merge-prefixed' \
+  '      mode: merge' \
+  '      target_naming: prefixed' \
+  > "$HOME/.config/skillshare/config.yaml"
+
+OUTPUT=$(ss sync -g 2>&1)
+echo "SYNC_EXIT=$?"
+echo "$OUTPUT" | grep -q 'target naming "prefixed" requires copy mode' && echo "MERGE_PREFIXED_REJECTED=OK" || echo "MERGE_PREFIXED_REJECTED=FAIL"
+test -z "$(ls -A "$HOME/.e2e-target-naming/merge-prefixed" 2>/dev/null)" && echo "MERGE_PREFIXED_EMPTY=OK" || echo "MERGE_PREFIXED_EMPTY=FAIL"
+```
+
+Expected:
+- exit_code: 0
+- SYNC_EXIT=1
+- MERGE_PREFIXED_REJECTED=OK
+- MERGE_PREFIXED_EMPTY=OK
+
 ## Pass Criteria
 
-- All 6 steps pass
+- All 10 steps pass
 - `standard` mode produces bare target entry names for merge/copy targets
 - invalid skills and target-visible collisions are warned and skipped only in `standard` mode
 - per-target `flat` override preserves the legacy flattened naming contract
 - managed flat entries migrate safely to bare names in `standard` mode
 - destination conflicts preserve the legacy managed entry instead of overwriting local content
 - `symlink` mode ignores `target_naming`
+- `prefixed` keeps same-named skills from two tracked repos, rewrites only the copy's `name:`, and is copy-only
+- switching between `flat`, `standard` and `prefixed` renames managed copies in place without orphans

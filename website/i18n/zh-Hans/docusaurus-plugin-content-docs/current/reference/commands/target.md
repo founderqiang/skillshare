@@ -21,7 +21,7 @@ skillshare target <name> --skills=false    # Stop syncing skills
 - 安装新工具后添加新的 AI CLI target
 - 移除不再使用的 target
 - 更改某个 target 的同步模式（merge、copy 或 symlink）
-- 更改某个 target 的命名方式（flat 或 standard）
+- 更改某个 target 的命名方式（flat、standard 或 prefixed）
 - 逐个 target 调整兼容性，而不是强制使用单一全局模式
 - 为选择性的 skill 同步设置 include/exclude 过滤器
 - 某个工具已经会读取另一个 target 的文件夹时，停止向它同步 skills，同时继续管理它的 agents、MCP server 和指示文件
@@ -192,9 +192,10 @@ skillshare sync  # Apply changes
 |--------|----------|
 | `flat` | Nested skills flattened with `__` separators (e.g. `frontend__dev`). **Default.** |
 | `standard` | Uses SKILL.md `name` field directly (e.g. `dev`). Follows the [Agent Skills spec](https://agentskills.io/specification). |
+| `prefixed` | Copy mode only. Like `standard`, but a skill inside a tracked repo is named `<repo>-<name>`, in the folder and in the copy's `name:` (e.g. `mattpocock-skills-prototype`). |
 
-`target --target-naming` 控制 skill 目录在 targets 中的命名方式。在 `standard` 模式下，
-名称无效或冲突的 skills 会被警告并跳过。在 symlink 模式下会被忽略。
+`target --target-naming` 控制 skill 目录在 targets 中的命名方式。在 `standard` 和 `prefixed` 模式下，
+名称无效或冲突的 skills 会被警告并跳过。`flat` 和 `standard` 在 symlink 模式下会被忽略。除非 target 以 copy 模式同步 skills，否则 `--target-naming prefixed` 会被拒绝；当 target 使用 `prefixed` 时，`--mode` 也会拒绝离开 copy 模式。见 [Target 命名](/docs/understand/sync-modes#target-naming)。
 
 ```bash
 # Set target to copy mode (for Cursor, Copilot CLI, etc.)
@@ -319,7 +320,7 @@ skillshare target pi --skills=false
 |------|-------------|
 | `--mode, -m <mode>` | Set sync mode (merge, copy, or symlink) |
 | `--agent-mode <mode>` | Set agents sync mode (merge, copy, or symlink) |
-| `--target-naming <naming>` | Set target naming (flat or standard) |
+| `--target-naming <naming>` | Set target naming (flat, standard, or prefixed; prefixed needs copy mode) |
 | `--skills <true\|false>` | Turn skills sync [on or off](#skills-off); also `--skills=false` |
 | `--dry-run, -n` | With `--skills=false`, preview what would be removed |
 | `--add-include <pattern>` | Add an include filter pattern |

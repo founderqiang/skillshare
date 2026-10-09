@@ -1,10 +1,13 @@
 package config
 
 import (
+	"cmp"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -148,7 +151,8 @@ func (c *Config) expandProjects() error {
 			// ponytail: every target syncs skills, so an agents-only project excludes
 			// them all and is left with an empty skills folder. Teach the sync loops
 			// to skip skills if that folder ever matters.
-			skills := ResourceTargetConfig{Exclude: []string{"*"}}
+			// It syncs no skill, so it takes a naming every mode accepts rather than inherit one.
+			skills := ResourceTargetConfig{Exclude: []string{"*"}, TargetNaming: "flat"}
 			if project.Skills != nil {
 				skills = *project.Skills
 			}
@@ -211,7 +215,24 @@ func (c *Config) ValidateProjects(projects map[string]ManagedProject) error {
 			}
 		}
 	}
+	if err := c.ProjectNamingError(projects, c.Mode); err != nil {
+		return err
+	}
 	return probe.expandProjects()
+}
+
+// ProjectNamingError checks each project's effective skills naming against its
+// effective mode under global mode, which the targets it expands into will inherit.
+// It covers projects whose folder is missing, which expand into no target yet.
+func (c *Config) ProjectNamingError(projects map[string]ManagedProject, mode string) error {
+	for _, root := range slices.Sorted(maps.Keys(projects)) {
+		if sk := projects[root].Skills; sk != nil && sk.IsEnabled() {
+			if err := TargetNamingModeError(cmp.Or(sk.TargetNaming, c.TargetNaming), cmp.Or(sk.Mode, mode)); err != nil {
+				return fmt.Errorf("projects: %s: %w", root, err)
+			}
+		}
+	}
+	return nil
 }
 
 // ConvertibleProject is a group of ordinary targets whose folders are the tool paths of

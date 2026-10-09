@@ -261,6 +261,27 @@ func TestHandleUpdateTarget_Mode(t *testing.T) {
 	}
 }
 
+func TestHandleUpdateTarget_PrefixedNamingNeedsCopyMode(t *testing.T) {
+	tgtPath := filepath.Join(t.TempDir(), "claude-skills")
+	s, _ := newTestServerWithTargets(t, map[string]string{"claude": tgtPath})
+
+	for _, tc := range []struct {
+		body string
+		want int
+	}{
+		{`{"target_naming":"prefixed"}`, http.StatusBadRequest}, // inherits merge
+		{`{"mode":"copy","target_naming":"prefixed"}`, http.StatusOK},
+		{`{"mode":"merge"}`, http.StatusBadRequest}, // would leave prefixed on merge
+	} {
+		req := httptest.NewRequest(http.MethodPatch, "/api/targets/claude", strings.NewReader(tc.body))
+		rr := httptest.NewRecorder()
+		s.handler.ServeHTTP(rr, req)
+		if rr.Code != tc.want {
+			t.Fatalf("%s: expected %d, got %d: %s", tc.body, tc.want, rr.Code, rr.Body.String())
+		}
+	}
+}
+
 func TestHandleUpdateTarget_NotFound(t *testing.T) {
 	s, _ := newTestServer(t)
 	body := `{"mode":"merge"}`
@@ -599,5 +620,62 @@ func TestHandleAvailableTargets_NamesTheConfigDir(t *testing.T) {
 		if accounts[target.Name] != (target.ConfigDir != "") {
 			t.Errorf("%s: configDir = %q", target.Name, target.ConfigDir)
 		}
+	}
+}
+
+func TestHandleAddTarget_ProjectPrefixedNamingUsesCopyMode(t *testing.T) {
+	s, _ := newTestProjectServerWithExtras(t, nil)
+	s.projectCfg.TargetNaming = "prefixed"
+	if err := s.projectCfg.Save(s.projectRoot); err != nil { // requests reload the config from disk
+		t.Fatal(err)
+	}
+	rr := httptest.NewRecorder()
+	s.handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/api/targets", strings.NewReader(`{"name":"cursor"}`)))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("add: got %d %s", rr.Code, rr.Body.String())
+	}
+	if _, invalid, err := config.ValidateProjectConfigForSync(s.projectCfg, s.projectRoot); err != nil || invalid["cursor"] != nil {
+		t.Fatalf("added target invalid: err = %v, invalid = %v", err, invalid)
+	}
+}
+
+func TestHandleAddTarget_GlobalPrefixedNamingUnderMergeUsesCopyMode(t *testing.T) {
+	s, _ := newTestServer(t)
+	s.cfg.Mode, s.cfg.TargetNaming = "merge", "prefixed" // valid while every target overrides copy
+	if err := s.saveConfig(); err != nil {
+		t.Fatal(err)
+	}
+	rr := httptest.NewRecorder()
+	body := `{"name":"cursor","path":"` + filepath.ToSlash(filepath.Join(t.TempDir(), "skills")) + `"}`
+	s.handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/api/targets", strings.NewReader(body)))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("add: got %d %s", rr.Code, rr.Body.String())
+	}
+	if tc := s.cfg.Targets["cursor"]; tc.SkillsConfig().Mode != "copy" {
+		mode := tc.SkillsConfig().Mode
+		t.Fatalf("new target mode = %q, want copy", mode)
+	}
+
+	rr = httptest.NewRecorder()
+	body = `{"name":"claude-work","agent":"claude","configDir":"` + filepath.ToSlash(filepath.Join(t.TempDir(), ".claude-work")) + `"}`
+	s.handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/api/targets", strings.NewReader(body)))
+	if tc := s.cfg.Targets["claude-work"]; rr.Code != http.StatusOK || tc.SkillsConfig().Mode != "copy" {
+		t.Fatalf("add config dir: got %d %s, mode %q; want copy", rr.Code, rr.Body.String(), tc.SkillsConfig().Mode)
+	}
+}
+
+func TestHandleUpdateTarget_ReenablingSkillsChecksPrefixedNaming(t *testing.T) {
+	s, _ := newTestServer(t)
+	skills := &config.ResourceTargetConfig{Path: filepath.Join(t.TempDir(), "skills"), TargetNaming: "prefixed"}
+	skills.SetEnabled(false) // allowed while off: it syncs no skill
+	s.cfg.Mode = "merge"
+	s.cfg.Targets = map[string]config.TargetConfig{"claude": {Skills: skills}}
+	if err := s.saveConfig(); err != nil {
+		t.Fatal(err)
+	}
+	rr := httptest.NewRecorder()
+	s.handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPatch, "/api/targets/claude", strings.NewReader(`{"skills_enabled":true}`)))
+	if rr.Code != http.StatusBadRequest || !strings.Contains(rr.Body.String(), "requires copy mode") {
+		t.Fatalf("re-enable under merge: got %d %s, want 400", rr.Code, rr.Body.String())
 	}
 }

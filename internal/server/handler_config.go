@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"errors"
 	"net/http"
 	"os"
@@ -85,6 +86,18 @@ func (s *Server) handlePatchConfig(w http.ResponseWriter, r *http.Request) {
 	_ = s.reloadConfig()
 	args := map[string]any{"scope": "ui"}
 	if body.Mode != nil {
+		// Targets that inherit the mode must still be able to honour their naming.
+		for name, t := range s.cfg.Targets {
+			sc := t.SkillsConfig()
+			if err := config.TargetNamingModeError(sc.TargetNaming, cmp.Or(sc.Mode, *body.Mode)); err != nil && sc.IsEnabled() {
+				writeError(w, http.StatusBadRequest, "target "+name+": "+err.Error())
+				return
+			}
+		}
+		if err := s.cfg.ProjectNamingError(s.cfg.Projects, *body.Mode); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 		s.cfg.Mode = *body.Mode
 		args["mode"] = *body.Mode
 	}

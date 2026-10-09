@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"fmt"
 	"sort"
 	"strings"
@@ -522,6 +523,11 @@ func (m targetListTUIModel) doSetTargetMode(name, scope, newMode string) (string
 			if entry.Name == name {
 				targetCfg := scopeSetterProject(&projCfg.Targets[i], scope)
 				targetCfg.Mode = newMode
+				if scope == "skills" {
+					if err := config.TargetNamingModeError(projCfg.Targets[i].SkillsConfig().TargetNaming, newMode); err != nil {
+						return "", err
+					}
+				}
 				break
 			}
 		}
@@ -536,6 +542,11 @@ func (m targetListTUIModel) doSetTargetMode(name, scope, newMode string) (string
 		t := cfg.Targets[name]
 		targetCfg := scopeSetterGlobal(&t, scope)
 		targetCfg.Mode = newMode
+		if scope == "skills" {
+			if err := config.TargetNamingModeError(t.SkillsConfig().TargetNaming, cmp.Or(newMode, cfg.Mode)); err != nil {
+				return "", err
+			}
+		}
 		cfg.Targets[name] = t
 		if err := cfg.Save(); err != nil {
 			return "", err
@@ -597,6 +608,9 @@ func (m targetListTUIModel) doSetTargetNaming(name, newNaming string) (string, e
 		for i, entry := range projCfg.Targets {
 			if entry.Name == name {
 				projCfg.Targets[i].EnsureSkills().TargetNaming = newNaming
+				if err := config.TargetNamingModeError(newNaming, projCfg.Targets[i].SkillsConfig().Mode); err != nil {
+					return "", err
+				}
 				break
 			}
 		}
@@ -610,6 +624,9 @@ func (m targetListTUIModel) doSetTargetNaming(name, newNaming string) (string, e
 		}
 		t := cfg.Targets[name]
 		t.EnsureSkills().TargetNaming = newNaming
+		if err := config.TargetNamingModeError(newNaming, cmp.Or(t.SkillsConfig().Mode, cfg.Mode)); err != nil {
+			return "", err
+		}
 		cfg.Targets[name] = t
 		if err := cfg.Save(); err != nil {
 			return "", err
@@ -1061,7 +1078,7 @@ func (m targetListTUIModel) renderNamingPicker() string {
 	var b strings.Builder
 	b.WriteString(theme.Primary().Bold(true).Render("Skills naming") + theme.Dim().Render(" · "+m.namingPickerTarget) + "\n\n")
 	for i, naming := range config.ValidTargetNamings {
-		desc := map[string]string{"flat": "flattened __ names", "standard": "SKILL.md name"}[naming]
+		desc := map[string]string{"flat": "flattened __ names", "standard": "SKILL.md name", "prefixed": "<repo>-<name>, copy mode only"}[naming]
 		b.WriteString(renderPickerRow(naming, desc, i == m.namingCursor))
 	}
 	return b.String()

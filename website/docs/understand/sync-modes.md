@@ -238,6 +238,7 @@ Controls how skill directories are named in targets when using merge or copy mod
 |--------|----------|
 | `flat` (default) | Nested skills flattened with `__` separators: `frontend/dev` → `frontend__dev` |
 | `standard` | Uses the SKILL.md `name` field: `frontend/dev` → `dev` |
+| `prefixed` | Copy mode only. `standard`, plus the tracked repo name in front: `_mattpocock-skills/skills/prototype` → `mattpocock-skills-prototype` |
 
 Set globally or per-target:
 
@@ -258,9 +259,28 @@ skillshare sync
 
 **Standard mode** follows the [Agent Skills specification](https://agentskills.io/specification), which requires the SKILL.md `name` field to match the parent directory name. A valid name has at most 64 lowercase letters (in any script), digits and single hyphens, and does not start or end with `-`; underscores are not allowed. Skills with invalid names or name collisions are warned and skipped.
 
-**Migration**: Switching from `flat` to `standard` automatically renames existing managed entries in place. If a local skill already occupies the bare name, the legacy flat entry is preserved.
+**Prefixed mode** is for tracked repos that ship skills with the same name. Under `standard` two `prototype` skills from different repos collide and both are skipped; under `prefixed` each skill inside a tracked repo becomes `<repo>-<name>`, so both reach the tool. `<repo>` is the tracked repo folder without its leading `_`, lowercased, with every character other than a letter or digit (in any script) turned into `-`. The prefixed name is used for the folder and written to `name:` in the copied `SKILL.md`; the source is never changed.
 
-**Symlink mode**: `target_naming` is ignored — the entire directory is linked as-is.
+- A name that already starts with the repo name is not prefixed again: `_bmad/skills/bmad-ux` stays `bmad-ux`.
+- Skills outside tracked repos keep their name.
+- The source skill must pass the `standard` checks first. A prefixed name longer than 64 characters is skipped with a warning, and names that still collide are skipped as in `standard`.
+- For a shorter prefix, track the repo under a short name: `skillshare install <repo> --track --name mp` gives `mp-prototype`.
+- Relative links to sibling skills (`../other-skill/`) are not rewritten, the same as `flat` in copy mode.
+- The name becomes what the tool shows; in Claude Code it is the slash command, e.g. `/mattpocock-skills-prototype`.
+
+`prefixed` needs copy mode because merge links point at the source, where `name:` cannot change. A target that resolves to `prefixed` in merge or symlink mode fails validation and is skipped by sync. When a new target would inherit `prefixed` in a mode other than copy (a project target defaults to merge), `target add` gives it copy mode.
+
+```yaml
+targets:
+  universal:
+    skills:
+      mode: copy
+      target_naming: prefixed
+```
+
+**Migration**: Switching between `flat`, `standard` and `prefixed` renames existing managed entries in place. In copy mode the manifest records which naming made each copy, so a renamed copy is copied again and its `name:` matches the new naming, even when the source did not change. If a local skill already occupies the new name, the old managed entry is preserved.
+
+**Symlink mode**: `flat` and `standard` are ignored — the entire directory is linked as-is. `prefixed` fails validation, as above.
 
 ---
 

@@ -154,3 +154,45 @@ func TestConvertibleProjects_SkipsFoldersWhoseTargetsDisagree(t *testing.T) {
 		t.Fatalf("found %+v", found)
 	}
 }
+
+func TestValidateProjects_PrefixedNamingNeedsCopyMode(t *testing.T) {
+	cfg, root, err := loadWithProjects(t, "", "app")
+	if err != nil {
+		t.Fatal(err)
+	}
+	project := func(mode string) map[string]ManagedProject {
+		return map[string]ManagedProject{filepath.Join(root, "app"): {
+			Targets: []string{"claude"},
+			Skills:  &ResourceTargetConfig{Mode: mode, TargetNaming: "prefixed"},
+		}}
+	}
+	if err := cfg.ValidateProjects(project("")); err == nil || !strings.Contains(err.Error(), "requires copy mode") {
+		t.Fatalf("merge default: err = %v, want copy-mode error", err)
+	}
+	if err := cfg.ValidateProjects(project("copy")); err != nil {
+		t.Fatalf("copy: err = %v", err)
+	}
+}
+
+func TestProjects_AgentsOnlyIgnoresPrefixedNaming(t *testing.T) {
+	root := t.TempDir()
+	for _, dir := range []string{"app", "skills"} {
+		if err := os.MkdirAll(filepath.Join(root, dir), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	path := filepath.Join(root, "config.yaml")
+	t.Setenv("SKILLSHARE_CONFIG", path)
+	data := "source: " + root + "/skills\nmode: merge\ntarget_naming: prefixed\ntargets: {}\nprojects:\n  " + root + "/app:\n    targets: [claude]\n    agents: {}\n"
+	if err := os.WriteFile(path, []byte(data), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The project syncs no skill, so the inherited naming must not block its agents.
+	if _, invalid, err := ValidateConfigForSync(cfg); err != nil || invalid["app@claude"] != nil {
+		t.Fatalf("err = %v, invalid = %v; want app@claude valid", err, invalid)
+	}
+}

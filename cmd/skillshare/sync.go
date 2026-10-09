@@ -746,7 +746,8 @@ func backupTargetsBeforeSync(cfg *config.Config) {
 
 func reportCollisions(skills []sync.DiscoveredSkill, targets map[string]config.TargetConfig) {
 	global, perTarget := sync.CheckNameCollisionsForTargets(skills, targets)
-	if len(global) == 0 {
+	// A target's naming can make distinct names collide (prefixed _a/b-c vs a-b-c).
+	if len(global) == 0 && len(perTarget) == 0 {
 		return
 	}
 
@@ -803,7 +804,7 @@ func reportCollisions(skills []sync.DiscoveredSkill, targets map[string]config.T
 		ui.Note("Rename one in SKILL.md or adjust include/exclude filters")
 		fmt.Println()
 	} else {
-		// Global collision exists but filters isolate them — show first few names
+		// Global collision exists but filters or target naming isolate them — show first few names
 		const maxShow = 5
 		names := make([]string, 0, maxShow)
 		for i, c := range global {
@@ -812,7 +813,7 @@ func reportCollisions(skills []sync.DiscoveredSkill, targets map[string]config.T
 			}
 			names = append(names, c.Name)
 		}
-		line := fmt.Sprintf("%d duplicate skill names (isolated by target filters): %s", len(global), strings.Join(names, ", "))
+		line := fmt.Sprintf("%d duplicate skill names (isolated by target filters or naming): %s", len(global), strings.Join(names, ", "))
 		if len(global) > maxShow {
 			line += fmt.Sprintf(", ... and %d more", len(global)-maxShow)
 		}

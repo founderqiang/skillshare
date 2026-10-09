@@ -1,0 +1,354 @@
+//go:build !online
+
+package integration
+
+import (
+	"encoding/json"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	ssync "skillshare/internal/sync"
+	"skillshare/internal/testutil"
+)
+
+// prefixedFixture creates two tracked repos that both ship "prototype", plus a
+// skill outside any tracked repo, and returns the copy-mode target path.
+func prefixedFixture(t *testing.T, sb *testutil.Sandbox) string {
+	t.Helper()
+	sb.CreateNestedSkill("_emil-design/skills/prototype", map[string]string{
+		"SKILL.md": "---\nname: prototype\ndescription: Emil\n---\n# Emil prototype",
+	})
+	sb.CreateNestedSkill("_mattpocock-skills/skills/engineering/prototype", map[string]string{
+		"SKILL.md": "---\nname: prototype\ndescription: Matt\n---\n# Matt prototype",
+	})
+	sb.CreateSkill("my-skill", map[string]string{
+		"SKILL.md": "---\nname: my-skill\n---\n# Mine",
+	})
+	return sb.CreateTarget("claude")
+}
+
+func writeNamingConfig(sb *testutil.Sandbox, targetPath, naming, mode string) {
+	sb.WriteConfig(`source: ` + sb.SourcePath + `
+target_naming: ` + naming + `
+targets:
+  claude:
+    path: ` + targetPath + `
+    mode: ` + mode + `
+`)
+}
+
+func readSyncManifest(t *testing.T, sb *testutil.Sandbox, targetPath string) ssync.Manifest {
+	t.Helper()
+	var manifest ssync.Manifest
+	if err := json.Unmarshal([]byte(sb.ReadFile(filepath.Join(targetPath, ssync.ManifestFile))), &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	return manifest
+}
+
+// assertEntries checks the target holds exactly the given skill folders, each
+// with name: equal to its folder.
+func assertEntries(t *testing.T, sb *testutil.Sandbox, targetPath string, want ...string) {
+	t.Helper()
+	got := filterVisible(sb.ListDir(targetPath))
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("target entries = %v, want %v", got, want)
+	}
+	for _, name := range want {
+		if content := sb.ReadFile(filepath.Join(targetPath, name, "SKILL.md")); !strings.Contains(content, "\nname: "+name+"\n") {
+			t.Errorf("%s/SKILL.md name: does not match its folder:\n%s", name, content)
+		}
+	}
+}
+
+func TestSync_TargetNamingPrefixed_KeepsSameNamedSkillsFromTwoRepos(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	targetPath := prefixedFixture(t, sb)
+	writeNamingConfig(sb, targetPath, "prefixed", "copy")
+
+	result := sb.RunCLI("sync")
+	result.AssertSuccess(t)
+	result.AssertOutputNotContains(t, "collision")
+
+	assertEntries(t, sb, targetPath, "emil-design-prototype", "mattpocock-skills-prototype", "my-skill")
+	if src := sb.ReadFile(filepath.Join(sb.SourcePath, "_emil-design/skills/prototype/SKILL.md")); !strings.Contains(src, "\nname: prototype\n") {
+		t.Fatalf("source SKILL.md was modified:\n%s", src)
+	}
+	if got := readSyncManifest(t, sb, targetPath).Naming["emil-design-prototype"]; got != "prefixed" {
+		t.Fatalf("manifest naming = %q, want prefixed", got)
+	}
+
+	// A second sync finds every copy current.
+	again := sb.RunCLI("sync", "--json")
+	again.AssertSuccess(t)
+	var summary struct{ Linked, Updated int }
+	if err := json.Unmarshal([]byte(again.Stdout), &summary); err != nil {
+		t.Fatalf("parse sync --json: %v\n%s", err, again.Stdout)
+	}
+	if summary.Linked != 0 || summary.Updated != 0 {
+		t.Fatalf("second sync copied again: %+v", summary)
+	}
+}
+
+func TestSync_TargetNamingPrefixed_RejectedOutsideCopyMode(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	targetPath := prefixedFixture(t, sb)
+	writeNamingConfig(sb, targetPath, "prefixed", "merge")
+
+	result := sb.RunCLI("sync")
+	result.AssertFailure(t)
+	result.AssertAnyOutputContains(t, `target naming "prefixed" requires copy mode`)
+	if entries := sb.ListDir(targetPath); len(entries) != 0 {
+		t.Fatalf("merge target was written: %v", entries)
+	}
+}
+
+func TestSync_TargetNamingPrefixed_SwitchesRenameInPlace(t *testing.T) {
+	steps := []struct {
+		naming string
+		want   []string
+	}{
+		{"flat", []string{"_emil-design__skills__prototype", "_mattpocock-skills__skills__engineering__prototype", "my-skill"}},
+		{"prefixed", []string{"emil-design-prototype", "mattpocock-skills-prototype", "my-skill"}},
+		{"standard", []string{"my-skill"}}, // both prototypes collide under standard
+		{"prefixed", []string{"emil-design-prototype", "mattpocock-skills-prototype", "my-skill"}},
+	}
+
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	targetPath := prefixedFixture(t, sb)
+	for _, step := range steps {
+		writeNamingConfig(sb, targetPath, step.naming, "copy")
+		sb.RunCLI("sync").AssertSuccess(t)
+		// Flat copies keep the source name:, so only check the folder list there.
+		if step.naming == "flat" {
+			if got := strings.Join(filterVisible(sb.ListDir(targetPath)), ","); got != strings.Join(step.want, ",") {
+				t.Fatalf("after %s: entries = %s, want %v", step.naming, got, step.want)
+			}
+			continue
+		}
+		assertEntries(t, sb, targetPath, step.want...)
+	}
+}
+
+func TestSync_TargetNamingPrefixed_StandardToPrefixedRenamesAndRewritesName(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	sb.CreateNestedSkill("_emil-design/skills/prototype", map[string]string{
+		"SKILL.md": "---\nname: prototype\n---\n# Emil prototype",
+	})
+	targetPath := sb.CreateTarget("claude")
+
+	writeNamingConfig(sb, targetPath, "standard", "copy")
+	sb.RunCLI("sync").AssertSuccess(t)
+	assertEntries(t, sb, targetPath, "prototype")
+
+	// The source is unchanged, so only the recorded naming forces the re-copy
+	// that rewrites name:.
+	writeNamingConfig(sb, targetPath, "prefixed", "copy")
+	sb.RunCLI("sync").AssertSuccess(t)
+	assertEntries(t, sb, targetPath, "emil-design-prototype")
+
+	writeNamingConfig(sb, targetPath, "standard", "copy")
+	sb.RunCLI("sync").AssertSuccess(t)
+	assertEntries(t, sb, targetPath, "prototype")
+	manifest := readSyncManifest(t, sb, targetPath)
+	if _, ok := manifest.Managed["emil-design-prototype"]; ok || manifest.Naming["prototype"] != "standard" {
+		t.Fatalf("manifest = %+v, want only prototype recorded as standard", manifest)
+	}
+}
+
+func TestSync_TargetNamingPrefixed_MigratesManifestWithoutNamingRecords(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	sb.CreateNestedSkill("_emil-design/skills/prototype", map[string]string{
+		"SKILL.md": "---\nname: prototype\n---\n# Emil prototype",
+	})
+	targetPath := sb.CreateTarget("claude")
+
+	writeNamingConfig(sb, targetPath, "standard", "copy")
+	sb.RunCLI("sync").AssertSuccess(t)
+
+	// Rewrite the manifest the way releases before naming records wrote it.
+	manifest := readSyncManifest(t, sb, targetPath)
+	manifest.Naming = nil
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), `"naming"`) {
+		t.Fatalf("old-style manifest still has naming: %s", data)
+	}
+	sb.WriteFile(filepath.Join(targetPath, ssync.ManifestFile), string(data))
+
+	writeNamingConfig(sb, targetPath, "prefixed", "copy")
+	sb.RunCLI("sync").AssertSuccess(t)
+	assertEntries(t, sb, targetPath, "emil-design-prototype")
+	if got := readSyncManifest(t, sb, targetPath).Naming["emil-design-prototype"]; got != "prefixed" {
+		t.Fatalf("manifest naming = %q, want prefixed", got)
+	}
+}
+
+func filterVisible(names []string) []string {
+	var out []string
+	for _, n := range names {
+		if !strings.HasPrefix(n, ".") {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+func TestTarget_SetPrefixedNamingNeedsCopyMode(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	targetPath := prefixedFixture(t, sb)
+	writeNamingConfig(sb, targetPath, "flat", "merge")
+
+	rejected := sb.RunCLI("target", "claude", "--target-naming", "prefixed")
+	rejected.AssertFailure(t)
+	rejected.AssertAnyOutputContains(t, "set --mode copy first")
+
+	sb.RunCLI("target", "claude", "--mode", "copy").AssertSuccess(t)
+	sb.RunCLI("target", "claude", "--target-naming", "prefixed").AssertSuccess(t)
+	sb.RunCLI("sync").AssertSuccess(t)
+	assertEntries(t, sb, targetPath, "emil-design-prototype", "mattpocock-skills-prototype", "my-skill")
+}
+
+func TestSync_TargetNaming_OldManifestDoesNotTakeAnotherSkillsEntry(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	sb.CreateSkill("dev", map[string]string{"SKILL.md": "---\nname: dev\n---\n# top"})
+	// "aaa/dev" syncs before "dev", so its lookup runs before dev records its naming.
+	sb.CreateNestedSkill("aaa/dev", map[string]string{"SKILL.md": "---\nname: dev\n---\n# nested"})
+	targetPath := sb.CreateTarget("claude")
+	writeNamingConfig(sb, targetPath, "flat", "copy")
+	sb.RunCLI("sync").AssertSuccess(t)
+
+	// Under an old manifest, "dev" is also aaa/dev's standard name; it
+	// still belongs to the top-level skill that syncs to it.
+	manifest := readSyncManifest(t, sb, targetPath)
+	manifest.Naming = nil
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sb.WriteFile(filepath.Join(targetPath, ssync.ManifestFile), string(data))
+
+	result := sb.RunCLI("sync")
+	result.AssertSuccess(t)
+	result.AssertOutputNotContains(t, "kept legacy")
+	if got := sb.ReadFile(filepath.Join(targetPath, "dev", "SKILL.md")); !strings.Contains(got, "# top") {
+		t.Fatalf("dev was overwritten:\n%s", got)
+	}
+	if got := sb.ReadFile(filepath.Join(targetPath, "aaa__dev", "SKILL.md")); !strings.Contains(got, "# nested") {
+		t.Fatalf("aaa__dev has the wrong content:\n%s", got)
+	}
+}
+
+func TestSync_TargetNamingPrefixed_ProjectMode(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	projectRoot := sb.SetupProjectDir("claude")
+	sb.CreateProjectSkill(projectRoot, "_emil-design/prototype", map[string]string{"SKILL.md": "---\nname: prototype\n---\n# Emil"})
+	sb.CreateProjectSkill(projectRoot, "_mattpocock-skills/prototype", map[string]string{"SKILL.md": "---\nname: prototype\n---\n# Matt"})
+	sb.WriteProjectConfig(projectRoot, `target_naming: prefixed
+targets:
+  - name: claude
+    skills:
+      mode: copy
+`)
+
+	sb.RunCLIInDir(projectRoot, "sync", "-p").AssertSuccess(t)
+	assertEntries(t, sb, filepath.Join(projectRoot, ".claude", "skills"), "emil-design-prototype", "mattpocock-skills-prototype")
+}
+
+func TestDiff_TargetNamingChange_ReportsRename(t *testing.T) {
+	for _, tc := range []struct{ mode, from, to, oldName, newName string }{
+		{"copy", "standard", "prefixed", "prototype", "emil-design-prototype"},
+		{"merge", "flat", "standard", "_emil-design__skills__prototype", "prototype"},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			sb := testutil.NewSandbox(t)
+			defer sb.Cleanup()
+			sb.CreateNestedSkill("_emil-design/skills/prototype", map[string]string{
+				"SKILL.md": "---\nname: prototype\n---\n# Emil prototype",
+			})
+			targetPath := sb.CreateTarget("claude")
+			writeNamingConfig(sb, targetPath, tc.from, tc.mode)
+			sb.RunCLI("sync").AssertSuccess(t)
+
+			writeNamingConfig(sb, targetPath, tc.to, tc.mode)
+			result := sb.RunCLI("diff", "--no-tui")
+			result.AssertSuccess(t)
+			result.AssertRowContains(t, "Renamed", tc.newName)
+			result.AssertOutputNotContains(t, "New")
+		})
+	}
+}
+
+func TestTargetAdd_GlobalPrefixedNamingUnderMergeUsesCopyMode(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	targetPath := prefixedFixture(t, sb)
+	writeNamingConfig(sb, targetPath, "prefixed", "copy")
+	sb.WriteConfig(strings.Replace(sb.ReadFile(sb.ConfigPath), "targets:", "mode: merge\ntargets:", 1))
+
+	sb.RunCLI("target", "add", "cursor", sb.CreateTarget("cursor")).AssertSuccess(t)
+	sb.RunCLI("sync").AssertOutputNotContains(t, "requires copy mode")
+}
+
+func TestDiff_StaleRecordedNamingIsModified(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	targetPath := prefixedFixture(t, sb)
+	writeNamingConfig(sb, targetPath, "prefixed", "copy")
+	sb.RunCLI("sync").AssertSuccess(t)
+
+	// As if a sync renamed the entry and saved the manifest, then stopped before re-copying it.
+	manifest := readSyncManifest(t, sb, targetPath)
+	manifest.Naming["emil-design-prototype"] = "standard"
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sb.WriteFile(filepath.Join(targetPath, ssync.ManifestFile), string(data))
+
+	result := sb.RunCLI("diff", "--no-tui")
+	result.AssertSuccess(t)
+	result.AssertRowContains(t, "Modified", "emil-design-prototype")
+}
+
+func TestSync_TargetNamingPrefixed_ReportsCollisionsOnlyThePrefixCreates(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	// Different names, but _a's b-c becomes a-b-c, the local skill's name.
+	sb.CreateNestedSkill("_a/b-c", map[string]string{"SKILL.md": "---\nname: b-c\n---\n# A"})
+	sb.CreateSkill("a-b-c", map[string]string{"SKILL.md": "---\nname: a-b-c\n---\n# Local"})
+	targetPath := sb.CreateTarget("claude")
+	writeNamingConfig(sb, targetPath, "prefixed", "copy")
+
+	result := sb.RunCLI("sync")
+	result.AssertSuccess(t)
+	result.AssertOutputContains(t, "duplicate skill names")
+	result.AssertOutputContains(t, "_a/ vs a-b-c/")
+}
+
+func TestSync_TargetNamingPrefixed_FromMergeFlatPrunesLinksAndCopies(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	targetPath := prefixedFixture(t, sb)
+	sb.CreateNestedSkill("_bmad/skills/bmad-ux", map[string]string{"SKILL.md": "---\nname: bmad-ux\n---\n# UX"})
+	writeNamingConfig(sb, targetPath, "flat", "merge")
+	sb.RunCLI("sync").AssertSuccess(t)
+
+	writeNamingConfig(sb, targetPath, "prefixed", "copy")
+	result := sb.RunCLI("sync")
+	result.AssertSuccess(t)
+	// Prefixing, not a filter, keeps the two prototypes apart.
+	result.AssertAnyOutputContains(t, "isolated by target filters or naming")
+	assertEntries(t, sb, targetPath, "bmad-ux", "emil-design-prototype", "mattpocock-skills-prototype", "my-skill")
+}

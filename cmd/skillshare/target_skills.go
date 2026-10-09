@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 	"time"
@@ -29,6 +30,13 @@ func stripNoSkillsFlag(args []string) ([]string, bool) {
 // off saves the config, then removes the folder's links into the source.
 func setTargetSkillsGlobal(cfg *config.Config, name string, target config.TargetConfig, enabled, dryRun bool) error {
 	start := time.Now()
+	if enabled {
+		// An off target may keep a naming its mode cannot sync.
+		sc := target.SkillsConfig()
+		if err := config.TargetNamingModeError(sc.TargetNaming, cmp.Or(sc.Mode, cfg.Mode)); err != nil {
+			return err
+		}
+	}
 	res, err := switchTargetSkills(name, enabled, dryRun, func() error {
 		target.EnsureSkills().SetEnabled(enabled)
 		cfg.Targets[name] = target
@@ -44,6 +52,12 @@ func setTargetSkillsGlobal(cfg *config.Config, name string, target config.Target
 func setTargetSkillsProject(cfg *config.ProjectConfig, idx int, enabled, dryRun bool, root string) error {
 	start := time.Now()
 	name := cfg.Targets[idx].Name
+	if enabled {
+		sc := cfg.Targets[idx].SkillsConfig()
+		if err := config.TargetNamingModeError(sc.TargetNaming, sc.Mode); err != nil {
+			return err
+		}
+	}
 	res, err := switchTargetSkills(name, enabled, dryRun, func() error {
 		cfg.Targets[idx].EnsureSkills().SetEnabled(enabled)
 		return cfg.Save(root)

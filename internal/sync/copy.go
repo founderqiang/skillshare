@@ -96,10 +96,12 @@ func SyncTargetCopyWithSkillsOptions(name string, target config.TargetConfig, al
 	if err != nil {
 		return nil, fmt.Errorf("failed to read manifest: %w", err)
 	}
+	naming := resolution.Naming
 
+	taken := resolution.ValidTargetNames()
 	for i, resolved := range resolution.Skills {
 		skill := resolved.Skill
-		activeName, err := selectActiveTargetNameForSync("copy", sc.Path, resolved, manifest, dryRun)
+		activeName, err := selectActiveTargetNameForSync("copy", sc.Path, resolved, taken, manifest, dryRun)
 		if err != nil {
 			return nil, err
 		}
@@ -115,9 +117,27 @@ func SyncTargetCopyWithSkillsOptions(name string, target config.TargetConfig, al
 		// mtime fast-path: if source mtime is unchanged AND target is still a valid dir, skip checksum
 		oldChecksum, isManaged := manifest.Managed[activeName]
 		oldMtime := manifest.Mtimes[activeName] // 0 if missing
-		if mtimeErr == nil && isManaged && !force && oldMtime > 0 && currentMtime == oldMtime {
+		// A copy made under another naming carries another name:, so it is
+		// refreshed even when the source is unchanged. A legacy entry kept
+		// under its old name keeps its old naming.
+		onDesiredName := activeName == resolved.TargetName
+		recordedNaming := manifest.Naming[activeName]
+		namingChanged := onDesiredName && recordedNaming != "" && recordedNaming != naming
+		// Under prefixed naming the copy's name: becomes the entry name, so it
+		// matches its folder. A legacy entry kept under its old name is copied as is.
+		rewriteName := ""
+		if naming == "prefixed" && onDesiredName && resolved.TargetName != resolved.SkillName {
+			rewriteName = resolved.TargetName
+		}
+		recordNaming := func() {
+			if onDesiredName && !dryRun {
+				manifest.Naming[activeName] = naming
+			}
+		}
+		if mtimeErr == nil && isManaged && !force && !namingChanged && oldMtime > 0 && currentMtime == oldMtime {
 			// Verify target still exists as a directory (user may have replaced it)
 			if ti, err := os.Lstat(targetSkillPath); err == nil && ti.IsDir() {
+				recordNaming()
 				result.Skipped = append(result.Skipped, activeName)
 				continue
 			}
@@ -157,10 +177,11 @@ func SyncTargetCopyWithSkillsOptions(name string, target config.TargetConfig, al
 							if err := os.RemoveAll(targetSkillPath); err != nil {
 								return nil, fmt.Errorf("failed to remove invalid entry %s: %w", activeName, err)
 							}
-							if err := copyDirectoryWithIgnore(skill.SourcePath, targetSkillPath, ignorePatterns); err != nil {
+							if err := copySkillToTarget(skill.SourcePath, targetSkillPath, rewriteName, ignorePatterns); err != nil {
 								return nil, fmt.Errorf("failed to copy skill %s: %w", activeName, err)
 							}
 							manifest.Managed[activeName] = srcChecksum
+							recordNaming()
 							if mtimeErr == nil {
 								manifest.Mtimes[activeName] = currentMtime
 							}
@@ -174,11 +195,12 @@ func SyncTargetCopyWithSkillsOptions(name string, target config.TargetConfig, al
 					continue
 				}
 
-				if !force && isManaged && oldChecksum == srcChecksum {
+				if !force && isManaged && !namingChanged && oldChecksum == srcChecksum {
 					// Unchanged — skip (but update mtime record if it changed)
 					if mtimeErr == nil && currentMtime != oldMtime && !dryRun {
 						manifest.Mtimes[activeName] = currentMtime
 					}
+					recordNaming()
 					result.Skipped = append(result.Skipped, activeName)
 					continue
 				}
@@ -195,10 +217,11 @@ func SyncTargetCopyWithSkillsOptions(name string, target config.TargetConfig, al
 						}
 					}
 					if !dryRun {
-						if err := copyDirectoryWithIgnore(skill.SourcePath, targetSkillPath, ignorePatterns); err != nil {
+						if err := copySkillToTarget(skill.SourcePath, targetSkillPath, rewriteName, ignorePatterns); err != nil {
 							return nil, fmt.Errorf("failed to copy skill %s: %w", activeName, err)
 						}
 						manifest.Managed[activeName] = srcChecksum
+						recordNaming()
 						if mtimeErr == nil {
 							manifest.Mtimes[activeName] = currentMtime
 						}
@@ -219,10 +242,11 @@ func SyncTargetCopyWithSkillsOptions(name string, target config.TargetConfig, al
 				fmt.Fprintf(DiagOutput, "[dry-run] Would copy: %s -> %s\n", skill.SourcePath, targetSkillPath)
 			}
 		} else {
-			if err := copyDirectoryWithIgnore(skill.SourcePath, targetSkillPath, ignorePatterns); err != nil {
+			if err := copySkillToTarget(skill.SourcePath, targetSkillPath, rewriteName, ignorePatterns); err != nil {
 				return nil, fmt.Errorf("failed to copy skill %s: %w", activeName, err)
 			}
 			manifest.Managed[activeName] = srcChecksum
+			recordNaming()
 			if mtimeErr == nil {
 				manifest.Mtimes[activeName] = currentMtime
 			}
@@ -238,6 +262,30 @@ func SyncTargetCopyWithSkillsOptions(name string, target config.TargetConfig, al
 	}
 
 	return result, nil
+}
+
+// copySkillToTarget copies a skill into dst and, when newName is set, rewrites
+// name: in the copied SKILL.md to it. The source is never touched.
+func copySkillToTarget(src, dst, newName string, ignorePatterns []string) error {
+	if err := copyDirectoryWithIgnore(src, dst, ignorePatterns); err != nil {
+		return err
+	}
+	if newName == "" {
+		return nil
+	}
+	skillFile := filepath.Join(dst, "SKILL.md")
+	// The copy keeps the source's mode; lift a read-only one for the rewrite only.
+	if info, err := os.Stat(skillFile); err == nil && info.Mode().Perm()&0o200 == 0 {
+		os.Chmod(skillFile, info.Mode().Perm()|0o200)
+		defer os.Chmod(skillFile, info.Mode().Perm())
+	}
+	if err := utils.SetFrontmatterValue(skillFile, "name", newName); err != nil {
+		// dst was just created by this copy; left behind without a manifest
+		// entry, it would pass for a user's folder and never be refreshed.
+		os.RemoveAll(dst)
+		return fmt.Errorf("failed to set prefixed name: %w", err)
+	}
+	return nil
 }
 
 // PruneOrphanCopies removes managed copies that no longer exist in source.
@@ -268,7 +316,7 @@ func PruneOrphanCopiesWithSkills(targetPath string, allSourceSkills []Discovered
 		return nil, err
 	}
 	validTargetNames := resolution.ValidTargetNames()
-	legacyNames := resolution.LegacyFlatNames()
+	legacyNames := resolution.LegacyNames("copy", targetPath, manifest)
 
 	// Remove manifest entries that are no longer in source
 	for entryName := range manifest.Managed {
@@ -288,8 +336,7 @@ func PruneOrphanCopiesWithSkills(targetPath string, allSourceSkills []Discovered
 					fmt.Sprintf("%s: failed to remove: %v", entryName, err))
 				continue
 			}
-			delete(manifest.Managed, entryName)
-			delete(manifest.Mtimes, entryName)
+			manifest.Remove(entryName)
 		}
 		result.Removed = append(result.Removed, entryName)
 	}

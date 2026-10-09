@@ -1,6 +1,7 @@
 package config
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"maps"
@@ -17,7 +18,8 @@ const errAgentsEnabled = "agents.enabled is not supported (only skills.enabled)"
 // Returns warnings (non-fatal) and error (fatal, should return 400).
 func ValidateConfig(cfg *Config) (warnings []string, err error) {
 	warnings, invalid, err := ValidateConfigForSync(cfg)
-	return warnings, joinTargetErrors(err, invalid)
+	// A raw config (the dashboard's config save) has not expanded projects into targets yet.
+	return warnings, errors.Join(joinTargetErrors(err, invalid), cfg.ProjectNamingError(cfg.Projects, cfg.Mode))
 }
 
 // ValidateConfigForSync validates a global config for sync, which runs every
@@ -66,7 +68,7 @@ func ValidateConfigForSync(cfg *Config) (warnings []string, invalid map[string]e
 
 	invalid = map[string]error{}
 	for name, target := range cfg.Targets {
-		if problems := validateGlobalTarget(name, target); len(problems) > 0 {
+		if problems := validateGlobalTarget(name, target, cfg.Mode, cfg.TargetNaming); len(problems) > 0 {
 			invalid[name] = errors.New(strings.Join(problems, "; "))
 		}
 	}
@@ -78,7 +80,8 @@ func ValidateConfigForSync(cfg *Config) (warnings []string, invalid map[string]e
 }
 
 // validateGlobalTarget returns the problems of one global target's settings.
-func validateGlobalTarget(name string, target TargetConfig) []string {
+// globalMode and globalNaming are the defaults the target inherits.
+func validateGlobalTarget(name string, target TargetConfig, globalMode, globalNaming string) []string {
 	var problems []string
 	if err := ValidateTargetInstructions(target.Instructions, false); err != nil {
 		problems = append(problems, err.Error())
@@ -92,6 +95,11 @@ func validateGlobalTarget(name string, target TargetConfig) []string {
 	}
 	if !IsValidTargetNaming(sc.TargetNaming) {
 		return append(problems, fmt.Sprintf("invalid target naming %q (valid: %s)", sc.TargetNaming, strings.Join(ValidTargetNamings, ", ")))
+	}
+	naming, mode := cmp.Or(sc.TargetNaming, globalNaming), cmp.Or(sc.Mode, globalMode)
+	// Skills off syncs no skill, and the target's agents must still sync.
+	if err := TargetNamingModeError(naming, mode); err != nil && sc.IsEnabled() {
+		problems = append(problems, err.Error())
 	}
 	if sc.Path == "" {
 		// Known built-in targets get their path from targets.yaml at runtime;
@@ -155,6 +163,7 @@ func ValidateProjectConfigForSync(cfg *ProjectConfig, projectRoot string) (warni
 
 	problems := map[string][]string{}
 	for _, entry := range cfg.Targets {
+		entry.defaultTargetNaming = cfg.TargetNaming // a raw config has not been through LoadProject
 		problems[entry.Name] = append(problems[entry.Name], validateProjectTarget(entry, projectRoot, sourcePath, agentsSourcePath)...)
 	}
 	invalid = map[string]error{}
@@ -185,6 +194,9 @@ func validateProjectTarget(entry ProjectTargetEntry, projectRoot, sourcePath, ag
 	}
 	if !IsValidTargetNaming(sc.TargetNaming) {
 		return append(problems, fmt.Sprintf("invalid target naming %q (valid: %s)", sc.TargetNaming, strings.Join(ValidTargetNamings, ", ")))
+	}
+	if err := TargetNamingModeError(sc.TargetNaming, sc.Mode); err != nil && sc.IsEnabled() {
+		problems = append(problems, err.Error())
 	}
 
 	var skillsBuiltin string

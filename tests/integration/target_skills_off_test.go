@@ -235,3 +235,22 @@ func TestTargetProject_AddNoSkills(t *testing.T) {
 		t.Errorf("project config should record enabled: false:\n%s", cfg)
 	}
 }
+
+func TestTargetSkillsOn_RefusesPrefixedNamingOutsideCopyMode(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	targetPath := sb.CreateTarget("claude")
+	sb.WriteConfig(`source: ` + sb.SourcePath + `
+mode: merge
+target_naming: prefixed
+targets:
+  claude:
+    skills:
+      path: ` + targetPath + `
+      enabled: false
+`)
+
+	result := sb.RunCLI("target", "claude", "--skills=true")
+	result.AssertFailure(t)
+	result.AssertAnyOutputContains(t, "requires copy mode")
+}

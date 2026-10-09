@@ -84,10 +84,10 @@
     },
     "target_naming": {
       "type": "string",
-      "description": "Default target entry naming strategy for merge/copy sync. 'flat' preserves flattened parent directory prefixes; 'standard' uses the SKILL.md name and enforces the Agent Skills standard.",
-      "enum": ["flat", "standard"],
+      "description": "Default target entry naming strategy for merge/copy sync. 'flat' preserves flattened parent directory prefixes; 'standard' uses the SKILL.md name and enforces the Agent Skills standard; 'prefixed' (copy mode only) is standard plus the tracked repo name in front, '<repo>-<name>', for both the folder and name: in the copy.",
+      "enum": ["flat", "standard", "prefixed"],
       "default": "flat",
-      "examples": ["flat", "standard"]
+      "examples": ["flat", "standard", "prefixed"]
     },
     "targets": {
       "type": "object",
@@ -234,7 +234,7 @@
           "additionalProperties": false,
           "properties": {
             "mode": { "type": "string", "enum": ["merge", "symlink", "copy"] },
-            "target_naming": { "type": "string", "enum": ["flat", "standard"] },
+            "target_naming": { "type": "string", "enum": ["flat", "standard", "prefixed"] },
             "include": { "type": "array", "items": { "type": "string" } },
             "exclude": { "type": "array", "items": { "type": "string" } }
           }
@@ -310,8 +310,8 @@
             },
             "target_naming": {
               "type": "string",
-              "description": "Target entry naming strategy for skills. If omitted, inherits the top-level target_naming (defaults to flat). Ignored in symlink mode.",
-              "enum": ["flat", "standard"]
+              "description": "Target entry naming strategy for skills. If omitted, inherits the top-level target_naming (defaults to flat). 'flat' and 'standard' are ignored in symlink mode; 'prefixed' requires copy mode.",
+              "enum": ["flat", "standard", "prefixed"]
             },
             "include": {
               "type": "array",
