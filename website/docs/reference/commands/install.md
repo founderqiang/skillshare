@@ -413,7 +413,7 @@ skillshare install google-gemini/gemini-cli/.../skill-creator --name my-creator
 
 `--name` only works when install resolves to a single skill.
 In `--track` mode, custom names are stored as tracked repo directories (auto-prefixed with `_`) and must not contain path separators or `..`.
-`--track` accepts a local path when that path is the root of a git repository (it is cloned like `file:///path`); for any other local folder, install it without `--track`.
+`--track` accepts a local path when that path is the root of a git repository (it is cloned like `file:///path`); for any other local folder, install it without `--track`. With `--track --force`, the existing tracked repo is replaced only after the new clone succeeds, so a failed reinstall keeps the old one; a local source (path or `file://` URL) that is, or lies inside, that tracked repo is refused.
 
 ```bash
 # ✅ Single skill (works)

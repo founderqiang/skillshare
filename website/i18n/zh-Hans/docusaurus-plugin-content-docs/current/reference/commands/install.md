@@ -409,7 +409,7 @@ skillshare install google-gemini/gemini-cli/.../skill-creator --name my-creator
 
 `--name` 仅在安装解析为单个 Skill 时有效。
 在 `--track` 模式下，自定义名称会作为 tracked repo 目录存储（自动加上 `_` 前缀），且不能包含路径分隔符或 `..`。
-`--track` 也接受本地路径，前提是该路径是 git 仓库的根目录（会像 `file:///path` 一样被 clone）；其他本地文件夹请不要加 `--track` 安装。
+`--track` 也接受本地路径，前提是该路径是 git 仓库的根目录（会像 `file:///path` 一样被 clone）；其他本地文件夹请不要加 `--track` 安装。使用 `--track --force` 时，只有在新的 clone 成功后才会替换现有的 tracked repo，因此重新安装失败时旧的 repo 会保留；若本地来源（路径或 `file://` URL）就是该 tracked repo 或位于其中，会被拒绝。
 
 ```bash
 # ✅ 单个 Skill（可行）
