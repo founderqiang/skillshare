@@ -259,7 +259,7 @@ skillshare sync
 
 **Standard 模式**遵循 [Agent Skills specification](https://agentskills.io/specification)，该规范要求 SKILL.md 的 `name` 字段与父目录名一致。有效名称最多 64 个字符，只能包含小写字母（任何文字系统）、数字和单个连字符，且不能以 `-` 开头或结尾；不允许使用下划线。名称无效或存在名称冲突的 skill 会收到警告并被跳过。
 
-**Prefixed 模式**适用于包含同名 skill 的 tracked repo。在 `standard` 下，来自不同 repo 的两个 `prototype` skill 会冲突并都被跳过；在 `prefixed` 下，tracked repo 内的每个 skill 都会变成 `<repo>-<name>`，因此两者都能到达工具。`<repo>` 是 tracked repo 文件夹名去掉开头的 `_`、转为小写，并把其他所有字符替换为 `-` 的结果。带前缀的名称既用作文件夹名，也会写入复制出的 `SKILL.md` 的 `name:`；source 不会被修改。
+**Prefixed 模式**适用于包含同名 skill 的 tracked repo。在 `standard` 下，来自不同 repo 的两个 `prototype` skill 会冲突并都被跳过；在 `prefixed` 下，tracked repo 内的每个 skill 都会变成 `<repo>-<name>`，因此两者都能到达工具。`<repo>` 是 tracked repo 文件夹名去掉开头的 `_`、转为小写，并把字母和数字（任何文字系统）以外的字符替换为 `-` 的结果。带前缀的名称既用作文件夹名，也会写入复制出的 `SKILL.md` 的 `name:`；source 不会被修改。
 
 - 名称已经以 repo 名开头时不会重复加前缀：`_bmad/skills/bmad-ux` 仍是 `bmad-ux`。
 - 不在 tracked repo 内的 skill 保持原名。

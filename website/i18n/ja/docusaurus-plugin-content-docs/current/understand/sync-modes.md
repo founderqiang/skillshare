@@ -260,7 +260,7 @@ skillshare sync
 
 **Standard mode** は [Agent Skills specification](https://agentskills.io/specification) に従い、SKILL.md の `name` フィールドが親ディレクトリ名と一致することを要求します。有効な名前は最大 64 文字の小文字（どの文字体系でも可）、数字、単独のハイフンで構成され、`-` で始まったり終わったりしません。アンダースコアは使えません。名前が無効な Skill や名前の衝突は警告され、スキップされます。
 
-**Prefixed mode** は、同じ名前の Skill を提供する tracked repo のためのものです。`standard` では、別々の repo にある 2 つの `prototype` Skill が衝突して両方ともスキップされますが、`prefixed` では tracked repo 内の各 Skill が `<repo>-<name>` になるため、両方がツールに届きます。`<repo>` は tracked repo フォルダー名から先頭の `_` を除き、小文字にし、それ以外の文字をすべて `-` に置き換えたものです。prefixed 名はフォルダー名として使われ、コピーされた `SKILL.md` の `name:` にも書き込まれます。source は変更されません。
+**Prefixed mode** は、同じ名前の Skill を提供する tracked repo のためのものです。`standard` では、別々の repo にある 2 つの `prototype` Skill が衝突して両方ともスキップされますが、`prefixed` では tracked repo 内の各 Skill が `<repo>-<name>` になるため、両方がツールに届きます。`<repo>` は tracked repo フォルダー名から先頭の `_` を除き、小文字にし、文字と数字（任意の文字体系）以外をすべて `-` に置き換えたものです。prefixed 名はフォルダー名として使われ、コピーされた `SKILL.md` の `name:` にも書き込まれます。source は変更されません。
 
 - 名前がすでに repo 名で始まっている場合は、再度プレフィックスを付けません: `_bmad/skills/bmad-ux` は `bmad-ux` のままです。
 - tracked repo の外にある Skill は名前をそのまま保ちます。

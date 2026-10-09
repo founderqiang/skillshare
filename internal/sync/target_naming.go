@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"unicode"
+
+	"golang.org/x/text/unicode/norm"
 
 	"skillshare/internal/config"
 	"skillshare/internal/skillpkg"
@@ -227,15 +230,16 @@ func PrefixedTargetName(skill DiscoveredSkill, skillName string) string {
 	return repo + "-" + skillName
 }
 
-// normalizeSpecName lowercases s, turns every character outside [a-z0-9] into
+// normalizeSpecName applies NFKC and lowercases s, as skillpkg.ValidateName reads a
+// name, turns every character other than a letter or number (in any script) into
 // "-", collapses repeated hyphens and trims them from both ends.
 func normalizeSpecName(s string) string {
 	mapped := strings.Map(func(r rune) rune {
-		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) {
 			return r
 		}
 		return '-'
-	}, strings.ToLower(s))
+	}, strings.ToLower(norm.NFKC.String(s)))
 	parts := strings.FieldsFunc(mapped, func(r rune) bool { return r == '-' })
 	return strings.Join(parts, "-")
 }

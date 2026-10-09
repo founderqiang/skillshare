@@ -259,7 +259,7 @@ skillshare sync
 
 **Standard mode** follows the [Agent Skills specification](https://agentskills.io/specification), which requires the SKILL.md `name` field to match the parent directory name. A valid name has at most 64 lowercase letters (in any script), digits and single hyphens, and does not start or end with `-`; underscores are not allowed. Skills with invalid names or name collisions are warned and skipped.
 
-**Prefixed mode** is for tracked repos that ship skills with the same name. Under `standard` two `prototype` skills from different repos collide and both are skipped; under `prefixed` each skill inside a tracked repo becomes `<repo>-<name>`, so both reach the tool. `<repo>` is the tracked repo folder without its leading `_`, lowercased, with every other character turned into `-`. The prefixed name is used for the folder and written to `name:` in the copied `SKILL.md`; the source is never changed.
+**Prefixed mode** is for tracked repos that ship skills with the same name. Under `standard` two `prototype` skills from different repos collide and both are skipped; under `prefixed` each skill inside a tracked repo becomes `<repo>-<name>`, so both reach the tool. `<repo>` is the tracked repo folder without its leading `_`, lowercased, with every character other than a letter or digit (in any script) turned into `-`. The prefixed name is used for the folder and written to `name:` in the copied `SKILL.md`; the source is never changed.
 
 - A name that already starts with the repo name is not prefixed again: `_bmad/skills/bmad-ux` stays `bmad-ux`.
 - Skills outside tracked repos keep their name.

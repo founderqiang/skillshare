@@ -22,6 +22,8 @@ func TestPrefixedTargetName(t *testing.T) {
 		{"", "my-skill", "my-skill"},
 		{"org/_My_Team..v2", "dev", "my-team-v2-dev"},
 		{"_--", "dev", "dev"},
+		{"_技能", "dev", "技能-dev"},
+		{"_Café", "dev", "café-dev"},
 	}
 	for _, tt := range tests {
 		skill := DiscoveredSkill{IsInRepo: tt.repo != "", RepoRelPath: tt.repo}
