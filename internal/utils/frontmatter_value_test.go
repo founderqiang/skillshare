@@ -58,6 +58,16 @@ func TestSetFrontmatterValue(t *testing.T) {
 			want: "---\n{description: text, name: emil-design-prototype}\n---\nBody",
 		},
 		{
+			name: "indented root mapping keeps its indent",
+			in:   "---\n  name: prototype\n  description: d\n---\nBody",
+			want: "---\n  name: emil-design-prototype\n  description: d\n---\nBody",
+		},
+		{
+			name: "indented root mapping without name gets it at the same indent",
+			in:   "---\n  description: d\n---\nBody",
+			want: "---\n  description: d\n  name: emil-design-prototype\n---\nBody",
+		},
+		{
 			name: "no frontmatter gets one",
 			in:   "# Just a body\n",
 			want: "---\nname: emil-design-prototype\n---\n# Just a body\n",

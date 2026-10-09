@@ -153,6 +153,9 @@ func SetFrontmatterValue(filePath, key, value string) error {
 
 	lines := fm.lines
 	m := fm.mapping()
+	if m != nil && len(m.Content) > 0 {
+		line = strings.Repeat(" ", m.Content[0].Column-1) + line // a root mapping may be indented as a whole
+	}
 	if m != nil && m.Style&yaml.FlowStyle != 0 {
 		// Flow-style keys share lines, so the mapping is written back whole.
 		setMappingScalar(m, key, value)
