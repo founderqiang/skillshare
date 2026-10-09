@@ -336,3 +336,19 @@ func TestSync_TargetNamingPrefixed_ReportsCollisionsOnlyThePrefixCreates(t *test
 	result.AssertOutputContains(t, "duplicate skill names")
 	result.AssertOutputContains(t, "_a/ vs a-b-c/")
 }
+
+func TestSync_TargetNamingPrefixed_FromMergeFlatPrunesLinksAndCopies(t *testing.T) {
+	sb := testutil.NewSandbox(t)
+	defer sb.Cleanup()
+	targetPath := prefixedFixture(t, sb)
+	sb.CreateNestedSkill("_bmad/skills/bmad-ux", map[string]string{"SKILL.md": "---\nname: bmad-ux\n---\n# UX"})
+	writeNamingConfig(sb, targetPath, "flat", "merge")
+	sb.RunCLI("sync").AssertSuccess(t)
+
+	writeNamingConfig(sb, targetPath, "prefixed", "copy")
+	result := sb.RunCLI("sync")
+	result.AssertSuccess(t)
+	// Prefixing, not a filter, keeps the two prototypes apart.
+	result.AssertAnyOutputContains(t, "isolated by target filters or naming")
+	assertEntries(t, sb, targetPath, "bmad-ux", "emil-design-prototype", "mattpocock-skills-prototype", "my-skill")
+}
