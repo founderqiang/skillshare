@@ -265,3 +265,27 @@ targets:
 	sb.RunCLIInDir(projectRoot, "sync", "-p").AssertSuccess(t)
 	assertEntries(t, sb, filepath.Join(projectRoot, ".claude", "skills"), "emil-design-prototype", "mattpocock-skills-prototype")
 }
+
+func TestDiff_TargetNamingChange_ReportsRename(t *testing.T) {
+	for _, tc := range []struct{ mode, from, to, oldName, newName string }{
+		{"copy", "standard", "prefixed", "prototype", "emil-design-prototype"},
+		{"merge", "flat", "standard", "_emil-design__skills__prototype", "prototype"},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			sb := testutil.NewSandbox(t)
+			defer sb.Cleanup()
+			sb.CreateNestedSkill("_emil-design/skills/prototype", map[string]string{
+				"SKILL.md": "---\nname: prototype\n---\n# Emil prototype",
+			})
+			targetPath := sb.CreateTarget("claude")
+			writeNamingConfig(sb, targetPath, tc.from, tc.mode)
+			sb.RunCLI("sync").AssertSuccess(t)
+
+			writeNamingConfig(sb, targetPath, tc.to, tc.mode)
+			result := sb.RunCLI("diff", "--no-tui")
+			result.AssertSuccess(t)
+			result.AssertRowContains(t, "Renamed", tc.newName)
+			result.AssertOutputNotContains(t, "New")
+		})
+	}
+}

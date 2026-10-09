@@ -176,6 +176,22 @@ func (r *TargetSkillResolution) LegacyNames(mode, targetPath string, manifest *M
 	return legacy
 }
 
+// RenamedFrom inverts LegacyNames: for each target name sync will move a
+// legacy entry into, the entry's current name.
+func RenamedFrom(legacy map[string]ResolvedTargetSkill) map[string]string {
+	renamed := make(map[string]string, len(legacy))
+	for old, skill := range legacy {
+		renamed[skill.TargetName] = old
+	}
+	return renamed
+}
+
+// RenameReason is the diff reason for an entry sync renames after a target
+// naming change.
+func RenameReason(old string) string {
+	return "renamed from " + old + " (target naming changed)"
+}
+
 // namedTarget is the entry name a skill gets under one target naming.
 type namedTarget struct{ naming, name string }
 

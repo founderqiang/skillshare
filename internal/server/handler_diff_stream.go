@@ -116,6 +116,7 @@ func (s *Server) computeTargetDiff(name string, target config.TargetConfig, disc
 	validNames := resolution.ValidTargetNames()
 	manifest, _ := ssync.ReadManifest(sc.Path)
 	legacyNames := resolution.LegacyNames(mode, sc.Path, manifest)
+	renamedFrom := ssync.RenamedFrom(legacyNames)
 
 	if mode == "copy" {
 		for _, resolved := range resolution.Skills {
@@ -129,6 +130,8 @@ func (s *Server) computeTargetDiff(name string, target config.TargetConfig, disc
 					} else {
 						dt.Items = append(dt.Items, diffItem{Skill: resolved.TargetName, Action: "update", Reason: "target entry is not a directory", Kind: kindSkill})
 					}
+				} else if old, ok := renamedFrom[resolved.TargetName]; ok && os.IsNotExist(statErr) {
+					dt.Items = append(dt.Items, diffItem{Skill: resolved.TargetName, Action: "update", Reason: ssync.RenameReason(old), Kind: kindSkill})
 				} else if os.IsNotExist(statErr) {
 					dt.Items = append(dt.Items, diffItem{Skill: resolved.TargetName, Action: "link", Reason: "source only", Kind: kindSkill})
 				} else {
@@ -174,7 +177,9 @@ func (s *Server) computeTargetDiff(name string, target config.TargetConfig, disc
 		targetSkillPath := filepath.Join(sc.Path, resolved.TargetName)
 		_, err := os.Lstat(targetSkillPath)
 		if err != nil {
-			if os.IsNotExist(err) {
+			if old, ok := renamedFrom[resolved.TargetName]; ok && os.IsNotExist(err) {
+				dt.Items = append(dt.Items, diffItem{Skill: resolved.TargetName, Action: "update", Reason: ssync.RenameReason(old), Kind: kindSkill})
+			} else if os.IsNotExist(err) {
 				dt.Items = append(dt.Items, diffItem{Skill: resolved.TargetName, Action: "link", Reason: "source only", Kind: kindSkill})
 			}
 			continue
