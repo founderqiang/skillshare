@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.28.1] - 2026-10-30
+
+### New Features
+
+- **`agy` and `antigravity-cli` as MCP targets** — `mcp --target` and `--from` accept `agy` and `antigravity-cli`, the names `plugin` and `hooks` already use for Antigravity CLI. Both map to `antigravity`, because the agy CLI reads the file the `antigravity` client writes; the source still stores `antigravity`. Thanks to @jskswamy for the report and the implementation. Refs: #669, #670.
+  ```bash
+  skillshare mcp add docs --url https://example.com/mcp --target agy --sync
+  skillshare mcp import docs --from agy --target claude
+  ```
+
+### Bug Fixes
+
+- **Plugin update results** — in the dashboard's plugin update dialog, a result row with a multi-line message keeps its icon at the top of the row instead of floating in the middle.
+
 ## [0.28.0] - 2026-10-29
 
 ### New Features
