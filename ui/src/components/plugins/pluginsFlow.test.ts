@@ -191,6 +191,21 @@ describe('plugins flow', () => {
     expect(now().batch?.[0]).toMatchObject({ status: 'skipped', note: 'marketplace gone' });
   });
 
+  it('leaves no note when skipped Agents carry no message', async () => {
+    streams({ name: 'driver', plan: plan('u', { name: 'driver', target: 'pi', action: 'update' }), result: { results: [{ name: 'driver', target: 'pi', status: 'skipped' }, { name: 'driver', target: 'codex', status: 'skipped' }] }, failure: '', stale: false });
+    const { now } = flow();
+    await act(() => now().updateMany([{ name: 'driver', targets: ['pi', 'codex'] }]));
+    expect(now().batch?.[0].note).toBeUndefined();
+  });
+
+  it('falls back to the blocked label when blocked Agents carry no message', async () => {
+    const blocked = { ...plan('u', { name: 'driver', target: 'pi', action: 'blocked' }, { name: 'driver', target: 'codex', action: 'blocked' }), blocked: true };
+    streams({ name: 'driver', plan: blocked, result: { results: [] }, failure: '', stale: false });
+    const { now } = flow();
+    await act(() => now().updateMany([{ name: 'driver', targets: ['pi', 'codex'] }]));
+    expect(now().batch?.[0].note).toBe('plugins.blocked');
+  });
+
   it('keeps retained-import guidance in the completed batch', async () => {
     const note = { name: 'demo', target: 'codex', guidance: true, messageKey: 'plugins.note.importRecipeChanged' };
     streams({ name: 'demo', plan: plan('u', { ...note, action: 'noop' }), result: { results: [{ ...note, status: 'unchanged' }] }, failure: '', stale: false });
