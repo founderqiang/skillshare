@@ -44,9 +44,10 @@ func followFixture(t *testing.T) (root, checkout string) {
 
 func walkEntries(t *testing.T, root string, opts Options, skip string) (walk, walkDir []string) {
 	t.Helper()
-	root = resolvedPath(t, root)
+	// Keep passing the caller's root so Walk's own root resolution stays covered.
+	base := resolvedPath(t, root)
 	label := func(path string, dir bool, mode fs.FileMode) string {
-		rel, _ := filepath.Rel(root, path)
+		rel, _ := filepath.Rel(base, path)
 		kind := "file"
 		switch {
 		case dir:
