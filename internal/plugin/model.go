@@ -18,8 +18,13 @@ var Targets = func() []string {
 }()
 
 type Binding struct {
-	// PiRegistration references a private, content-addressed native entry. Values
-	// never enter shared config or API responses; only its digest is recorded.
+	ImportRetained bool `json:"importRetained,omitempty" yaml:"-"`
+	RefChanged     bool `json:"refChanged,omitempty" yaml:"-"`
+	Imported       bool `json:"imported,omitempty" yaml:"-"`
+	Cleanup        bool `json:"cleanup,omitempty" yaml:"-"`
+	ContextChanged bool `json:"contextChanged,omitempty" yaml:"-"`
+	// PiRegistration references a private, content-addressed native entry. Its
+	// digest belongs to the local receipt; native values never enter config or API responses.
 	PiRegistration string   `json:"piRegistration,omitempty" yaml:"pi_registration,omitempty"`
 	Entry          string   `json:"entry,omitempty" yaml:"entry,omitempty"`
 	SourceRef      string   `json:"sourceRef,omitempty" yaml:"source_ref,omitempty"`
@@ -34,7 +39,7 @@ type Binding struct {
 	Pending        string   `json:"pending,omitempty" yaml:"pending,omitempty"`
 }
 
-// Source, SourceRef, Plugin, Entry and Version keep a package managed while no Agent is bound,
+// Source, SourceRef, Plugin and Entry keep a package managed while no Agent is bound,
 // so Agents can be bound later from the same source and the dashboard can still show its version.
 type Package struct {
 	Version   string             `json:"version,omitempty" yaml:"version,omitempty"`
@@ -225,7 +230,10 @@ type Inventory struct {
 }
 
 type Change struct {
+	Guidance       bool `json:"guidance,omitempty"`
+	sourceVersion  *string
 	PreservedKeys  []string `json:"preservedKeys,omitempty"`
+	recipe         *declaration
 	piRecord       []byte
 	piSettingsHash string
 	piRestores     map[string]piRestoreReceipt
@@ -249,16 +257,18 @@ type Change struct {
 }
 
 type Plan struct {
+	hosts    map[string]Host
 	Revision string   `json:"revision"`
 	Blocked  bool     `json:"blocked"`
 	Changes  []Change `json:"changes"`
 }
 
 type Outcome struct {
-	Name    string `json:"name"`
-	Target  string `json:"target"`
-	Status  string `json:"status"`
-	Message string `json:"message,omitempty"`
+	Guidance bool   `json:"guidance,omitempty"`
+	Name     string `json:"name"`
+	Target   string `json:"target"`
+	Status   string `json:"status"`
+	Message  string `json:"message,omitempty"`
 	// MessageKey names Message for the dashboard to translate, with MessageArgs.
 	MessageKey  string            `json:"messageKey,omitempty"`
 	MessageArgs map[string]string `json:"messageArgs,omitempty"`
@@ -291,6 +301,7 @@ type Service struct {
 	// discoveries keeps each source UpdateBatch read while it runs, so its plugins share one copy.
 	discoveries   map[string]*Discovery
 	discoveryErrs map[string]error
+	applyConfig   *[]byte
 }
 
 func (b Binding) Selected() bool { return b.Sync == nil || *b.Sync }

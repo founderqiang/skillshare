@@ -57,6 +57,7 @@ ss() { /workspace/bin/skillshare "$@"; }
 PKG=npm:@evoclock/pi-agentic-driver
 S=$PI_CODING_AGENT_DIR/settings.json
 CFG=$XDG_CONFIG_HOME/skillshare/config.yaml
+STATE=$XDG_STATE_HOME/skillshare/plugins/$(printf %s "$CFG" | sha256sum | cut -c1-16)/state.json
 pi --version
 npm view ${PKG#npm:}@1.1.0 version scripts
 ```
@@ -117,8 +118,8 @@ grep '"plugin add"' $XDG_STATE_HOME/skillshare/logs/operations.log | tail -1
 ```
 
 **Expected**: `pi-agentic-driver  pi · installed`, `exit=0`;
-`["npm:@evoclock/pi-agentic-driver@1.0.0"]`; the binding `pi: id: npm:@evoclock/pi-agentic-driver@1.0.0`
-with no `source`; `pi list` shows the package under User packages; version `1.0.0`; an oplog
+`["npm:@evoclock/pi-agentic-driver@1.0.0"]`; the shared recipe `pi: source: npm:@evoclock/pi-agentic-driver@1.0.0`
+with no native `id`; `pi list` shows the package under User packages; version `1.0.0`; an oplog
 entry with `"status":"ok"`.
 
 ### 6. Update skips the pinned version
@@ -141,7 +142,7 @@ jq -r .version $PI_CODING_AGENT_DIR/npm/node_modules/@evoclock/pi-agentic-driver
 
 **Expected**: the preview is `install` with key `plugins.note.npmReplace` and
 `{"from":"npm:@evoclock/pi-agentic-driver@1.0.0"}`; `exit=0`; Pi keeps one entry,
-`["npm:@evoclock/pi-agentic-driver@1.1.0"]`; the binding ID is `@1.1.0`; version `1.1.0`.
+`["npm:@evoclock/pi-agentic-driver@1.1.0"]`; the shared source is `npm:@evoclock/pi-agentic-driver@1.1.0` (native IDs stay local); version `1.1.0`.
 
 ### 8. An account that already has the package imports it
 
@@ -155,7 +156,7 @@ grep -A5 'pi-agentic-driver:' $CFG
 ```
 
 **Expected**: `{"target":"pi-work","action":"import"}`; `pi-agentic-driver  pi-work · imported`,
-`exit=0`; `unchanged`; bindings for both `pi` and `pi-work` with ID `@1.1.0`.
+`exit=0`; `unchanged`; shared recipes for both `pi` and `pi-work` with source `npm:@evoclock/pi-agentic-driver@1.1.0`; no native IDs in shared config.
 
 ### 9. Remove runs pi remove on every bound target
 
@@ -175,7 +176,8 @@ jq '.packages = [{source: .packages[0], extensions: ["-extensions/pulse.ts"]}]' 
 ss plugin import $PKG@1.0.0 --from pi --name pi-agentic-driver --no-tui -g; echo "exit=$?"
 ss plugin add $PKG@1.1.0 --name pi-agentic-driver --target pi --no-tui -g; echo "exit=$?"
 jq -c .packages $S
-grep -c pi_registration $CFG
+jq -e '.bindings["pi-agentic-driver"].pi.applied.binding.piRegistration | type == "string" and length > 0' "$STATE"
+! grep -q pi_registration "$CFG" && echo shared-config-clean
 pi remove $PKG@1.1.0 > /dev/null
 ss plugin sync --no-tui -g; echo "exit=$?"
 jq -c .packages $S
@@ -185,7 +187,8 @@ ss plugin remove pi-agentic-driver --no-tui -g > /dev/null; jq -c .packages $S
 **Expected**: `pi · imported`, then `pi · installed`, both `exit=0`. Pi moves the entry to the
 new version and keeps its filter:
 `[{"source":"npm:@evoclock/pi-agentic-driver@1.1.0","extensions":["-extensions/pulse.ts"]}]`,
-and the binding has a `pi_registration` (`1`). After the package is removed outside
+and the machine-local receipt has a `piRegistration` digest (`true`). The shared
+config contains no `pi_registration` (`shared-config-clean`). After the package is removed outside
 Skillshare, `sync` reinstalls it (`pi · installed`, `exit=0`) with the same filtered entry.
 The final removal leaves `[]`.
 

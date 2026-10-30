@@ -185,19 +185,15 @@ Skillshare는 자격 증명을 값이 아닌 `fromEnv` 참조로 저장합니다
 
 ### Plugins {#plugins}
 
-Plugin 정의는 git으로 이동하지 않습니다. 각 머신에서 같은 소스로부터 다시 추가합니다:
+공유 설정의 `plugins:` 섹션에 version 2 소스, ref, 대상 선택을 저장할 수 있습니다. StateDir는 기기마다 따로 유지하세요. 설정을 별도로 관리한다면 **Plugins → Share**에서 add 명령을 복사할 수 있습니다.
 
-1. 첫 번째 머신의 dashboard에서 **Plugins → Share**를 열고 명령을 복사합니다. HTTPS Git 소스로 추가한 plugins가 나열되며, 예를 들면 다음과 같습니다:
+새 기기에서 `skillshare plugin sync`로 소스를 검토하고 로컬 snapshot 경로에 설치하세요. 검토와 commit 고정은 기기별입니다. 브랜치 ref는 설치나 업데이트 시 해석되므로 비대화형 sync가 다른 기기에서 검토한 것보다 새 commit을 사용할 수 있습니다. 같은 버전이 필요하면 `source_ref`에 commit SHA를 지정하세요. 로컬 소스 경로는 각 기기에 존재해야 합니다.
 
-   ```bash
-   skillshare plugin add https://github.com/acme/plugins --plugin review -g --no-tui
-   ```
+native-only 선언에는 **이 기기에서 가져오기 필요**가 표시되며 sync는 건너뜁니다. 각 기기의 네이티브 클라이언트에서 설치한 뒤 `skillshare plugin import LOCAL-ID --from TARGET --name NAME`을 실행하세요. 기존 소스 선언으로 가져오면 로컬 기록만 저장하며, 다른 기기의 소스 설정과 설치는 유지됩니다.
 
-2. 다른 머신에서 이 명령을 실행하고, Plugins 페이지에서 Agents를 체크한 뒤 `skillshare sync plugins`를 실행합니다.
+**첫 v2 편집 전에 모든 writer를 업데이트하고, 공유 YAML이 레거시일 때 각 기기에서 `skillshare plugin list`를 실행하세요.** 로컬 마이그레이션 정보를 저장합니다. [플러그인 상태와 마이그레이션](/docs/reference/commands/plugin#host-state)을 참고하세요.
 
-여러 머신에서 쓸 plugin은 **Import installed**가 아니라 **Add plugin**으로 소스에서 추가하세요. Import는 native 설치만 기록합니다. 다른 머신에서 Claude와 Codex는 같은 이름의 native marketplace에서 다시 설치하며, 그 marketplace가 등록되어 있지 않으면 plugin을 건너뜁니다. Cursor와 Antigravity는 imported plugin을 다시 설치할 수 없습니다. 로컬 디렉터리에서 추가한 plugin은 경로가 첫 번째 머신에만 있으므로 **Share**에 표시되지 않습니다.
-
-`sync plugins`는 없는 plugins를 설치하고, 이미 설치된 것은 그대로 둡니다. 업데이트하려면 `skillshare plugin check`를 실행한 다음 `skillshare plugin update`를 실행하세요. [도구 간 plugins 관리](/docs/how-to/daily-tasks/sharing-plugins#updates-and-recovery)를 참고하세요.
+`sync`는 누락된 plugin 설치, 변경된 ref 반영, 로컬 정리 재시도를 수행합니다. 같은 ref의 새 릴리스는 `skillshare plugin check`와 `skillshare plugin update`로 확인하고 업데이트하세요.
 
 ### Hooks {#hooks}
 

@@ -5,9 +5,9 @@ export type PluginTarget = string;
 /** `npm`: the target installs npm:<package> sources (Pi, or a Pi account that runs pi). */
 export interface PluginTargetDefinition { target: string; label: string; project: boolean; operations: string[]; reason?: string; reasonKey?: string; npm?: boolean }
 export const targetMap = (definitions: PluginTargetDefinition[] = []) => Object.fromEntries(definitions.map((d) => [d.target, d]));
-export type PluginAction = 'add' | 'import' | 'sync' | 'check' | 'update' | 'remove' | 'enable' | 'disable';
+export type PluginAction = 'add' | 'import' | 'unimport' | 'sync' | 'check' | 'update' | 'remove' | 'enable' | 'disable';
 export interface PluginRequest { action: PluginAction; name?: string; source?: string; sourceRef?: string; entry?: string; plugin?: string; targets?: PluginTarget[]; from?: PluginTarget }
-export interface PluginBinding { piRegistration?: string; id: string; source?: string; sourceRef?: string; commit?: string; entry?: string; plugin?: string; digest?: string; version?: string; pending?: string; sync?: boolean; components?: string[] }
+export interface PluginBinding { refChanged?: boolean; imported?: boolean; importRetained?: boolean; cleanup?: boolean; contextChanged?: boolean; piRegistration?: string; id: string; source?: string; sourceRef?: string; commit?: string; entry?: string; plugin?: string; digest?: string; version?: string; pending?: string; sync?: boolean; components?: string[] }
 export interface NativePlugin { id: string; version?: string; enabled: boolean; enabledKnown?: boolean; scope?: string; filtered?: boolean; importable?: boolean }
 export interface PluginPackage { version?: string; source?: string; sourceRef?: string; plugin?: string; entry?: string; bindings: Partial<Record<PluginTarget, PluginBinding>> }
 export interface PluginInventory {
@@ -25,12 +25,28 @@ export interface PluginInventory {
  * the plan from the API instead if the two ever drift.
  */
 export const syncAction = (b: PluginBinding, host?: PluginInventory['hosts'][number]) => {
+  if (b.contextChanged) return '';
+  if (b.imported && !b.id) return '';
   const exists = host?.installed.some((i) => i.id === b.id);
   // The plugin is gone but the marketplace Skillshare registered for it is still there.
   const leftover = !exists && !!b.source && b.id.includes('@') && !!host?.managedMarketplaces?.includes(b.id.slice(b.id.indexOf('@') + 1));
+  if (b.cleanup) return host && !host.error ? 'remove' : '';
   if (b.sync === false) return exists || leftover ? 'uninstall' : '';
+  if (b.refChanged && host?.status === 'ready' && !host.error) return exists ? 'update' : 'install';
   if (b.pending) return b.pending === 'install' && exists && !b.piRegistration ? '' : b.pending;
   return !host || host.error || exists ? '' : 'install';
+};
+/** Local binding state shown beside the existing target checkbox. */
+export const bindingStatus = (b: PluginBinding, host?: PluginInventory['hosts'][number]) => {
+  if (b.contextChanged) return 'plugins.accountChanged';
+  if (b.cleanup) return 'plugins.cleanup';
+  if (b.imported && !b.id) return 'plugins.importRequired';
+  if (syncAction(b, host)) return 'plugins.pending';
+  if (b.importRetained) return 'plugins.importRetained';
+  if (!host) return '';
+  if (host.error) return 'plugins.unverified';
+  const installed = host.installed.find((i) => i.id === b.id);
+  return installed && installed.enabledKnown !== false && !installed.enabled ? 'plugins.nativeDisabled' : '';
 };
 /**
  * A binding's version: what config recorded, else what the Agent reports installed. On a Pi
@@ -56,8 +72,8 @@ export const pluginShareCommand = (name: string, p: { source?: string; sourceRef
 export interface PluginCandidate { name: string; description: string; version: string; targets: PluginTarget[]; components: string[]; problem?: string; problemKey?: string; problemArgs?: Record<string, string>; targetInfo?: Record<string, { manifest: string; path?: string; version?: string; logo?: string; entry?: string; components: string[]; problem?: string; problemKey?: string; problemArgs?: Record<string, string> }> }
 export interface PluginDiscovery {
   warnings?: string[]; source: string; sourceRef?: string; commit?: string; targetDefinitions?: PluginTargetDefinition[]; digest: string; candidates: PluginCandidate[] }
-export interface PluginPlan { revision: string; blocked: boolean; changes: { name: string; target: PluginTarget; id: string; action: string; message?: string; messageKey?: string; messageArgs?: Record<string, string>; components?: string[]; preservedKeys?: string[]; logo?: string; binding?: PluginBinding }[] }
-export interface PluginOutcome { name: string; target: PluginTarget; status: string; message?: string; messageKey?: string; messageArgs?: Record<string, string> }
+export interface PluginPlan { revision: string; blocked: boolean; changes: { name: string; target: PluginTarget; id: string; action: string; guidance?: boolean; message?: string; messageKey?: string; messageArgs?: Record<string, string>; components?: string[]; preservedKeys?: string[]; logo?: string; binding?: PluginBinding }[] }
+export interface PluginOutcome { name: string; target: PluginTarget; status: string; guidance?: boolean; message?: string; messageKey?: string; messageArgs?: Record<string, string> }
 
 export interface PluginRun { name: string; target: string; version?: string }
 
@@ -74,7 +90,7 @@ export function byPlugin<R extends PluginRun>(rows: R[], key: (r: R) => string =
 }
 export interface PluginResult { result: { results: PluginOutcome[] } | null; failure: string }
 /** What a check showed for one Agent of a plugin: the version an update would bring, and the source it came from. */
-export interface PluginUpdate { version: string; commit?: string; digest?: string }
+export interface PluginUpdate { version: string; commit?: string; digest?: string; id?: string; source?: string; sourceRef?: string; plugin?: string; entry?: string }
 /** One plugin of a batch update, with what the check showed per Agent so a source that moved since is not installed. */
 export interface PluginUpdateItem { name: string; targets: PluginTarget[]; seen?: Record<PluginTarget, PluginUpdate> }
 export type PluginUpdateEvent =

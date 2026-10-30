@@ -643,12 +643,7 @@ skillshare backup -p --all           # 效果相同（在 Project mode 下会收
 
 ### `The native marketplace X is gone` {#plugin-marketplace-gone}
 
-**原因：** 该 plugin 是导入的，因此 Skillshare 会从它原来的原生 marketplace 重新安装，但 Agent 中没有注册该 marketplace。这在第二台机器上很常见：导入只记录在第一台机器上。
-
-**解决方式：**
-
-1. 在 Agent 中重新添加该 marketplace，然后运行 `skillshare sync plugins`。
-2. 或从该 plugin 移除这个 Agent，再从 source 重新添加 plugin。请参阅 [Cross-Machine Sync — Plugins](/docs/how-to/sharing/cross-machine-sync#plugins)。
+本机已有导入记录，但原生 marketplace 不再注册。Skillshare 会跳过操作；导入记录本身不是经过审查的重装来源。请在原生客户端中恢复 marketplace，并安装或更新插件。如果需要重新绑定，请使用声明的包名导入本地 ID。也可以删除该 Agent 的绑定，再从源码添加。另一台机器若没有本地记录，会显示需要导入，sync 会跳过；请先原生安装，再使用声明的包名导入本地 ID。
 
 ---
 

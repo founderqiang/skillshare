@@ -7,8 +7,9 @@ func printPluginHelp() {
 			{"add [source]", "Choose a plugin from a directory or HTTPS Git repository,\nor add npm:<package> to Pi"},
 			{"discover <source>", "Inspect source candidates without installing"},
 			{"import [native-id]", "Adopt an existing native install with --from"},
+			{"unimport <name>", "Uninstall this machine's import with --target; keep shared intent"},
 			{"inspect <name>", "Show bindings and native installation state"},
-			{"sync [name]", "Install missing bindings or retry pending operations"},
+			{"sync [name]", "Install missing plugins, reconcile refs and retry local cleanup"},
 			{"check [name]", "Check source content for changes (read-only)"},
 			{"update [name | --all]", "Review and update supported targets"},
 			{"enable [name]", "Select managed targets for the next sync"},
@@ -18,7 +19,7 @@ func printPluginHelp() {
 		helpGroup{title: "Options", rows: []helpRow{
 			{"--target <target>", "Receiving client (repeat to select several; add without\nit keeps the plugin in Skillshare only)"},
 			{"--plugin <name>", "Select one plugin from a marketplace"},
-			{"--name <name>", "Logical Skillshare package name"},
+			{"--name <name>", "Logical package name; import binds to this declaration"},
 			{"--from <target>", "Import from this native client in the selected scope"},
 			{"-a, --all", "Update all managed plugins (update only)"},
 			{"-n, --dry-run", "Preview without writing config or Agent state"},
@@ -56,6 +57,7 @@ func printPluginHelp() {
 			"OMP manages marketplace plugins only and loads their extension modules at its next start.",
 			"Enable/disable saves sync selection only; run sync to install/remove the target.",
 			"Authentication, hook trust and command-source approval remain in the native client.",
+			"Unimport also removes native-client config or login associated with that install.",
 			"Use check before update. Import does not reinstall or change enabled state.",
 		),
 	)

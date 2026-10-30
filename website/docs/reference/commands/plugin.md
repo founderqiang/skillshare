@@ -46,6 +46,7 @@ removed. `remove NAME` without `--target` removes it from Skillshare.
 | `discover SOURCE` | Inspect a local directory, `owner/repo`, or HTTPS Git repository |
 | `add [SOURCE]` | Choose and install a whole plugin with its target adapter, or an `npm:` package through Pi |
 | `import [NATIVE-ID]` | Adopt an existing installation without reinstalling or enabling it |
+| `unimport NAME` | Uninstall this machine’s imported bindings for explicit targets; keep shared source declarations |
 | `inspect NAME` | Inspect one managed package |
 | `sync [NAME]` | Reconcile selected targets and retry incomplete native operations |
 | `check [NAME]` | Compare source content with the recorded digest, or a Pi npm package's version with npm's latest; never update |
@@ -398,7 +399,7 @@ Import accepts plain Pi package sources and, on Pi 0.99.2 or later,
 filtered object entries with supported sources and option shapes. Preview lists
 retained field names, never opaque values. Import changes neither native settings
 nor installed files. The original entry is kept in private Skillshare state;
-shared config stores only its digest. Sync/update retain the live entry. When
+the local receipt stores only its digest. Sync/update retain the live entry. When
 uninstalling, Skillshare captures its latest rules and options; reinstall restores
 that object before native installation, avoiding a default-enabled window.
 Multiple restores in one Apply recognize only that Apply's own exact writes;
@@ -438,8 +439,8 @@ skillshare plugin add ./package --entry dist/plugin.js --target opencode --no-tu
 skillshare plugin update review --source-ref v1.1.0 --target claude --dry-run --json
 ```
 
-Bindings record `source_ref` and the resolved `commit`. Installation uses the
-reviewed commit; `check` and `update` resolve the configured ref again, so a branch
+Shared bindings record `source_ref`; the resolved `commit` stays in the local receipt. Installation uses the
+locally reviewed commit; `check` and `update` resolve the configured ref again, so a branch
 can advance while a commit remains pinned. `--revision` is a preview token, not
 a Git ref. `--entry` is relative to each candidate's package root and must already
 exist; it does not trigger a build or package-manager install.
@@ -484,8 +485,8 @@ never supplies native trust approval flags.
   infer release availability for an imported plugin without a source, except an npm
   package in Pi, which it checks against npm. If an
   imported Claude or Codex plugin's native marketplace is gone, sync and update
-  skip that target and say so. This also happens on another machine where that
-  marketplace was never added. Restore the marketplace in the Agent, or remove
+  skip that target and say so. A new machine requires an explicit local import,
+  even if a marketplace with the same name exists. Restore the marketplace in the Agent, or remove
   the target and add the plugin again from its source; Skillshare never moves an
   imported plugin to another source on its own.
 - Skillshare registers one marketplace per managed Claude/Codex plugin, named
@@ -521,3 +522,92 @@ runtime; unsupported operations are blocked with an explanation.
 - [Pi packages](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md)
 - [OpenCode v1 plugins](https://opencode.ai/docs/plugins/)
 - [OpenCode v2 plugins](https://opencode.ai/v2/docs/plugins)
+
+## Shared declarations and local installations {#host-state}
+
+`plugins.version: 2` stores intent in global or project configuration: package
+source/ref/plugin/entry, target-specific source overrides, `sync` selection, or
+`imported: true` for native-only targets. A target's effective source is recorded
+explicitly so changing package defaults cannot change another target's distribution.
+
+```yaml
+plugins:
+  version: 2
+  packages:
+    router:
+      source: https://github.com/acme/router.git
+      plugin: router
+      bindings:
+        pi: {source: https://github.com/acme/router.git, plugin: router}
+        omp: {imported: true}
+```
+
+Each machine keeps native IDs, reviewed commits/digests/versions, private Pi
+registration references and pending operations under
+`<StateDir>/plugins/<config-path-hash>/state.json` (local format version 1).
+State is keyed by the config's **absolute path**. Moving or renaming a project
+folder or config starts a new state namespace. Previous installs are not
+implicitly tracked or cleaned up; remove them through the old config location
+before moving, or manage/import them explicitly at the new location.
+Keep StateDir machine-local. Sync, update, verification, failure and retry never
+write shared declarations; `update --source-ref` writes only a changed desired ref.
+Reads capture legacy evidence under the local operation lock without changing shared YAML. If another operation holds the lock, the read leaves persistence to that operation or the next unlocked read. Explicit add, import, selection
+and removal edit declarations with changed-byte checks. This does not merge simultaneous
+Syncthing intent edits: concurrent declaration edits can still conflict.
+
+On a new machine, sync reviews source content and derives that machine's native
+snapshot paths. Review and commit pinning are per machine: a branch ref resolves
+when that machine installs or updates it, so non-interactive sync on another
+machine can install a newer commit. A ref change also resolves locally. Set
+`source_ref` to a commit SHA to pin all machines to the same revision.
+Local source paths remain user input and must exist on each machine.
+Native-only targets show **Import required on this machine**: install natively,
+then run `plugin import LOCAL-ID --from TARGET --name NAME` on that machine.
+Repeating that import records the local ID without rewriting identical intent.
+Importing into an existing source-managed target records only a local receipt;
+other machines keep their source recipe and working installation. Reimporting
+the same native ID with an existing verified source binding preserves its source
+recipe.
+An explicit Pi `add npm:PACKAGE` shares an npm install recipe and Pi runs its
+install scripts; an npm import shares only native-only intent.
+
+Import never fetches a remote source. For a manually written remote recipe without
+`plugin:`, set `plugin:` to the native package name before importing so Skillshare
+can verify its identity offline. Recipes created with `plugin add` already record
+this identity. Local directory recipes can be discovered locally.
+
+Old configurations remain readable. Native IDs are adopted only with local
+inventory and, for source installs, owned snapshot evidence. Foreign pending
+operations are ignored. Reads and sync leave old YAML unchanged; the next actual
+declaration edit writes version 2. Unresolved legacy bindings remain private,
+passive hints across that edit. They are retried in their original native context
+and become receipts only after ownership checks, retaining the old intent for
+cleanup even if its shared target was removed. Legacy npm entries cannot prove whether they
+came from add or import, so they remain native-only; explicitly add the npm spec
+again to establish a shared recipe. Upgrade **every writer** of a shared config
+before editing version 2; older binaries cannot safely write this format. On **each
+machine**, run `skillshare plugin list` against the shared config while it is still
+legacy YAML, before any machine makes the first v2 declaration edit. This captures
+that machine's legacy hints locally, even if its native client is temporarily unavailable.
+
+A machine returning after a target or source changed retains its previous local
+receipt until cleanup succeeds. Failed cleanup or replacement remains local and
+retryable. Repointing/removing an account preserves its old receipt and requires
+resolving the previous native context before cleanup. Authentication, native
+settings and trust remain in each tool; do not copy them as plugin state.
+
+A local import remains installed when its shared source recipe changes. To switch
+to the shared source recipe on this machine, run:
+
+```bash
+skillshare plugin unimport NAME --target TARGET --no-tui
+skillshare plugin sync NAME --no-tui
+```
+
+`unimport` requires one or more explicit `--target` flags, an existing local import
+receipt, and a shared source recipe for each selected target. It uninstalls the
+imported binding on this machine using the target's removal adapter, then drops
+its local receipt. Shared declarations and other machines' installations stay
+unchanged. The next sync installs the shared source recipe.
+
+Uninstalling also removes native-client configuration or login associated with that installation.

@@ -37,6 +37,7 @@ skillshare plugin remove review --no-tui
 | `discover SOURCE` | ローカルディレクトリ、`owner/repo`、または HTTPS Git リポジトリを検査 |
 | `add [SOURCE]` | plugin 全体とその target アダプタを選択してインストール。または Pi 経由で `npm:` パッケージをインストール |
 | `import [NATIVE-ID]` | 再インストールや有効化を行わずに既存のインストールを取り込む |
+| `unimport NAME` | 指定したターゲットのローカル import をアンインストールし、共有ソース宣言を保持 |
 | `inspect NAME` | 管理下の 1 つの package を検査 |
 | `sync [NAME]` | 選択済みの target を整合させ、未完了のネイティブ操作を再試行 |
 | `check [NAME]` | Source の内容を記録済みのダイジェストと、または Pi の npm パッケージのバージョンを npm の最新と比較。更新は行わない |
@@ -254,7 +255,7 @@ OpenCode は、管理下エントリを `opencode.json` または既存の `open
 
 ユーザースコープの npm 登録に managed cache がない場合は Unknown／読み取り専用です。未インストールとは限りません。Pi は Skillshare が調べない legacy global npm/pnpm パスを使うことがあります。
 
-インポートは通常の Pi source に加え、Pi 0.99.2 以降の対応する source とオプション形式を持つ filtered object を受け付けます。プレビューは保持するキー名だけを表示し、opaque 値を表示しません。ネイティブ設定とファイルは変更せず、元のエントリを Skillshare の非公開 state に保存し、共有 config には digest だけを記録します。sync/update は現在のエントリを保持します。アンインストール前に最新のオプションを保存し、再インストール時はネイティブ install の前に object を復元して、他のリソースが一時的に既定で有効になるのを防ぎます。同じ Apply で複数を復元するときは、その操作自身が書いた正確な内容だけを受け入れます。他の設定変更がある場合は後続の復元を止めます。非公開 state を保持してください。記録の欠落・変更や別 target の記録は復元を拒否します。Windows の新しい登録ディレクトリは owner/SYSTEM 用の保護された ACL で作成します。既存ディレクトリと記録は、現在のユーザーと特権を持つ SYSTEM/Administrators 以外にアクセスを許可している場合、または ACL を確認できない場合、インポート・復元を拒否します。既存 ACL は変更しません。記録を保持し、所有者がアクセス保護を修復してから再試行してください。不明な source・優先順位、非対応のエンコーディング、Pi が正規化するローカル参照は読み取り専用です。通常の OpenCode エントリは取り込めますが、filtered OpenCode は引き続き拒否します。10 秒の stale 閾値を超えた空のロックディレクトリは inode と mtime が変わっていない場合だけ回収します。新しい・更新された・置換されたロック、空でないディレクトリ、ファイル、symlink は保持します。古さは所有者の終了を証明せず、最終確認と削除は atomic CAS ではありません。インポートされた Pi の package は、global モードでは `pi update SOURCE` で更新され、設定エントリは保持されます。project のものは Pi で更新してください。`pi update` は global の package にも及ぶためです。インポートされた OpenCode v1 の package は、そのネイティブツール上で更新されます。OpenCode v2 の global インポートはネイティブの update コマンドを使用できますが、v2 の update コマンドは global 向けであるため、project のインポートはネイティブに更新する必要があります。
+インポートは通常の Pi source に加え、Pi 0.99.2 以降の対応する source とオプション形式を持つ filtered object を受け付けます。プレビューは保持するキー名だけを表示し、opaque 値を表示しません。ネイティブ設定とファイルは変更せず、元のエントリを Skillshare の非公開 state に保存し、ローカル receipt に digest だけを記録します。sync/update は現在のエントリを保持します。アンインストール前に最新のオプションを保存し、再インストール時はネイティブ install の前に object を復元して、他のリソースが一時的に既定で有効になるのを防ぎます。同じ Apply で複数を復元するときは、その操作自身が書いた正確な内容だけを受け入れます。他の設定変更がある場合は後続の復元を止めます。非公開 state を保持してください。記録の欠落・変更や別 target の記録は復元を拒否します。Windows の新しい登録ディレクトリは owner/SYSTEM 用の保護された ACL で作成します。既存ディレクトリと記録は、現在のユーザーと特権を持つ SYSTEM/Administrators 以外にアクセスを許可している場合、または ACL を確認できない場合、インポート・復元を拒否します。既存 ACL は変更しません。記録を保持し、所有者がアクセス保護を修復してから再試行してください。不明な source・優先順位、非対応のエンコーディング、Pi が正規化するローカル参照は読み取り専用です。通常の OpenCode エントリは取り込めますが、filtered OpenCode は引き続き拒否します。10 秒の stale 閾値を超えた空のロックディレクトリは inode と mtime が変わっていない場合だけ回収します。新しい・更新された・置換されたロック、空でないディレクトリ、ファイル、symlink は保持します。古さは所有者の終了を証明せず、最終確認と削除は atomic CAS ではありません。インポートされた Pi の package は、global モードでは `pi update SOURCE` で更新され、設定エントリは保持されます。project のものは Pi で更新してください。`pi update` は global の package にも及ぶためです。インポートされた OpenCode v1 の package は、そのネイティブツール上で更新されます。OpenCode v2 の global インポートはネイティブの update コマンドを使用できますが、v2 の update コマンドは global 向けであるため、project のインポートはネイティブに更新する必要があります。
 
 ```bash
 skillshare plugin add ./cursor-plugin --target cursor --no-tui
@@ -275,7 +276,7 @@ skillshare plugin add ./package --entry dist/plugin.js --target opencode --no-tu
 skillshare plugin update review --source-ref v1.1.0 --target claude --dry-run --json
 ```
 
-バインディングには `source_ref` と解決済みの `commit` が記録されます。インストールには reviewed されたコミットが使われます。`check` と `update` は設定された ref を再度解決するため、コミットが固定されたままブランチが進むことがあります。`--revision` は Git ref ではなくプレビュートークンです。`--entry` は各候補の package ルートからの相対パスであり、既に存在している必要があります。ビルドや package manager のインストールをトリガーすることはありません。
+共有バインディングには `source_ref` を記録し、解決済みの `commit` はローカルの記録に保存します。インストールには reviewed されたコミットが使われます。`check` と `update` は設定された ref を再度解決するため、コミットが固定されたままブランチが進むことがあります。`--revision` は Git ref ではなくプレビュートークンです。`--entry` は各候補の package ルートからの相対パスであり、既に存在している必要があります。ビルドや package manager のインストールをトリガーすることはありません。
 
 Copilot と Antigravity CLI のインストールは、reviewed されたローカルスナップショットを使用します。インポートには再インストール用の reviewed source がありません。削除後は、ネイティブクライアントでインストールしてから再度 sync してください。Grok もインストール/再インストール前にネイティブな trust が必要です。Skillshare はネイティブな trust の承認フラグを提供しません。
 
@@ -293,7 +294,7 @@ Copilot と Antigravity CLI のインストールは、reviewed されたロー�
 - Codex のネイティブな project インストールは、このアダプタでは提供されません。global の Codex インストールに対する sync 選択は引き続き機能します。
 - Codex には update コマンドがないため、update は更新後のスナップショットからプラグインを再度 add します。add は常にプラグインを有効にするため、Codex で無効化されたプラグインはスキップされます。Import した Codex プラグインは `codex plugin marketplace upgrade NAME` で更新されます。これは Codex がその marketplace からインストールしたすべてのプラグインを再インストールするもので、Codex も起動時に同じことを行います。
 - update は対応できない Target を理由を示してスキップし、そのプラグインのほかの Agent は通常どおり更新されます。スキップされた update は保留のまま残り、後の sync で処理されます。
-- インポートされた plugin は元のマーケットプレイス identity を保持します。`check` は、source のないインポート済み plugin についてリリースの有無を推測できません。ただし Pi の npm パッケージは npm で確認します。インポートした Claude または Codex の plugin のネイティブ marketplace がなくなった場合、sync と update はその Target をスキップして理由を示します。その marketplace を一度も追加していない別のマシンでも同じことが起こります。Agent で marketplace を復元するか、その Target を削除して source から plugin を追加し直してください。Skillshare がインポート済み plugin を勝手に別の source へ移すことはありません。
+- インポートされた plugin は元のマーケットプレイス identity を保持します。`check` は、source のないインポート済み plugin についてリリースの有無を推測できません。ただし Pi の npm パッケージは npm で確認します。インポートした Claude または Codex の plugin のネイティブ marketplace がなくなった場合、sync と update はその Target をスキップして理由を示します。新しいマシンでは、同名の marketplace があっても明示的なローカル import が必要です。Agent で marketplace を復元するか、その Target を削除して source から plugin を追加し直してください。Skillshare がインポート済み plugin を勝手に別の source へ移すことはありません。
 - Skillshare は管理下の Claude/Codex plugin ごとに marketplace を 1 つ登録し、`skillshare-<plugin>-<hash>` と名付けます（以前のインストールは `skillshare-<hash>` のまま）。plugin を削除または除外すると、plugin がすでになくてもその marketplace も削除し、失敗したクリーンアップは次回の sync で再試行します。marketplace がなくなっていた場合、update で再登録します。別のパスにある同名の登録とインポート済み plugin の marketplace には触れません。スナップショットとネイティブキャッシュは保持されます。
 - これらの登録は、user 設定でも project 設定でも、このマシンの Skillshare 状態ディレクトリを指します。Git や dotfile マネージャーで Agent の設定を共有すると、ほかのマシンには存在しないパスが持ち込まれます。各マシンで source から plugin を追加してください。
 - Claude は、skills ディレクトリ内で plugin manifest を持つ skill フォルダも `<name>@skills-dir` という plugin として読み込み、同じ名前の plugin は 1 つしか読み込みません。同名の Claude plugin を追加するとプレビューでそのことを伝えます。名前を変えるかどちらかを削除するまで、Claude は plugin を読み込み、skill フォルダはスキップします。
@@ -308,3 +309,46 @@ Copilot と Antigravity CLI のインストールは、reviewed されたロー�
 - [Pi packages](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md)
 - [OpenCode v1 plugins](https://opencode.ai/docs/plugins/)
 - [OpenCode v2 plugins](https://opencode.ai/v2/docs/plugins)
+
+## 共有宣言とマシンごとのインストール {#host-state}
+
+`plugins.version: 2` は global/project 設定に source、ref、plugin、entry、ターゲットごとのソースと `sync` 選択、または `imported: true` を保存します。ターゲットのソースは明示的に保存されるため、パッケージの既定値を変えても別の配布物には切り替わりません。
+
+```yaml
+plugins:
+  version: 2
+  packages:
+    router:
+      source: https://github.com/acme/router.git
+      plugin: router
+      bindings:
+        pi: {source: https://github.com/acme/router.git, plugin: router}
+        omp: {imported: true}
+```
+
+ネイティブ ID、確認済みの commit/digest/version、Pi 登録参照、保留中の操作は `<StateDir>/plugins/<config-path-hash>/state.json`（ローカル形式 version 1）に保存します。StateDir はマシンごとに保持してください。状態は設定ファイルの**絶対パス**で識別されます。プロジェクトや設定を移動・改名すると新しい状態領域になり、以前のインストールは追跡も削除もされません。移動前に旧設定から削除するか、移動先で明示的に管理・インポートしてください。
+
+sync、通常の update、検証、失敗、再試行は共有宣言を書き換えません。`update --source-ref` は ref が変わったときだけ宣言を更新します。読み取りはローカルの操作ロックの下で旧形式の証拠を保存し、共有 YAML は変更しません。ロック使用中は保存を次の操作または読み取りに任せます。add、import、選択、remove は必要な宣言変更を保存し、外部変更を検出します。同時の Syncthing 編集はマージできません。
+
+ソースの確認と commit の固定は**マシンごと**です。ブランチ ref はそのマシンでのインストール・更新時に解決されるため、非対話 sync が別のマシンで確認したものより新しい commit をインストールすることがあります。ref の変更も各マシンで解決します。全マシンで同じ版を使うには `source_ref` に commit SHA を指定してください。ローカルのソースパスも各マシンに必要です。
+
+native-only ターゲットは「このマシンでインポートが必要」と表示され、sync はスキップします。ネイティブクライアントでインストール後、`plugin import LOCAL-ID --from TARGET --name NAME` を実行してください。同じインポートを繰り返しても、共有宣言が同じなら YAML は書き換えません。既存のソース宣言へのローカル import はローカル記録だけを作り、他のマシンのソースやインストールを変えません。確認済みソースの同じ ID を再 import してもソースは保持されます。Pi の明示的な `add npm:PACKAGE` はインストール手順を共有し、Pi がスクリプトを実行します。npm import は native-only 宣言を作ります。
+
+`import` はリモートソースを取得しません。手書きのリモートソース設定に `plugin:` がない場合は、インポート前にネイティブパッケージ名を `plugin:` に指定してください。これによりオフラインで同一性を確認できます。`plugin add` で作成した設定には、この名前がすでに記録されています。ローカルディレクトリの設定はローカルで検出できます。
+
+旧形式の読み取りと sync は YAML を変えず、次の宣言編集で version 2 にします。**最初の v2 編集前に全 writer を更新し、各マシンで共有 YAML が旧形式のうちに `skillshare plugin list` を実行してください。** ネイティブクライアントが一時的に使えなくても移行のヒントを保存できます。採用には元のネイティブ環境の inventory と、ソースの場合は所有する snapshot の証拠が必要です。他のホストの保留中操作は実行しません。未確認のヒントと削除の証拠は、所有権確認と cleanup が完了するまで保持します。旧 npm は add/import を区別できないため、共有手順が必要なら明示的に add し直してください。
+
+アカウント変更時は以前のネイティブ環境を解決してから cleanup します。認証、ネイティブ設定、trust は各ツールに残ります。
+
+同じインポートを繰り返しても共有の意図は書き換えません。クリーンアップが失敗すると再試行できるローカル記録が残り、次の sync で再試行します。古いバイナリはバージョン付きの宣言フィールドを認識しないため v2 を書き込めません。
+
+共有ソースの設定が変わってもローカルのインポートは保持します。このマシンを共有ソースへ切り替えるには、次を実行してください。
+
+```bash
+skillshare plugin unimport NAME --target TARGET --no-tui
+skillshare plugin sync NAME --no-tui
+```
+
+`unimport` には 1 つ以上の明示的な `--target` と、各ターゲットの既存のローカル import 記録および共有ソース設定が必要です。ターゲットの削除アダプターを使って、このマシンのインポート済みのインストールを解除してからローカル記録を削除します。共有宣言と他のマシンのインストールは変更しません。次の sync が共有ソースからインストールします。
+
+アンインストールすると、そのインストールに関連するネイティブクライアントの設定やログイン情報も削除されます。

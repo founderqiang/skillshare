@@ -78,7 +78,7 @@ func parsePluginOptions(args []string) (pluginOptions, error) {
 		o.request.Source = positional
 	case "import":
 		o.request.Plugin = positional
-	case "list", "sync", "check", "inspect", "remove", "update", "enable", "disable":
+	case "list", "sync", "check", "inspect", "unimport", "remove", "update", "enable", "disable":
 		if positional != "" {
 			if o.request.Name != "" {
 				return o, fmt.Errorf("specify one package name")
@@ -159,17 +159,15 @@ func cmdPlugin(args []string) (resultErr error) {
 		return err
 	}
 	interactive := mcpInteractive(mcpOptions{json: o.json, noTUI: o.noTUI})
-	return s.WithDiscoveryCache(func() error {
-		if interactive && !o.dryRun {
-			if o.request.Action == "list" {
-				return runPluginManager(s)
-			}
-			if o.request.Action == "add" || o.request.Action == "import" || o.request.Action == "remove" || o.request.Action == "update" || o.request.Action == "enable" || o.request.Action == "disable" || o.request.Action == "sync" {
-				return pluginWizard(s, o)
-			}
+	if interactive && !o.dryRun {
+		if o.request.Action == "list" {
+			return runPluginManager(s)
 		}
-		return executePlugin(s, o)
-	})
+		if o.request.Action == "add" || o.request.Action == "import" || o.request.Action == "unimport" || o.request.Action == "remove" || o.request.Action == "update" || o.request.Action == "enable" || o.request.Action == "disable" || o.request.Action == "sync" {
+			return pluginWizard(s, o)
+		}
+	}
+	return s.WithDiscoveryCache(func() error { return executePlugin(s, o) })
 }
 
 func executePlugin(s *plugin.Service, o pluginOptions) error {
@@ -227,8 +225,23 @@ func executePlugin(s *plugin.Service, o pluginOptions) error {
 							}
 						}
 					}
+					if b.ImportRetained {
+						mark, state = ui.MarkWarn, "shared recipe changed; local import retained"
+					}
+					if b.RefChanged {
+						mark, state = ui.MarkWarn, "shared ref changed; sync to reconcile"
+					}
 					if b.Pending != "" {
 						mark, state = ui.MarkWarn, "pending "+b.Pending
+					}
+					if b.Imported && b.ID == "" {
+						mark, state = ui.MarkWarn, "Import required on this machine"
+					}
+					if b.Cleanup {
+						mark, state = ui.MarkWarn, "local cleanup required"
+					}
+					if b.ContextChanged {
+						mark, state = ui.MarkWarn, "native account changed; restore its previous settings to resolve local state"
 					}
 					ui.Row(mark, name, target+" · "+state+ui.DimText(" · "+b.ID), width)
 				}

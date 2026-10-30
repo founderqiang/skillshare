@@ -293,6 +293,19 @@ func (s *Service) Inventory(ctx context.Context) (*Inventory, error) {
 		wg.Go(func() { result.Hosts[i] = s.host(ctx, target) })
 	}
 	wg.Wait()
+	d, err := s.load()
+	if err != nil {
+		return nil, err
+	}
+	s.adoptLegacy(d, func(target string) Host {
+		for _, h := range result.Hosts {
+			if h.Target == target {
+				return h
+			}
+		}
+		return Host{Error: "inventory unavailable"}
+	})
+	result.Packages = d.packages
 	return result, nil
 }
 

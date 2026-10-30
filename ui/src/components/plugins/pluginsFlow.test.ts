@@ -1,8 +1,9 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { pluginsApi } from '../../api/plugins';
+import { ApiError } from '../../api/client';
 import type { PluginInventory, PluginPlan, PluginUpdateEvent } from '../../api/plugins';
-import { changedRuns, failureText, piPackageTest, reviewChanges, syncTodo, updatesFound, updatedTargets, updatesLeft, updatesPending, usePluginsFlow, versionMoves } from './pluginsFlow';
+import { changedRuns, failureText, importPackageNames, importRequest, piPackageTest, reviewChanges, syncTodo, updatesFound, updatedTargets, updatesLeft, updatesPending, usePluginsFlow, versionMoves } from './pluginsFlow';
 
 vi.mock('../../api/plugins', async (importOriginal) => ({ ...await importOriginal<typeof import('../../api/plugins')>(), pluginsApi: { preview: vi.fn(), apply: vi.fn(), update: vi.fn(), stopUpdate: vi.fn() } }));
 
@@ -71,6 +72,27 @@ describe('plugins flow', () => {
     expect(now().busy).toBe(false);
   });
 
+  it('localizes a keyed import preview failure without accepting the import', async () => {
+    const error = new ApiError(400, 'Native plugin does not match the declaration recipe', { code: 'plugins.error.importRecipeMismatch' });
+    vi.mocked(pluginsApi.preview).mockRejectedValueOnce(error);
+    const { now } = flow();
+    await act(async () => { await expect(now().preview({ action: 'import', from: 'pi', plugin: 'npm:wrong' })).rejects.toBe(error); });
+    expect(now().failure).toBe('plugins.error.importRecipeMismatch');
+    expect(now().review).toBeNull();
+    expect(pluginsApi.apply).not.toHaveBeenCalled();
+  });
+
+  it('localizes a batch import preview failure and still applies the next reviewed import', async () => {
+    vi.mocked(pluginsApi.preview).mockRejectedValueOnce(new ApiError(400, 'Remote recipe has no plugin identity', { code: 'plugins.error.importRecipeIdentityRequired' }));
+    const { now } = flow();
+    await act(() => now().importMany([
+      { action: 'import', from: 'pi', plugin: 'npm:unknown' },
+      { action: 'import', from: 'pi', plugin: 'npm:known' },
+    ]));
+    expect(now().failure).toBe('npm:unknown: plugins.error.importRecipeIdentityRequired');
+    expect(pluginsApi.apply).toHaveBeenCalledExactlyOnceWith({ action: 'import', from: 'pi', plugin: 'npm:known' }, 'reviewed');
+  });
+
   it('keeps the review open and refreshes when apply is refused', async () => {
     vi.mocked(pluginsApi.apply).mockRejectedValue(new Error('preview is stale'));
     const { now, refresh } = flow();
@@ -93,16 +115,17 @@ describe('plugins flow', () => {
   });
 
   it('remembers what a check found, opens no review, and takes an Agent off once its batch update is applied', async () => {
-    const found = { name: 'driver', target: 'pi', binding: { id: 'npm:driver', version: '1.1.0', commit: 'abc' } };
+    const observed = { id: '/owned/driver', source: 'https://fixture.invalid/driver.git', sourceRef: 'main', plugin: 'driver', entry: 'entry.js', version: '1.1.0', commit: 'abc', digest: 'reviewed-digest' };
+    const found = { name: 'driver', target: 'pi', binding: observed };
     vi.mocked(pluginsApi.preview).mockResolvedValueOnce(plan('r', { ...found, action: 'update-available' }));
     streams({ name: 'driver', plan: plan('r2', { ...found, action: 'update' }), result: { results: [{ name: 'driver', target: 'pi', status: 'installed' }] }, failure: '', stale: false });
     const { now, onPreviewed } = flow();
     await act(() => now().check());
-    expect(now().updates).toEqual({ driver: { pi: { version: '1.1.0', commit: 'abc' } } });
+    expect(now().updates).toEqual({ driver: { pi: observed } });
     expect(now().review).toBeNull();
     expect(onPreviewed).not.toHaveBeenCalled();
     await act(() => now().updateMany([{ name: 'driver', targets: ['pi'] }]));
-    expect(vi.mocked(pluginsApi.update).mock.calls[0][0]).toEqual([{ name: 'driver', targets: ['pi'], seen: { pi: { version: '1.1.0', commit: 'abc' } } }]);
+    expect(vi.mocked(pluginsApi.update).mock.calls[0][0]).toEqual([{ name: 'driver', targets: ['pi'], seen: { pi: observed } }]);
     expect(now().updates).toEqual({ driver: {} });
     expect(now().batch).toEqual([{ name: 'driver', targets: ['pi'], status: 'done', versions: { moves: [{ target: 'pi', from: undefined, to: '1.1.0', fromCommit: undefined, toCommit: 'abc' }], shared: true } }]);
   });
@@ -167,6 +190,15 @@ describe('plugins flow', () => {
     expect(now().updates.driver.pi).toBeDefined();
     expect(now().batch?.[0]).toMatchObject({ status: 'skipped', note: 'marketplace gone' });
   });
+
+  it('keeps retained-import guidance in the completed batch', async () => {
+    const note = { name: 'demo', target: 'codex', guidance: true, messageKey: 'plugins.note.importRecipeChanged' };
+    streams({ name: 'demo', plan: plan('u', { ...note, action: 'noop' }), result: { results: [{ ...note, status: 'unchanged' }] }, failure: '', stale: false });
+    const { now } = flow();
+    await act(() => now().updateMany([{ name: 'demo', targets: ['codex'] }]));
+    expect(now().batch?.[0]).toMatchObject({ status: 'done', note: 'plugins.note.importRecipeChanged' });
+  });
+
 
   it('drops a plugin whose source moved since the check and checks again, showing why that check failed', async () => {
     vi.mocked(pluginsApi.preview)
@@ -253,9 +285,20 @@ describe('plugins flow rules', () => {
 
   const pending = { demo: { codex: { version: '1.1.0' }, claude: { version: '1.1.0' } } };
   const updating = plan('r', { action: 'update' }, { target: 'claude', action: 'update' });
-  it('takes off an Agent that updated or was already there, and keeps one that failed', () => {
-    const left = updatesLeft(pending, plan('r', { action: 'noop' }, { target: 'claude', action: 'update' }), { result: { results: [{ name: 'demo', target: 'codex', status: 'unchanged' }, { name: 'demo', target: 'claude', status: 'failed' }] }, failure: 'x' });
-    expect(left).toEqual({ demo: { claude: { version: '1.1.0' } } });
+  it('takes off an Agent whose final operation succeeded and keeps failed or unfinished updates', () => {
+    for (const action of ['noop', 'update', 'install']) {
+      const status = action === 'noop' ? 'unchanged' : 'installed';
+      const reviewed = plan('r', { action }, { target: 'claude', action: 'update' });
+      const response = { result: { results: [{ name: 'demo', target: 'codex', status }, { name: 'demo', target: 'claude', status: 'failed' }] }, failure: 'native failure' };
+      expect(updatesLeft(pending, reviewed, response)).toEqual({ demo: { claude: { version: '1.1.0' } } });
+    }
+    const replacing = plan('r', { action: 'remove' }, { action: 'install' });
+    for (const tail of ['failed', 'not run', 'installed']) {
+      const results = [{ name: 'demo', target: 'codex', status: 'removed' }];
+      if (tail !== 'not run') results.push({ name: 'demo', target: 'codex', status: tail });
+      const expected = tail === 'installed' ? { demo: { claude: { version: '1.1.0' } } } : pending;
+      expect.soft(updatesLeft(pending, replacing, { result: { results }, failure: tail === 'installed' ? '' : 'native failure' }), tail).toEqual(expected);
+    }
   });
   it('keeps an Agent whose update was skipped', () => {
     expect(updatesLeft(pending, updating, { result: { results: [{ name: 'demo', target: 'codex', status: 'skipped' }] }, failure: '' })).toEqual(pending);
@@ -297,4 +340,37 @@ describe('plugins flow rules', () => {
     ]);
     expect(runs.map((r) => [r.name, r.status, r.targets, r.note])).toEqual([['bad', 'failed', ['codex'], 'Native authentication required'], ['demo', 'installed', ['claude', 'codex'], '']]);
   });
+});
+
+it('keeps the chosen declaration name in single and batch import requests', () => {
+  const inventory: PluginInventory = { hosts: [], packages: {
+    bar: { bindings: { pi: { id: '', imported: true } } },
+    other: { bindings: { pi: { id: '', imported: true } } },
+    managed: { bindings: { pi: { id: 'npm:managed' } } },
+  } };
+  expect(importPackageNames(inventory, 'pi')).toEqual(['bar', 'other']);
+  expect(importRequest('pi', 'npm:foo', 'bar')).toEqual({ action: 'import', from: 'pi', plugin: 'npm:foo', name: 'bar' });
+  expect(importRequest('pi', 'npm:new', '')).toEqual({ action: 'import', from: 'pi', plugin: 'npm:new' });
+  expect(importPackageNames(inventory, 'claude')).toEqual([]);
+});
+
+it('leaves the declaration name unset unless explicitly selected', () => {
+ expect(importRequest('claude', 'a@m')).toEqual({action: 'import', from: 'claude', plugin: 'a@m'});
+ expect(importRequest('claude', 'b@m')).toEqual({action: 'import', from: 'claude', plugin: 'b@m'});
+});
+
+it('keeps unchanged recipe guidance visible in preview and completed outcomes', () => {
+ const note = {name: 'demo', target: 'codex', guidance: true, message: 'Shared recipe moved; plugin unimport then sync.', messageKey: 'plugins.note.importRecipeChanged'};
+ const preview = reviewChanges(plan('r', {...note, action: 'noop'}));
+ expect(preview.active).toHaveLength(1);
+ expect(preview.idle).toHaveLength(0);
+ expect(changedRuns(t, [{...note, status: 'unchanged'}])).toMatchObject([{name: 'demo', status: 'unchanged', note: 'plugins.note.importRecipeChanged'}]);
+});
+
+it.each([undefined, false])('folds an incidental noop message away without guidance: %s', (guidance) => {
+ const note = {name: 'demo', target: 'omp', guidance, message: 'Removes this scope registration.'};
+ const preview = reviewChanges(plan('r', {...note, action: 'noop'}));
+ expect(preview.active).toEqual([]);
+ expect(preview.idle).toEqual([{name: 'demo', target: 'omp'}]);
+ expect(changedRuns(t, [{...note, status: 'unchanged'}])).toEqual([]);
 });

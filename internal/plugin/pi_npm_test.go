@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -19,9 +20,18 @@ func fakePiNpm(t *testing.T, commands *[]string) *Service {
 	t.Helper()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("XDG_DATA_HOME", filepath.Join(home, ".local/share"))
+	t.Setenv("XDG_STATE_HOME", filepath.Join(home, ".local/state"))
+	for _, key := range []string{"OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "OPENCODE_CONFIG_CONTENT"} {
+		t.Setenv(key, "")
+	}
 	t.Setenv("PI_CODING_AGENT_DIR", filepath.Join(home, ".pi/agent"))
 	s := &Service{ConfigPath: filepath.Join(home, "config.yaml"), StateDir: filepath.Join(home, "state")}
+	var nativeMu sync.Mutex
 	s.Run = func(_ context.Context, _ string, env []string, bin string, args ...string) ([]byte, error) {
+		nativeMu.Lock()
+		defer nativeMu.Unlock()
 		if args[0] == "--version" {
 			return []byte("0.99.2"), nil
 		}
@@ -530,7 +540,11 @@ func TestPiAccountRunningPiByPathTakesNpmPackages(t *testing.T) {
 func TestNpmPackageBatchUpdateInstallsTheVersionTheCheckFound(t *testing.T) {
 	fakeNpmRegistry(t, "1.2.0")
 	s := installedNpmDemo(t, "1.0.0")
-	_, result, err := s.updateLocked(context.Background(), UpdateItem{Name: "demo", Targets: []string{"pi"}, Seen: map[string]Seen{"pi": {Version: "1.2.0"}}}, func(*Plan) {})
+	checked, err := s.Preview(context.Background(), Request{Action: "check", Name: "demo"})
+	if err != nil || len(checked.Changes) != 1 || checked.Changes[0].Action != "update-available" {
+		t.Fatalf("check: %+v %v", checked, err)
+	}
+	_, result, err := s.updateLocked(context.Background(), UpdateItem{Name: "demo", Targets: []string{"pi"}, Seen: map[string]Seen{"pi": checkedObservation(t, checked.Changes[0].Binding)}}, func(*Plan) {})
 	if err != nil || len(result.Results) != 1 || result.Results[0].Status != "installed" {
 		t.Fatalf("update: %+v %v", result, err)
 	}

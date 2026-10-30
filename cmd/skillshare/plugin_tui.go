@@ -26,8 +26,8 @@ func runPluginManager(s *plugin.Service) error {
 		if err := executePlugin(s, pluginOptions{request: plugin.Request{Action: "list"}, noTUI: true}); err != nil {
 			return err
 		}
-		actions := []string{"add", "import", "inspect", "sync", "check", "update", "enable", "disable", "remove"}
-		labels := []string{"Add a plugin", "Import an existing install", "Inspect a plugin", "Sync / retry pending operations", "Check for source updates", "Update a plugin", "Include a target in sync", "Exclude a target from sync", "Remove a plugin"}
+		actions := []string{"add", "import", "unimport", "inspect", "sync", "check", "update", "enable", "disable", "remove"}
+		labels := []string{"Add a plugin", "Import an existing install", "Uninstall a local import", "Inspect a plugin", "Sync / retry pending operations", "Check for source updates", "Update a plugin", "Include a target in sync", "Exclude a target from sync", "Remove a plugin"}
 		items := make([]checklistItemData, len(actions))
 		for i, label := range labels {
 			items[i] = checklistItemData{label: label}
@@ -76,6 +76,10 @@ func pluginNpmTargets(s *plugin.Service, r *plugin.Request) error {
 }
 
 func pluginWizard(s *plugin.Service, o pluginOptions) error {
+	return s.WithDiscoveryCache(func() error { return pluginWizardAction(s, o) })
+}
+
+func pluginWizardAction(s *plugin.Service, o pluginOptions) error {
 	ctx := context.Background()
 	r := o.request
 	switch r.Action {
@@ -157,7 +161,7 @@ func pluginWizard(s *plugin.Service, o pluginOptions) error {
 		if err != nil {
 			return err
 		}
-		type selection struct{ target, id string }
+		type selection struct{ target, id, name string }
 		choices := []selection{}
 		items := []checklistItemData{}
 		for _, h := range inventory.Hosts {
@@ -180,8 +184,23 @@ func pluginWizard(s *plugin.Service, o pluginOptions) error {
 				if r.Plugin != "" && r.Plugin != i.ID {
 					continue
 				}
-				choices = append(choices, selection{h.Target, i.ID})
-				items = append(items, checklistItemData{label: i.ID, desc: h.Target + " · " + i.Version})
+				names := []string{r.Name}
+				if r.Name == "" {
+					for name, p := range inventory.Packages {
+						if b, ok := p.Bindings[h.Target]; ok && b.ID == "" && !b.Cleanup {
+							names = append(names, name)
+						}
+					}
+					slices.Sort(names)
+				}
+				for _, name := range names {
+					label := i.ID
+					if name != "" {
+						label = name + " ← " + i.ID
+					}
+					choices = append(choices, selection{h.Target, i.ID, name})
+					items = append(items, checklistItemData{label: label, desc: h.Target + " · " + i.Version})
+				}
 			}
 		}
 		if len(items) == 0 {
@@ -193,6 +212,7 @@ func pluginWizard(s *plugin.Service, o pluginOptions) error {
 		}
 		r.From = choices[idx[0]].target
 		r.Plugin = choices[idx[0]].id
+		r.Name = choices[idx[0]].name
 	default:
 		if r.Name == "" && !r.All && r.Action != "sync" && r.Action != "check" {
 			inventory, err := s.Inventory(ctx)
@@ -219,7 +239,15 @@ func pluginWizard(s *plugin.Service, o pluginOptions) error {
 		}
 	}
 	o.request = r
-	if len(r.Targets) == 0 && !r.All && (r.Action == "enable" || r.Action == "disable" || r.Action == "update" || r.Action == "remove") {
+	if len(r.Targets) == 0 && !r.All && (r.Action == "enable" || r.Action == "disable" || r.Action == "update" || r.Action == "remove" || r.Action == "unimport") {
+		var importedTargets []string
+		if r.Action == "unimport" {
+			var err error
+			importedTargets, err = s.UnimportTargets(r.Name)
+			if err != nil {
+				return err
+			}
+		}
 		inventory, err := s.Inventory(ctx)
 		if err != nil {
 			return err
@@ -228,10 +256,17 @@ func pluginWizard(s *plugin.Service, o pluginOptions) error {
 		items := []checklistItemData{}
 		for _, definition := range inventory.TargetDefinitions {
 			target := definition.Target
-			if !slices.Contains(definition.Operations, r.Action) {
+			action := r.Action
+			if action == "unimport" {
+				action = "remove"
+			}
+			if !slices.Contains(definition.Operations, action) {
 				continue
 			}
 			if b, ok := inventory.Packages[r.Name].Bindings[target]; ok {
+				if r.Action == "unimport" && !slices.Contains(importedTargets, target) {
+					continue
+				}
 				targets = append(targets, target)
 				items = append(items, checklistItemData{label: definition.Label, desc: b.ID})
 			}

@@ -37,6 +37,7 @@ skillshare plugin remove review --no-tui
 | `discover SOURCE` | 로컬 디렉터리, `owner/repo`, 또는 HTTPS Git 저장소를 검사 |
 | `add [SOURCE]` | target adapter와 함께 전체 plugin을 선택하여 설치하거나, Pi를 통해 `npm:` 패키지를 설치 |
 | `import [NATIVE-ID]` | 재설치하거나 활성화하지 않고 기존 설치를 채택 |
+| `unimport NAME` | 명시한 대상에서 이 기기의 가져온 설치를 제거하고 공유 소스 선언은 유지 |
 | `inspect NAME` | 관리되는 패키지 하나를 검사 |
 | `sync [NAME]` | 선택된 target을 재조정하고 미완료된 네이티브 작업을 재시도 |
 | `check [NAME]` | source 내용을 기록된 digest와, 또는 Pi npm 패키지 버전을 npm 최신 버전과 비교. 업데이트는 절대 하지 않음 |
@@ -182,7 +183,7 @@ OpenCode는 관리되는 entry를 `opencode.json` 또는 기존의 `opencode.jso
 
 사용자 범위 npm 등록에 managed cache가 없으면 Unknown／읽기 전용으로 표시합니다. 미설치라는 뜻은 아닙니다. Pi가 Skillshare에서 조회하지 않는 legacy global npm/pnpm 경로를 사용할 수 있습니다.
 
-Import는 일반 Pi source와 Pi 0.99.2 이상에서 지원되는 source 및 옵션 형식의 filtered object를 받아들입니다. 미리보기에는 보존할 키 이름만 표시하며 opaque 값은 표시하지 않습니다. 네이티브 설정과 설치 파일은 변경하지 않고, 원본 entry는 Skillshare의 비공개 state에 저장하며 공유 config에는 digest만 기록합니다. sync/update는 현재 entry를 유지합니다. 제거 전에 최신 옵션을 저장하고 재설치 시 네이티브 install 전에 object를 복원하여 다른 리소스가 일시적으로 기본 활성화되는 것을 방지합니다. 같은 Apply에서 여러 항목을 복원할 때는 해당 작업이 직접 쓴 정확한 내용만 허용합니다. 다른 설정 변경이 있으면 이후 복원을 중단합니다. 비공개 state를 보관하세요. 기록이 없거나 변경되었거나 다른 target 소유이면 복원을 거부합니다. Windows의 새 등록 디렉터리는 owner/SYSTEM용 보호 ACL로 생성합니다. 기존 디렉터리와 기록이 현재 사용자와 특권 SYSTEM/Administrators 이외에 접근을 허용하거나 ACL을 검증할 수 없으면 가져오기·복원을 거부합니다. 기존 ACL은 변경하지 않습니다. 기록을 보관하고 소유자가 접근 보호를 복구한 뒤 다시 시도하세요. 불확실한 source·우선순위, 미지원 인코딩, Pi가 정규화할 로컬 참조는 읽기 전용입니다. 일반 OpenCode entry는 가져올 수 있지만 filtered OpenCode는 계속 거부됩니다. 10초 stale 기준을 넘긴 빈 lock 디렉터리는 inode와 mtime이 바뀌지 않은 경우에만 회수합니다. 새 lock, 갱신·교체된 lock, 비어 있지 않은 디렉터리, 파일, symlink는 유지합니다. 오래되었다고 소유자가 종료된 것은 아니며 마지막 확인과 제거는 atomic CAS가 아닙니다. import된 Pi 패키지는 global 모드에서 `pi update SOURCE`로 업데이트되며 설정 entry는 유지됩니다. project의 패키지는 Pi에서 업데이트하세요. `pi update`는 global 패키지에도 영향을 주기 때문입니다. import된 OpenCode v1 패키지는 해당 네이티브 도구에서 업데이트됩니다. OpenCode v2의 global import는 자체 네이티브 업데이트 명령을 사용할 수 있지만, v2 업데이트 명령이 global이기 때문에 project import는 네이티브로 업데이트해야 합니다.
+Import는 일반 Pi source와 Pi 0.99.2 이상에서 지원되는 source 및 옵션 형식의 filtered object를 받아들입니다. 미리보기에는 보존할 키 이름만 표시하며 opaque 값은 표시하지 않습니다. 네이티브 설정과 설치 파일은 변경하지 않고, 원본 entry는 Skillshare의 비공개 state에 저장하며 로컬 receipt에 digest만 기록합니다. sync/update는 현재 entry를 유지합니다. 제거 전에 최신 옵션을 저장하고 재설치 시 네이티브 install 전에 object를 복원하여 다른 리소스가 일시적으로 기본 활성화되는 것을 방지합니다. 같은 Apply에서 여러 항목을 복원할 때는 해당 작업이 직접 쓴 정확한 내용만 허용합니다. 다른 설정 변경이 있으면 이후 복원을 중단합니다. 비공개 state를 보관하세요. 기록이 없거나 변경되었거나 다른 target 소유이면 복원을 거부합니다. Windows의 새 등록 디렉터리는 owner/SYSTEM용 보호 ACL로 생성합니다. 기존 디렉터리와 기록이 현재 사용자와 특권 SYSTEM/Administrators 이외에 접근을 허용하거나 ACL을 검증할 수 없으면 가져오기·복원을 거부합니다. 기존 ACL은 변경하지 않습니다. 기록을 보관하고 소유자가 접근 보호를 복구한 뒤 다시 시도하세요. 불확실한 source·우선순위, 미지원 인코딩, Pi가 정규화할 로컬 참조는 읽기 전용입니다. 일반 OpenCode entry는 가져올 수 있지만 filtered OpenCode는 계속 거부됩니다. 10초 stale 기준을 넘긴 빈 lock 디렉터리는 inode와 mtime이 바뀌지 않은 경우에만 회수합니다. 새 lock, 갱신·교체된 lock, 비어 있지 않은 디렉터리, 파일, symlink는 유지합니다. 오래되었다고 소유자가 종료된 것은 아니며 마지막 확인과 제거는 atomic CAS가 아닙니다. import된 Pi 패키지는 global 모드에서 `pi update SOURCE`로 업데이트되며 설정 entry는 유지됩니다. project의 패키지는 Pi에서 업데이트하세요. `pi update`는 global 패키지에도 영향을 주기 때문입니다. import된 OpenCode v1 패키지는 해당 네이티브 도구에서 업데이트됩니다. OpenCode v2의 global import는 자체 네이티브 업데이트 명령을 사용할 수 있지만, v2 업데이트 명령이 global이기 때문에 project import는 네이티브로 업데이트해야 합니다.
 
 ```bash
 skillshare plugin add ./cursor-plugin --target cursor --no-tui
@@ -203,7 +204,7 @@ skillshare plugin add ./package --entry dist/plugin.js --target opencode --no-tu
 skillshare plugin update review --source-ref v1.1.0 --target claude --dry-run --json
 ```
 
-바인딩은 `source_ref`와 해석된 `commit`을 기록합니다. 설치는 검토된 commit을 사용합니다. `check`와 `update`는 구성된 ref를 다시 해석하므로, commit이 고정된 상태에서도 브랜치는 진행될 수 있습니다. `--revision`은 Git ref가 아니라 미리보기 토큰입니다. `--entry`는 각 후보의 패키지 루트를 기준으로 하며 이미 존재해야 합니다. 이는 빌드나 패키지 매니저 설치를 트리거하지 않습니다.
+공유 바인딩은 `source_ref`를 기록하고 해석된 `commit`은 로컬 기록에 저장합니다. 설치는 검토된 commit을 사용합니다. `check`와 `update`는 구성된 ref를 다시 해석하므로, commit이 고정된 상태에서도 브랜치는 진행될 수 있습니다. `--revision`은 Git ref가 아니라 미리보기 토큰입니다. `--entry`는 각 후보의 패키지 루트를 기준으로 하며 이미 존재해야 합니다. 이는 빌드나 패키지 매니저 설치를 트리거하지 않습니다.
 
 Copilot과 Antigravity CLI 설치는 검토된 로컬 스냅샷을 사용합니다. import된 항목은 재설치를 위한 검토된 source가 없습니다: 제거 후에는 네이티브 클라이언트에서 설치하고 다시 sync하세요. Grok도 설치/재설치 전에 네이티브 trust가 필요합니다. Skillshare는 네이티브 trust 승인 플래그를 절대 제공하지 않습니다.
 
@@ -221,7 +222,7 @@ Copilot과 Antigravity CLI 설치는 검토된 로컬 스냅샷을 사용합니�
 - Codex의 네이티브 project 설치는 이 adapter에서 제공되지 않습니다. global Codex 설치에 대해서는 sync 선택이 여전히 동작합니다.
 - Codex에는 update 명령이 없으므로, 업데이트는 갱신된 스냅샷에서 플러그인을 다시 add합니다. add는 항상 플러그인을 활성화하므로 Codex에서 비활성화된 플러그인은 건너뜁니다. Import한 Codex 플러그인은 `codex plugin marketplace upgrade NAME`으로 업데이트되며, 이는 Codex가 해당 마켓플레이스에서 설치한 모든 플러그인을 다시 설치합니다. Codex도 시작할 때 같은 작업을 합니다.
 - 업데이트는 처리할 수 없는 Target을 이유와 함께 건너뛰며, 해당 플러그인의 다른 Agent는 그대로 업데이트됩니다. 건너뛴 업데이트는 대기 상태로 남아 이후 sync에서 처리됩니다.
-- import된 plugin은 원래의 marketplace identity를 유지합니다. `check`는 source가 없는 import된 plugin에 대해 release 가능 여부를 추론할 수 없습니다. 단, Pi의 npm 패키지는 npm에서 확인합니다. import한 Claude 또는 Codex plugin의 네이티브 marketplace가 사라지면 sync와 update는 해당 Target을 건너뛰고 이유를 알려 줍니다. 그 marketplace를 한 번도 추가하지 않은 다른 머신에서도 마찬가지입니다. Agent에서 marketplace를 복원하거나, 해당 Target을 제거한 뒤 source에서 plugin을 다시 추가하세요. Skillshare는 import된 plugin을 임의로 다른 source로 옮기지 않습니다.
+- import된 plugin은 원래의 marketplace identity를 유지합니다. `check`는 source가 없는 import된 plugin에 대해 release 가능 여부를 추론할 수 없습니다. 단, Pi의 npm 패키지는 npm에서 확인합니다. import한 Claude 또는 Codex plugin의 네이티브 marketplace가 사라지면 sync와 update는 해당 Target을 건너뛰고 이유를 알려 줍니다. 새 머신은 같은 이름의 marketplace가 있어도 명시적인 로컬 가져오기가 필요합니다. Agent에서 marketplace를 복원하거나, 해당 Target을 제거한 뒤 source에서 plugin을 다시 추가하세요. Skillshare는 import된 plugin을 임의로 다른 source로 옮기지 않습니다.
 - Skillshare는 관리하는 Claude/Codex plugin마다 marketplace를 하나 등록하고 `skillshare-<plugin>-<hash>`로 이름을 붙입니다(이전 설치는 `skillshare-<hash>`를 유지). plugin을 제거하거나 제외하면 plugin이 이미 없더라도 그 marketplace도 제거하며, 실패한 정리는 다음 sync에서 다시 시도합니다. marketplace가 사라졌다면 update가 다시 등록합니다. 다른 경로에 있는 같은 이름의 등록과 import된 plugin의 marketplace는 건드리지 않습니다. 스냅샷과 네이티브 캐시는 유지됩니다.
 - 이 등록은 user 설정이든 project 설정이든 이 머신의 Skillshare 상태 디렉터리를 가리킵니다. Git이나 dotfile 관리 도구로 Agent 설정을 공유하면 다른 머신에는 없는 경로가 함께 옮겨집니다. 각 머신에서 source로부터 plugin을 추가하세요.
 - Claude는 skills 디렉터리에서 plugin manifest가 있는 skill 폴더도 `<name>@skills-dir`라는 plugin으로 읽으며, 같은 이름의 plugin은 하나만 불러옵니다. 같은 이름의 Claude plugin을 추가하면 미리보기에서 이를 알려 줍니다. 둘 중 하나의 이름을 바꾸거나 제거할 때까지 Claude는 plugin을 불러오고 skill 폴더는 건너뜁니다.
@@ -236,3 +237,46 @@ Copilot과 Antigravity CLI 설치는 검토된 로컬 스냅샷을 사용합니�
 - [Pi packages](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md)
 - [OpenCode v1 plugins](https://opencode.ai/docs/plugins/)
 - [OpenCode v2 plugins](https://opencode.ai/v2/docs/plugins)
+
+## 공유 선언과 머신별 설치 {#host-state}
+
+`plugins.version: 2`는 전역/프로젝트 설정에 source, ref, plugin, entry, 대상별 소스와 `sync` 선택 또는 `imported: true`를 저장합니다. 대상 소스가 명시적으로 기록되므로 패키지 기본값을 바꿔도 다른 배포본으로 바뀌지 않습니다.
+
+```yaml
+plugins:
+  version: 2
+  packages:
+    router:
+      source: https://github.com/acme/router.git
+      plugin: router
+      bindings:
+        pi: {source: https://github.com/acme/router.git, plugin: router}
+        omp: {imported: true}
+```
+
+네이티브 ID, 검토한 commit/digest/version, Pi 등록 참조와 대기 작업은 `<StateDir>/plugins/<config-path-hash>/state.json`(로컬 형식 version 1)에 저장합니다. StateDir는 기기마다 따로 유지하세요. 상태는 설정 파일의 **절대 경로**로 구분됩니다. 프로젝트나 설정을 이동하거나 이름을 바꾸면 새 상태 영역이 생기며 이전 설치는 추적하거나 정리하지 않습니다. 이동 전에 이전 설정으로 제거하거나 새 위치에서 명시적으로 관리·가져오세요.
+
+sync, 일반 update, 검증, 실패와 재시도는 공유 선언을 바꾸지 않습니다. `update --source-ref`는 ref가 달라질 때만 선언을 변경합니다. 읽기는 로컬 작업 잠금 아래 레거시 증거를 저장하며 공유 YAML은 바꾸지 않습니다. 다른 작업이 잠금을 보유하면 해당 작업이나 다음 읽기에 저장을 맡깁니다. add, import, 선택, remove는 필요한 선언 변경을 저장하고 외부 변경을 감지합니다. 동시 Syncthing 편집을 병합하지는 않습니다.
+
+소스 검토와 commit 고정은 **기기별**입니다. 브랜치 ref는 해당 기기의 설치·업데이트 시점에 해석되므로 비대화형 sync가 다른 기기에서 검토한 것보다 새로운 commit을 설치할 수 있습니다. ref 변경도 기기별로 해석합니다. 모든 기기에서 같은 버전을 쓰려면 `source_ref`에 commit SHA를 지정하세요. 로컬 소스 경로도 각 기기에 있어야 합니다.
+
+native-only 대상은 이 기기에서 가져오기가 필요하다고 표시되며 sync가 건너뜁니다. 네이티브 클라이언트에서 설치한 뒤 `plugin import LOCAL-ID --from TARGET --name NAME`을 실행하세요. 기존 소스 선언으로 가져오면 로컬 기록만 만들고 다른 기기의 소스나 설치를 바꾸지 않습니다. 검토한 소스의 동일 ID를 다시 가져와도 소스를 유지합니다. 명시적인 Pi `add npm:PACKAGE`는 설치 방법을 공유하고 Pi가 스크립트를 실행합니다. npm import는 native-only 선언을 만듭니다.
+
+가져오기는 원격 소스를 다운로드하지 않습니다. 직접 작성한 원격 소스 설정에 `plugin:`이 없다면 가져오기 전에 네이티브 패키지 이름을 `plugin:`에 지정하세요. 그러면 오프라인으로 패키지의 일치 여부를 확인할 수 있습니다. `plugin add`로 만든 설정에는 이 이름이 이미 기록되어 있습니다. 로컬 디렉터리 설정은 로컬에서 탐색할 수 있습니다.
+
+레거시 읽기와 sync는 YAML을 바꾸지 않으며 다음 선언 편집에서 version 2로 전환합니다. **첫 v2 편집 전에 모든 writer를 업그레이드하고, 공유 YAML이 레거시 형식일 때 각 기기에서 `skillshare plugin list`를 실행하세요.** 네이티브 클라이언트가 일시적으로 없어도 이전 증거를 저장합니다. 채택에는 원래 네이티브 환경의 inventory와, 소스 설치의 경우 소유한 snapshot 증거가 필요합니다. 다른 호스트의 대기 작업은 실행하지 않습니다. 미확인 힌트와 제거 증거는 소유권 확인과 정리가 끝날 때까지 유지합니다. 레거시 npm은 add/import를 구별할 수 없으므로 공유 설치 방법이 필요하면 명시적으로 다시 add하세요.
+
+계정이 바뀌면 이전 네이티브 환경을 먼저 해결한 뒤 정리하세요. 인증, 네이티브 설정, trust는 각 도구에 남습니다.
+
+가져오기를 반복해도 공유 의도를 다시 쓰지 않습니다. 정리가 실패하면 다음 sync에서 재시도할 로컬 기록을 유지합니다. 이전 바이너리는 버전이 지정된 선언 필드를 알지 못하므로 v2를 쓸 수 없습니다.
+
+공유 소스 설정이 바뀌어도 로컬 가져오기는 유지합니다. 이 기기를 공유 소스로 전환하려면 다음을 실행하세요.
+
+```bash
+skillshare plugin unimport NAME --target TARGET --no-tui
+skillshare plugin sync NAME --no-tui
+```
+
+`unimport`에는 하나 이상의 명시적인 `--target`이 필요하며, 선택한 각 대상에 기존 로컬 가져오기 기록과 공유 소스 설정이 있어야 합니다. 대상의 제거 어댑터를 사용해 이 기기에서 가져온 설치를 제거한 다음 로컬 기록을 삭제합니다. 공유 선언과 다른 기기의 설치는 그대로 유지됩니다. 다음 sync는 공유 소스에서 설치합니다.
+
+제거하면 해당 설치와 연결된 네이티브 클라이언트 설정이나 로그인 정보도 삭제됩니다.

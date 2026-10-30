@@ -1,11 +1,15 @@
 package plugin
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+
+	"gopkg.in/yaml.v3"
 )
 
 func (s *Service) Apply(ctx context.Context, r Request, revision string) (*Result, error) {
@@ -29,18 +33,22 @@ func (s *Service) Apply(ctx context.Context, r Request, revision string) (*Resul
 
 // Lock serializes CLI and UI mutations across processes, not just HTTP requests.
 func (s *Service) Lock() (unlock func(), err error) {
-	if err := os.MkdirAll(filepath.Dir(s.ConfigPath), 0755); err != nil {
+	path := s.operationLockPath()
+	if err := noSymlink(s.StateDir, path); err != nil {
 		return nil, err
 	}
-	lock, err := os.OpenFile(s.ConfigPath+".plugins.lock", os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return nil, err
+	}
+	lock, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
-		return nil, fmt.Errorf("another plugin operation is running (lock: %s.plugins.lock)", s.ConfigPath)
+		return nil, fmt.Errorf("another plugin operation is running (lock: %s)", path)
 	}
 	_ = lock.Close()
-	return func() { _ = os.Remove(s.ConfigPath + ".plugins.lock") }, nil
+	return func() { _ = os.Remove(path) }, nil
 }
 
-// applyPlan carries out a plan previewed under the lock the caller holds.
+// applyPlan persists declarations once, then records all native work privately.
 func (s *Service) applyPlan(ctx context.Context, r Request, p *Plan) (*Result, error) {
 	if p.Blocked {
 		return nil, fmt.Errorf("resolve blocked plugin targets before applying")
@@ -52,143 +60,213 @@ func (s *Service) applyPlan(ctx context.Context, r Request, p *Plan) (*Result, e
 	if err != nil {
 		return nil, err
 	}
-	// Preserve private entries before writing references to them into config.
+	// Reuse the inventory already observed by this apply's fresh Preview.
+	s.adoptLegacy(d, func(target string) Host {
+		if h, ok := p.hosts[target]; ok {
+			return h
+		}
+		return s.host(ctx, target)
+	})
+	before, _ := yaml.Marshal(d.intent)
 	for _, c := range p.Changes {
-		if c.Action != "skip" && c.Action != "noop" {
-			if err := s.savePiRegistration(c); err != nil {
+		if c.Action == "skip" || c.Action == "blocked" {
+			continue
+		}
+		pack := d.intent[c.Name]
+		if pack.Bindings == nil {
+			pack.Bindings = map[string]declaration{}
+		}
+		switch r.Action {
+		case "add":
+			decl := declarationForAdd(r, c)
+			if old, exists := pack.Bindings[c.Target]; exists {
+				decl.Sync = old.Sync
+			}
+			if c.Target == "" || pack.Source == "" {
+				pack.Source, pack.SourceRef, pack.Plugin, pack.Entry = decl.Source, decl.SourceRef, decl.Plugin, decl.Entry
+			}
+			if c.Target != "" {
+				pack.Bindings[c.Target] = decl
+			}
+			d.intent[c.Name] = pack
+		case "import":
+			// Importing an existing declaration records only local evidence.
+			if old, exists := pack.Bindings[c.Target]; !exists {
+				pack.Bindings[c.Target] = declaration{Imported: true, Sync: old.Sync}
+				d.intent[c.Name] = pack
+			}
+		case "enable", "disable":
+			b := pack.Bindings[c.Target]
+			selected := r.Action == "enable"
+			b.Sync = &selected
+			pack.Bindings[c.Target] = b
+			d.intent[c.Name] = pack
+		case "remove":
+			if len(r.Targets) == 0 {
+				delete(d.intent, c.Name)
+			} else {
+				delete(pack.Bindings, c.Target)
+				if len(pack.Bindings) == 0 && pack.Source == "" {
+					delete(d.intent, c.Name)
+				} else {
+					d.intent[c.Name] = pack
+				}
+			}
+		case "update":
+			if r.SourceRef != "" && c.Target != "" {
+				b := pack.Bindings[c.Target]
+				b.SourceRef = r.SourceRef
+				pack.Bindings[c.Target] = b
+				d.intent[c.Name] = pack
+			}
+		}
+	}
+	after, _ := yaml.Marshal(recordPackageVersions(d, r, p))
+	if !bytes.Equal(before, after) {
+		// Preserve verified receipts and unresolved proof candidates before rewriting legacy YAML.
+		if d.hasLocalState() {
+			if err := s.saveState(d); err != nil {
 				return nil, err
 			}
 		}
+		if err := s.saveAndPruneVersions(d); err != nil {
+			return nil, err
+		}
 	}
+	s.applyConfig = &d.raw
+	defer func() { s.applyConfig = nil }()
 	result := &Result{Results: []Outcome{}}
-	var failures []error
-	changed := false
+	failures := []error{}
+	failed := map[string]bool{}
+	restores := map[string]piRestoreReceipt{}
 	for _, c := range p.Changes {
+		key := c.Name + "\x00" + c.Target
+		if failed[key] {
+			continue
+		}
+		outcome := Outcome{Name: c.Name, Target: c.Target, Guidance: c.Guidance}
 		if c.Action == "skip" {
-			// Unlike noop, a skipped update stays pending for a later sync.
-			status := "skipped"
+			outcome.Status = "skipped"
 			if c.batchError {
-				status = "failed"
+				outcome.Status, failed[key] = "failed", true
 				failures = append(failures, errors.New(c.Message))
 			}
-			result.Results = append(result.Results, Outcome{Name: c.Name, Target: c.Target, Status: status, Message: c.Message, MessageKey: c.MessageKey, MessageArgs: c.MessageArgs})
+			outcome.Message, outcome.MessageKey, outcome.MessageArgs = c.Message, c.MessageKey, c.MessageArgs
+			result.Results = append(result.Results, outcome)
 			continue
 		}
-		if c.Action == "noop" {
-			result.Results = append(result.Results, Outcome{Name: c.Name, Target: c.Target, Status: "unchanged"})
-			if r.Action == "sync" && d.packages[c.Name].Bindings[c.Target].Pending != "" {
-				changed = true
-				pack := d.packages[c.Name]
-				b := pack.Bindings[c.Target]
-				b.Pending = ""
-				pack.Bindings[c.Target] = b
-				d.packages[c.Name] = pack
-			}
-			continue
-		}
-		changed = true
-		pack := d.packages[c.Name]
-		if pack.Bindings == nil {
-			pack.Bindings = map[string]Binding{}
-		}
-		if c.Target == "" {
+		if c.Action == "selection" || c.Target == "" || c.ID == "" && c.Action == "forget" {
+			outcome.Status = "saved"
+
 			if c.Action == "forget" {
-				delete(d.packages, c.Name)
-			} else {
-				pack.Source, pack.SourceRef, pack.Plugin, pack.Entry, pack.Version = c.Binding.Source, c.Binding.SourceRef, c.Binding.Plugin, c.Binding.Entry, c.Binding.Version
-				d.packages[c.Name] = pack
-			}
-			continue
-		}
-		if r.Action == "add" && pack.Source == "" && c.Binding.Source != "" {
-			pack.Source, pack.SourceRef, pack.Plugin, pack.Entry = c.Binding.Source, c.Binding.SourceRef, c.Binding.Plugin, r.Entry
-		}
-		b := c.Binding
-		b.Pending = c.Action
-		if c.Action == "import" || c.Action == "selection" {
-			b.Pending = ""
-		}
-		pack.Bindings[c.Target] = b
-		d.packages[c.Name] = pack
-	}
-	if !changed {
-		return result, errors.Join(failures...)
-	}
-	if err := s.save(d); err != nil {
-		return result, err
-	}
-	// Receipts are private to this Apply, and record only bytes our restore wrote.
-	piRestores := map[string]piRestoreReceipt{}
-	for _, c := range p.Changes {
-		if c.Action == "noop" || c.Action == "skip" {
-			continue
-		}
-		if c.Target == "" {
-			outcome := Outcome{Name: c.Name, Status: "saved", Message: "Added to Skillshare. Choose Agents when you want to install it."}
-			if c.Action == "forget" {
-				outcome.Status, outcome.Message = "removed", "Removed from Skillshare."
+				outcome.Status = "removed"
+				outcome.Message = "Removed from Skillshare."
+				for target, local := range d.state.Bindings[c.Name] {
+					if c.Target == "" || c.Target == target {
+						local.Legacy = nil
+						d.putLocal(c.Name, target, local)
+					}
+				}
 			}
 			result.Results = append(result.Results, outcome)
 			continue
 		}
-		b := d.packages[c.Name].Bindings[c.Target]
-		c.piRestores = piRestores
+		local := d.state.Bindings[c.Name][c.Target]
+		decl, declared := d.intent[c.Name].Bindings[c.Target]
+
+		if c.Action == "noop" {
+			if r.Action == "add" && !c.Binding.Imported && local.Applied != nil && c.Binding.ID == local.Applied.Binding.ID {
+				local.Applied.Intent, local.Applied.Binding.Imported = decl.fingerprint(), c.Binding.Imported
+				local.Legacy = nil
+				d.putLocal(c.Name, c.Target, local)
+			}
+			if local.Pending != nil && local.Applied == nil && c.Binding.Selected() && !c.Binding.Cleanup && local.Pending.Intent == decl.fingerprint() {
+				h := s.host(ctx, c.Target)
+				if h.Error != "" || !slices.ContainsFunc(h.Installed, func(i Installed) bool { return i.ID == c.ID }) || c.Binding.Source != "" && !s.ownedSnapshot(c.Binding, c.Target) {
+					return result, fmt.Errorf("pending installation could not be verified; preview again")
+				}
+				local.Applied = local.Pending
+				local.Applied.Action = ""
+			}
+			if local.Pending != nil {
+				local.Pending = nil
+				d.putLocal(c.Name, c.Target, local)
+			}
+			outcome.Status = "unchanged"
+			outcome.Message, outcome.MessageKey, outcome.MessageArgs = c.Message, c.MessageKey, c.MessageArgs
+			result.Results = append(result.Results, outcome)
+			continue
+		}
+		if err := d.checkIntent(s.ConfigPath); err != nil {
+			return result, errors.Join(append(failures, err)...)
+		}
+		if err := s.savePiRegistration(c); err != nil {
+			return result, err
+		}
+		intent := decl.fingerprint()
+		if !declared && local.Applied != nil {
+			intent = local.Applied.Intent
+		}
+		b := c.Binding
+		b.Cleanup, b.ContextChanged, b.RefChanged, b.ImportRetained = false, false, false, false
+		local.Pending = &receipt{Intent: intent, Store: s.storeIdentity(c.Target), Binding: b, Action: c.Action}
+		d.putLocal(c.Name, c.Target, local)
+		if err := s.saveState(d); err != nil {
+			return result, errors.Join(append(failures, err)...)
+		}
+		if err := d.checkIntent(s.ConfigPath); err != nil {
+			return result, errors.Join(append(failures, err)...)
+		}
+		c.piRestores = restores
 		applyErr := s.applyChange(ctx, c, &b)
-		outcome := Outcome{Name: c.Name, Target: c.Target, Status: "installed", Message: "Native installation recorded. Reload the Agent and complete any required login or hook trust."}
 		if applyErr != nil {
-			outcome.Status = "failed"
-			outcome.Message = applyErr.Error()
+			outcome.Status, outcome.Message = "failed", applyErr.Error()
 			outcome.MessageKey, outcome.MessageArgs = ErrorKey(applyErr)
 			failures = append(failures, applyErr)
+			failed[key] = true
 		} else {
-			pack := d.packages[c.Name]
+			local.Pending = nil
+			local.Legacy = nil
+			b.Pending = ""
+			outcome.Status, outcome.Message = "installed", "Native installation recorded. Reload the Agent and complete any required login or hook trust."
 			if c.Action == "remove" || c.Action == "forget" {
-				delete(pack.Bindings, c.Target)
+				local.Applied = nil
 				outcome.Status = "removed"
 				outcome.Message = "Native plugin removed; shared marketplaces are retained."
-				if s.agentOf(c.Target) == "omp" {
-					outcome.Message, outcome.MessageKey = "Removed from this scope; shared cache, marketplaces and plugin settings were retained.", "plugins.outcome.ompRemoved"
-				}
-				if c.Action == "forget" && s.agentOf(c.Target) == "omp" {
-					outcome.Message = "Removed from Skillshare; the native plugin was already absent. Shared marketplaces are retained."
-				}
 			} else {
-				b.Pending = ""
 				if c.piRecordAfter {
 					if err := s.recordPiEntry(ctx, c.Target, &b); err != nil {
 						outcome.Message = "Installed, but its extension settings could not be recorded to restore on a later reinstall: " + err.Error()
 					}
 				}
-				pack.Bindings[c.Target] = b
-				if c.Action == "selection" {
-					outcome.Status = "saved"
-					outcome.Message = "Sync selection saved. Run sync to apply installation changes."
-				}
+				local.Applied = &receipt{Intent: intent, Store: s.storeIdentity(c.Target), Binding: b}
 				if c.Action == "uninstall" {
 					outcome.Status = "excluded"
 					outcome.Message = "Removed from this target; plugin definition retained."
-					if s.agentOf(c.Target) == "omp" {
-						outcome.Message, outcome.MessageKey = "Removed from this scope; shared cache, marketplaces and plugin settings were retained.", "plugins.outcome.ompRemoved"
-					}
 				}
 				if c.Action == "import" {
 					outcome.Status = "imported"
 					outcome.Message = "Existing installation adopted without changing its enabled state."
 				}
 			}
-			// A package with a recorded source stays managed without Agents until it is removed whole.
-			if len(pack.Bindings) == 0 && (pack.Source == "" || (r.Action == "remove" && len(r.Targets) == 0)) {
-				delete(d.packages, c.Name)
-			} else {
-				d.packages[c.Name] = pack
+			if s.agentOf(c.Target) == "omp" && (c.Action == "remove" || c.Action == "forget" || c.Action == "uninstall") {
+				outcome.Message, outcome.MessageKey = "Removed from this scope; shared cache, marketplaces and plugin settings were retained.", "plugins.outcome.ompRemoved"
 			}
-			if err := s.save(d); err != nil {
+			d.putLocal(c.Name, c.Target, local)
+			if err := s.saveState(d); err != nil {
 				outcome.Status = "failed"
 				outcome.Message = "Native operation completed, but recording its result failed; inspect status before retrying."
-				failures = append(failures, err)
+				result.Results = append(result.Results, outcome)
+				return result, errors.Join(append(failures, err)...)
 			}
 		}
 		result.Results = append(result.Results, outcome)
+	}
+	// This also persists verified migration receipts on an otherwise unchanged sync.
+	if d.hasLocalState() || d.stateRaw != nil {
+		if err := s.saveState(d); err != nil {
+			return result, errors.Join(append(failures, err)...)
+		}
 	}
 	return result, errors.Join(failures...)
 }

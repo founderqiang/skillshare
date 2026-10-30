@@ -185,19 +185,15 @@ Skillshare は認証情報を `fromEnv` 参照として保存し、値そのも�
 
 ### Plugins {#plugins}
 
-Plugin の定義は git では移動しません。各マシンで同じソースから追加し直します：
+共有設定の `plugins:` セクションに version 2 のソース、ref、ターゲット選択を保存できます。StateDir は各マシンに保持してください。設定を別々に管理する場合は、**Plugins → Share** から add コマンドをコピーできます。
 
-1. 最初のマシンの dashboard で **Plugins → Share** を開き、コマンドをコピーします。HTTPS Git ソースから追加した plugins が一覧され、例えば次のようになります：
+新しいマシンでは `skillshare plugin sync` でソースを確認し、ローカルの snapshot パスにインストールします。確認と commit 固定はマシンごとです。ブランチ ref はインストールや更新時に解決され、非対話 sync が別のマシンで確認した版より新しい commit を使う場合があります。同じ版が必要なら `source_ref` に commit SHA を指定してください。ローカルソースのパスは各マシンに存在する必要があります。
 
-   ```bash
-   skillshare plugin add https://github.com/acme/plugins --plugin review -g --no-tui
-   ```
+native-only 宣言は「このマシンでインポートが必要」と表示され、sync はスキップします。各マシンのネイティブクライアントでインストール後、`skillshare plugin import LOCAL-ID --from TARGET --name NAME` を実行してください。既存のソース宣言へのインポートはローカルの記録だけを作り、他のマシンのソース設定やインストールを変更しません。
 
-2. 別のマシンでそれを実行し、Plugins ページで Agents にチェックを入れてから `skillshare sync plugins` を実行します。
+**最初の v2 編集前に全 writer を更新し、共有 YAML が旧形式のうちに各マシンで `skillshare plugin list` を実行してください。** ローカルの移行情報を保存できます。[プラグインの状態と移行](/docs/reference/commands/plugin#host-state)を参照してください。
 
-複数のマシンで使う plugin は、**Import installed** ではなく **Add plugin** でソースから追加してください。Import が記録するのは native のインストールだけです。別のマシンでは、Claude と Codex は同名の native marketplace から再インストールし、その marketplace が登録されていなければ plugin はスキップされます。Cursor と Antigravity は imported plugin を再インストールできません。ローカルディレクトリから追加した plugin は、パスが最初のマシンにしか存在しないため **Share** に表示されません。
-
-`sync plugins` は不足している plugins をインストールし、インストール済みのものはそのままにします。更新するには `skillshare plugin check` を実行してから `skillshare plugin update` を実行します。[ツール間で plugins を管理する](/docs/how-to/daily-tasks/sharing-plugins#updates-and-recovery) を参照してください。
+`sync` は不足する plugin のインストール、変更された ref の反映、ローカルのクリーンアップの再試行を行います。同じ ref の新リリースには `skillshare plugin check` と `skillshare plugin update` を使ってください。
 
 ### Hooks {#hooks}
 

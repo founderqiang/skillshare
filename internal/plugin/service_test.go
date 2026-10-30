@@ -266,7 +266,11 @@ func TestAddWithoutTargetsKeepsPackageForLater(t *testing.T) {
 		t.Fatalf("preview lost the Codex logo: %q", p.Changes[0].Logo)
 	}
 	if d.packages["demo"].Version != "1.0.0" {
-		t.Fatalf("version not recorded without an Agent: %+v", d.packages["demo"])
+		t.Fatalf("lost local reviewed version: %+v", d.packages["demo"])
+	}
+	shared, err := decodeDocument(d.raw, nil)
+	if err != nil || len(shared.legacy) != 0 || shared.intent["demo"].Source != root {
+		t.Fatalf("shared intent cached local metadata: %s %v", d.raw, err)
 	}
 	apply(Request{Action: "add", Name: "demo", Source: root, Plugin: "demo", Targets: []string{"claude"}})
 	apply(Request{Action: "remove", Name: "demo", Targets: []string{"claude"}})
@@ -425,6 +429,7 @@ func legacyBinding(t *testing.T, s *Service, agents *fakeAgents, extra string) B
 	b := Binding{ID: "demo@skillshare-0123456789abcdef", Source: "https://example.com/demo", Plugin: "demo"}
 	writePluginFile(t, filepath.Dir(s.ConfigPath), "config.yaml", "plugins:\n  packages:\n    demo:\n      bindings:\n        claude:\n          id: "+b.ID+"\n          source: "+b.Source+"\n          plugin: demo\n"+extra)
 	agents.market("claude")["skillshare-0123456789abcdef"] = s.snapshotPath(b, "claude")
+	seedLocalBinding(t, s, "demo", "claude", b)
 	return b
 }
 
@@ -555,9 +560,15 @@ func TestMarketplaceAlsoDeclaredAtAnotherPathIsNotRemoved(t *testing.T) {
 }
 
 func TestSyncSkipsAnImportWhoseNativeMarketplaceIsGone(t *testing.T) {
-	agents := &fakeAgents{}
+	agents := &fakeAgents{installed: map[string][]Installed{"claude": {{ID: "demo@team", Scope: "user", Installed: true}}}, markets: map[string]map[string]string{"claude": {"team": "/team"}}}
 	s := agents.service(t)
-	writePluginFile(t, filepath.Dir(s.ConfigPath), "config.yaml", "plugins:\n  packages:\n    demo:\n      source: https://example.com/demo\n      plugin: demo\n      bindings:\n        claude:\n          id: demo@team\n          pending: install\n")
+	applyPluginRequest(t, s, Request{Action: "import", From: "claude", Plugin: "demo@team"})
+	if b := readState(t, s).state.Bindings["demo"]["claude"]; b.Applied == nil || b.Applied.Binding.ID != "demo@team" || b.Legacy != nil {
+		t.Fatal("fixture lacks a locally owned imported receipt")
+	}
+	delete(agents.market("claude"), "team")
+	agents.installed["claude"] = nil
+
 	p, err := s.Preview(context.Background(), Request{Action: "sync"})
 	if err != nil || p.Blocked || len(p.Changes) != 1 || p.Changes[0].Action != "skip" || p.Changes[0].MessageKey != "plugins.skip.marketplaceGone" {
 		t.Fatalf("sync did not skip the import: %+v %v", p, err)
@@ -668,7 +679,7 @@ func (f *fakeAgents) service(t *testing.T) *Service {
 		f.markets = map[string]map[string]string{}
 	}
 	s := &Service{ConfigPath: filepath.Join(home, "config.yaml"), StateDir: filepath.Join(home, "state")}
-	s.Run = func(_ context.Context, _ string, _ []string, bin string, args ...string) ([]byte, error) {
+	s.Run = func(_ context.Context, dir string, _ []string, bin string, args ...string) ([]byte, error) {
 		command := strings.Join(args, " ")
 		switch {
 		case command == "--version":
@@ -748,7 +759,7 @@ func (f *fakeAgents) service(t *testing.T) *Service {
 					}
 				}
 			}
-			f.installed[bin] = []Installed{{ID: args[2], PluginID: args[2], Installed: true, Enabled: enabled, Version: f.version, Scope: scope}}
+			f.installed[bin] = []Installed{{ID: args[2], PluginID: args[2], Installed: true, Enabled: enabled, Version: f.version, Scope: scope, ProjectPath: dir}}
 		case args[1] == "remove" || args[1] == "uninstall":
 			f.installed[bin] = nil
 		}
@@ -812,19 +823,30 @@ func importedDemo(t *testing.T) (*Service, *fakeAgents) {
 	agents := &fakeAgents{version: "2.0.0", installed: map[string][]Installed{"claude": {{ID: "demo@team", PluginID: "demo@team", Installed: true, Enabled: true, Version: "1.0.0", Scope: "user"}}}, markets: map[string]map[string]string{"claude": {"team": "/team"}}}
 	s := agents.service(t)
 	applyPluginRequest(t, s, Request{Action: "import", From: "claude", Plugin: "demo@team"})
-	cfg, err := s.load()
-	if err != nil {
-		t.Fatal(err)
+	source := fixture(t)
+	applyPluginRequest(t, s, Request{Action: "add", Name: "demo", Source: source})
+	run := s.Run
+	s.Run = func(ctx context.Context, dir string, env []string, bin string, args ...string) ([]byte, error) {
+		if bin == "claude" && len(args) > 1 && args[0] == "plugin" && args[1] == "update" && !slices.Contains(args, "--help") {
+			return nil, fmt.Errorf("native update failed")
+		}
+		return run(ctx, dir, env, bin, args...)
 	}
+	applyFailure(t, s, Request{Action: "update", Name: "demo", Targets: []string{"claude"}})
+	s.Run = run
+	cfg := readState(t, s)
 	pack := cfg.packages["demo"]
-	pack.Source = "https://example.com/demo"
-	b := pack.Bindings["claude"]
-	b.Pending = "update"
-	pack.Bindings["claude"] = b
-	cfg.packages["demo"] = pack
-	if err := s.save(cfg); err != nil {
-		t.Fatal(err)
+	local := cfg.state.Bindings["demo"]["claude"]
+	if pack.Source != source || pack.Bindings["claude"].Source != "" || !pack.Bindings["claude"].Imported {
+		t.Fatal("fixture lacks source intent with an imported Claude override")
 	}
+	if local.Applied == nil || local.Pending == nil || local.Pending.Action != "update" || local.Pending.Binding.Version != "1.0.0" || local.Pending.Intent != cfg.intent["demo"].Bindings["claude"].fingerprint() {
+		t.Fatal("fixture lacks a pending owned Claude update at 1.0.0")
+	}
+	if len(cfg.state.Bindings["demo"]) != 1 {
+		t.Fatal("fixture includes a foreign target receipt")
+	}
+
 	return s, agents
 }
 
@@ -854,10 +876,14 @@ func TestBatchUpdateOfAnImportRecordsTheVersionItInstalled(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer unlock()
-	if _, err := updateDemo(s, map[string]Seen{"claude": {Version: "1.0.0"}}); err != nil {
+	check, err := s.Preview(context.Background(), Request{Action: "check", Name: "demo"})
+	if err != nil || len(check.Changes) != 1 {
+		t.Fatalf("check: %+v %v", check, err)
+	}
+	if _, err := updateDemo(s, map[string]Seen{"claude": checkedObservation(t, check.Changes[0].Binding)}); err != nil {
 		t.Fatal(err)
 	}
-	if b := loadBinding(t, s); b.Version != "2.0.0" {
+	if b := loadBinding(t, s); b.Version != "2.0.0" || b.Pending != "" {
 		t.Fatalf("binding: %+v", b)
 	}
 }
@@ -901,7 +927,10 @@ func TestSkippedUpdateStaysPending(t *testing.T) {
 	b.Pending = "update"
 	pack.Bindings["codex"] = b
 	cfg.packages["demo"] = pack
-	if err := s.save(cfg); err != nil {
+	local := cfg.state.Bindings["demo"]["codex"]
+	local.Pending = &receipt{Intent: cfg.intent["demo"].Bindings["codex"].fingerprint(), Store: s.storeIdentity("codex"), Binding: b, Action: "update"}
+	cfg.putLocal("demo", "codex", local)
+	if err := s.saveState(cfg); err != nil {
 		t.Fatal(err)
 	}
 	agents.installed["codex"][0].Enabled = false
@@ -951,39 +980,70 @@ func bumpedDemo(t *testing.T) (*Service, *fakeAgents) {
 	return s, agents
 }
 
+// checkedObservation crosses the same JSON boundary as the dashboard's observed binding.
+func checkedObservation(t *testing.T, binding Binding) Seen {
+	t.Helper()
+	raw, err := json.Marshal(binding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var observed Seen
+	if err := json.Unmarshal(raw, &observed); err != nil {
+		t.Fatal(err)
+	}
+	return observed
+}
+
 func updateDemo(s *Service, seen map[string]Seen) (*Result, error) {
 	_, result, err := s.updateLocked(context.Background(), UpdateItem{Name: "demo", Targets: []string{"claude"}, Seen: seen}, func(*Plan) {})
 	return result, err
 }
 
-// The user approved the version a check showed; a batch update installs nothing newer.
-func TestBatchUpdateSkipsAPluginWhoseVersionMovedSinceTheCheck(t *testing.T) {
-	s, agents := bumpedDemo(t)
-	if _, err := updateDemo(s, map[string]Seen{"claude": {Version: "1.5.0"}}); err != ErrSourceMoved || len(agents.commands) != 0 {
-		t.Fatalf("moved source: %v, commands %q", err, agents.commands)
-	}
-}
-
-// A local directory has no commit: the same version with other content has moved too.
-func TestBatchUpdateSkipsAPluginWhoseContentMovedSinceTheCheck(t *testing.T) {
-	s, _ := bumpedDemo(t)
-	if _, err := updateDemo(s, map[string]Seen{"claude": {Version: "2.0.0", Digest: "edited-since"}}); err != ErrSourceMoved {
-		t.Fatalf("moved digest: %v", err)
-	}
-}
-
-// Without what a check showed there is nothing the user approved.
-func TestBatchUpdateSkipsAnAgentNoCheckShowed(t *testing.T) {
-	s, agents := bumpedDemo(t)
-	if _, err := updateDemo(s, nil); err != ErrSourceMoved || len(agents.commands) != 0 {
-		t.Fatalf("unchecked: %v, commands %q", err, agents.commands)
-	}
-}
-
-func TestBatchUpdateInstallsTheVersionTheCheckShowed(t *testing.T) {
-	s, _ := bumpedDemo(t)
-	if result, err := updateDemo(s, map[string]Seen{"claude": {Version: "2.0.0"}}); err != nil || len(result.Results) != 1 || result.Results[0].Status != "installed" {
-		t.Fatalf("approved update: %+v %v", result, err)
+// Batch updates may install only the source the user approved, including a missing native installation.
+func TestBatchUpdateUsesOnlyTheSourceTheCheckShowed(t *testing.T) {
+	for _, scenario := range []string{"version moved", "content moved", "no approval", "missing identity", "matching approval"} {
+		for _, missing := range []bool{false, true} {
+			t.Run(scenario+"/"+map[bool]string{false: "present", true: "removed"}[missing], func(t *testing.T) {
+				s, agents := bumpedDemo(t)
+				checked, err := s.Preview(context.Background(), Request{Action: "check", Name: "demo"})
+				if err != nil || len(checked.Changes) != 1 || checked.Changes[0].Action != "update-available" {
+					t.Fatalf("check: %+v %v", checked, err)
+				}
+				binding := checked.Changes[0].Binding
+				seen := map[string]Seen{"claude": checkedObservation(t, binding)}
+				switch scenario {
+				case "version moved":
+					moved := seen["claude"]
+					moved.Version = "1.5.0"
+					seen["claude"] = moved
+				case "content moved":
+					writeFile(t, binding.Source, "skills/demo/SKILL.md", "source changed after approval")
+				case "no approval":
+					seen = nil
+				case "missing identity":
+					seen["claude"] = Seen{Version: binding.Version, Commit: binding.Commit, Digest: binding.Digest}
+				}
+				if missing {
+					agents.installed["claude"] = nil
+				}
+				same := unchanged(t, s.ConfigPath, s.statePath())
+				result, err := updateDemo(s, seen)
+				if scenario != "matching approval" {
+					if err != ErrSourceMoved || len(agents.commands) != 0 {
+						t.Fatalf("unapproved source: %v, commands %q", err, agents.commands)
+					}
+					same()
+					return
+				}
+				if err != nil || len(result.Results) != 1 || result.Results[0].Status != "installed" {
+					t.Fatalf("approved update: %+v %v", result, err)
+				}
+				installed := readState(t, s).packages["demo"].Bindings["claude"]
+				if installed.Digest != binding.Digest || installed.Version != binding.Version || !s.ownedSnapshot(installed, "claude") {
+					t.Fatalf("update lost approved source: %+v", installed)
+				}
+			})
+		}
 	}
 }
 
@@ -1030,7 +1090,9 @@ func TestPluginUpdateAllValidationAndPartialFailureIsolation(t *testing.T) {
 	bumpDemo(t, sourceA, agents)
 	writeFile(t, sourceB, ".claude-plugin/plugin.json", `{"name":"other","version":"2.0.0","skills":"./skills"}`)
 	writeFile(t, sourceB, "skills/other/SKILL.md", "---\nname: other\n---\nother v2")
+	same := unchanged(t, s.ConfigPath)
 	applyPluginRequest(t, s, Request{Action: "update", All: true})
+	same()
 	cfg, err := s.load()
 	if err != nil {
 		t.Fatal(err)
@@ -1046,6 +1108,7 @@ func TestPluginUpdateAllValidationAndPartialFailureIsolation(t *testing.T) {
 	writeFile(t, sourceB, ".claude-plugin/plugin.json", `{"name":"other","version":"3.0.0","skills":"./skills"}`)
 	writeFile(t, sourceB, "skills/other/SKILL.md", "---\nname: other\n---\nother v3")
 
+	agents.version = "3.0.0"
 	var result *Result
 	var applyErr error
 	_ = s.WithDiscoveryCache(func() error {
@@ -1063,6 +1126,7 @@ func TestPluginUpdateAllValidationAndPartialFailureIsolation(t *testing.T) {
 	if applyErr == nil {
 		t.Fatalf("expected partial failure error from Apply when a source failed discovery, got nil (result=%+v)", result)
 	}
+	same()
 	cfg, err = s.load()
 	if err != nil {
 		t.Fatal(err)
@@ -1072,5 +1136,64 @@ func TestPluginUpdateAllValidationAndPartialFailureIsolation(t *testing.T) {
 	}
 	if cfg.packages["demo"].Bindings["claude"].Version != "2.0.0" || cfg.packages["demo"].Bindings["claude"].Pending != "" {
 		t.Fatalf("failed package binding should remain untouched at 2.0.0: %+v", cfg.packages["demo"])
+	}
+}
+
+func TestPluginUpdateAllOnSharedHostIsolatesMissingSource(t *testing.T) {
+	for _, existing := range []bool{false, true} {
+		t.Run(map[bool]string{false: "fresh", true: "replacement"}[existing], func(t *testing.T) {
+			var aCalls, bCalls []string
+			a := fakePiNpm(t, &aCalls)
+			broken, healthy := hostStatePiSource(t), t.TempDir()
+			writeFile(t, healthy, "package.json", `{"name":"other","version":"1.0.0","keywords":["pi-package"]}`)
+			writeFile(t, healthy, "extensions/other.ts", "export default () => {}")
+			applyPluginRequest(t, a, Request{Action: "add", Source: broken, Targets: []string{"pi"}})
+			applyPluginRequest(t, a, Request{Action: "add", Source: healthy, Targets: []string{"pi"}})
+			shared, _ := os.ReadFile(a.ConfigPath)
+			b := fakePiNpm(t, &bCalls)
+			writePluginFile(t, filepath.Dir(b.ConfigPath), filepath.Base(b.ConfigPath), string(shared))
+			oldID := ""
+			if existing {
+				applyPluginRequest(t, b, Request{Action: "sync"})
+				oldID = readState(t, b).state.Bindings["demo"]["pi"].Applied.Binding.ID
+				repairHost(t, a)
+				applyPluginRequest(t, a, Request{Action: "remove", Name: "demo", Targets: []string{"pi"}})
+				broken = hostStatePiSource(t)
+				applyPluginRequest(t, a, Request{Action: "add", Name: "demo", Source: broken, Targets: []string{"pi"}})
+				shared, _ = os.ReadFile(a.ConfigPath)
+				writePluginFile(t, filepath.Dir(b.ConfigPath), filepath.Base(b.ConfigPath), string(shared))
+				repairHost(t, b)
+			}
+			writeFile(t, healthy, "package.json", `{"name":"other","version":"2.0.0","keywords":["pi-package"]}`)
+			if err := os.RemoveAll(broken); err != nil {
+				t.Fatal(err)
+			}
+			same := unchanged(t, b.ConfigPath)
+			_ = b.WithDiscoveryCache(func() error {
+				request := Request{Action: "update", All: true}
+				plan, err := b.Preview(context.Background(), request)
+				if err != nil || plan.Blocked {
+					t.Fatalf("shared host --all did not isolate missing source: %+v %v", plan, err)
+				}
+				result, err := b.Apply(context.Background(), request, plan.Revision)
+				if err == nil || result == nil {
+					t.Fatalf("missing source did not report partial failure: %+v %v", result, err)
+				}
+				return nil
+			})
+			d := readState(t, b)
+			if d.packages["other"].Bindings["pi"].ID == "" || d.packages["other"].Bindings["pi"].Version != "2.0.0" {
+				t.Fatalf("shared host --all skipped healthy source: %+v", d.packages)
+			}
+			local := d.state.Bindings["demo"]["pi"]
+			if existing {
+				if local.Applied == nil || local.Applied.Binding.ID != oldID || local.Pending != nil || !slices.ContainsFunc(b.host(context.Background(), "pi").Installed, func(i Installed) bool { return i.ID == oldID }) {
+					t.Fatalf("failed replacement changed the previous native installation: %+v", local)
+				}
+			} else if len(d.state.Bindings["demo"]) != 0 {
+				t.Fatalf("missing source acquired a receipt: %+v", local)
+			}
+			same()
+		})
 	}
 }

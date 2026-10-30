@@ -185,19 +185,15 @@ Skillshare 把凭据保存为 `fromEnv` 引用，从不保存实际的值。请�
 
 ### Plugins {#plugins}
 
-Plugin 定义不会通过 git 传递。请在每台机器上从相同的来源重新添加：
+共享配置的 `plugins:` 区段可保存 version 2 的来源、ref 与目标选择。StateDir 应保留在每台机器上。如果单独管理各机器的配置，也可从 **Plugins → Share** 复制 add 命令。
 
-1. 在第一台机器的 dashboard 打开 **Plugins → Share**，复制命令。它会列出从 HTTPS Git 来源添加的 plugins，例如：
+在新机器上运行 `skillshare plugin sync`，检查来源并使用本机 snapshot 路径安装。检查与 commit 固定是各机器独立的；分支 ref 在安装或更新时解析，非交互 sync 可能安装比另一台机器检查时更新的 commit。若需要相同版本，请将 `source_ref` 设为 commit SHA。本地来源路径必须在每台机器上存在。
 
-   ```bash
-   skillshare plugin add https://github.com/acme/plugins --plugin review -g --no-tui
-   ```
+native-only 声明显示**此机器需要导入**，sync 会跳过。请在每台机器的原生客户端中安装后，再运行 `skillshare plugin import LOCAL-ID --from TARGET --name NAME`。导入已有来源声明只保存本机安装记录，其他机器的来源配置与安装保持不变。
 
-2. 在另一台机器运行该命令，在 Plugins 页面勾选 Agents，然后运行 `skillshare sync plugins`。
+**首次 v2 编辑前，请升级所有写入端，并在共享 YAML 仍为旧格式时，于每台机器运行 `skillshare plugin list`。** 这会保存该机器的本地迁移信息。参阅 [plugin 状态与迁移](/docs/reference/commands/plugin#host-state)。
 
-需要在多台机器上使用的 plugin，请用 **Add plugin** 从来源添加，而不是 **Import installed**。Import 只记录 native 安装。在另一台机器上，Claude 和 Codex 会从同名的 native marketplace 重新安装；如果那台机器没有注册该 marketplace，这个 plugin 就会被跳过。Cursor 和 Antigravity 则完全无法重新安装 imported plugin。从本地目录添加的 plugin 不会出现在 **Share** 中，因为该路径只存在于第一台机器上。
-
-`sync plugins` 会安装缺少的 plugins，已安装的保持不变。要更新它们，先运行 `skillshare plugin check`，再运行 `skillshare plugin update`。请参阅 [跨工具管理 plugins](/docs/how-to/daily-tasks/sharing-plugins#updates-and-recovery)。
+`sync` 会安装缺少的 plugin、协调已更改的 ref，并重试本机清理。对未更改的 ref，使用 `skillshare plugin check` 和 `skillshare plugin update` 检查及更新新版本。
 
 ### Hooks {#hooks}
 

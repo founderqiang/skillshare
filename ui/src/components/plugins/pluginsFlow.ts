@@ -3,6 +3,7 @@ import { bindingVersion, byPlugin, pluginsApi, syncAction, targetMap } from '../
 import type { PluginInventory, PluginOutcome, PluginPlan, PluginRequest, PluginResult, PluginTarget, PluginUpdate, PluginUpdateEvent } from '../../api/plugins';
 import type { useT } from '../../i18n';
 import { keyedMessage } from './outcomeText';
+import { pluginErrorMessage } from './pluginError';
 
 type T = ReturnType<typeof useT>;
 type Updates = Record<string, Record<PluginTarget, PluginUpdate>>;
@@ -18,6 +19,19 @@ export interface BatchItem extends UpdatePick {
   failed?: PluginTarget[];
   /** The source moved past what the check showed: nothing was applied, and only a new check can show what it would bring. */
   stale?: boolean;
+}
+
+/** Existing declarations awaiting a local binding in this target. */
+export function importPackageNames(inventory: PluginInventory | undefined, target: string) {
+  return Object.entries(inventory?.packages ?? {}).filter(([, p]) => {
+    const b = p.bindings[target];
+    return b && !b.id && !b.cleanup;
+  }).map(([name]) => name).sort();
+}
+
+export function importRequest(from: string, plugin: string, selected?: string): PluginRequest {
+  const name = selected ?? '';
+  return { action: 'import', from, plugin, ...(name ? { name } : {}) };
 }
 
 /** What is still to update after the last check: the Agents it found behind that are still bound, still ticked, and can be updated from here, per plugin. */
@@ -40,7 +54,7 @@ const blockedText = (t: T, plan: PluginPlan) => plan.changes.filter((c) => c.act
 /** What a check found to update, per plugin and Agent (version '' when the source changed without a new one). */
 export function updatesFound(plan: PluginPlan) {
   const found: Updates = {};
-  for (const c of plan.changes) if (c.action === 'update-available') (found[c.name] ??= {})[c.target] = { version: c.binding?.version ?? '', commit: c.binding?.commit, digest: c.binding?.digest };
+  for (const c of plan.changes) if (c.action === 'update-available') (found[c.name] ??= {})[c.target] = { version: c.binding?.version ?? '', commit: c.binding?.commit, digest: c.binding?.digest, id: c.binding?.id, source: c.binding?.source, sourceRef: c.binding?.sourceRef, plugin: c.binding?.plugin, entry: c.binding?.entry };
   return found;
 }
 
@@ -49,14 +63,21 @@ export function updatesFound(plan: PluginPlan) {
  * failed, was skipped, or never ran because the apply stopped first keeps its Update action.
  */
 export function updatesLeft(updates: Updates, plan: PluginPlan, response: PluginResult) {
-  const done = new Set((response.result?.results ?? []).filter((r) => r.status !== 'failed' && r.status !== 'skipped').map((r) => `${r.name}:${r.target}`));
   const next = { ...updates };
   for (const c of plan.changes) {
-    if ((c.action !== 'update' && c.action !== 'noop') || !done.has(`${c.name}:${c.target}`) || !next[c.name]) continue;
+    if (!completedUpdate(c, plan, response) || !next[c.name]) continue;
     next[c.name] = { ...next[c.name] };
     delete next[c.name][c.target];
   }
   return next;
+}
+
+function completedUpdate(c: PluginPlan['changes'][number], plan: PluginPlan, response: PluginResult) {
+  const operations = plan.changes.filter((p) => p.name === c.name && p.target === c.target);
+  const outcomes = (response.result?.results ?? []).filter((r) => r.name === c.name && r.target === c.target);
+  return c === operations.at(-1) && ['update', 'install', 'noop'].includes(c.action)
+    && outcomes.length === operations.length
+    && outcomes.at(-1)?.status === (c.action === 'noop' ? 'unchanged' : 'installed');
 }
 
 /** What Sync would do: every binding whose tick differs from what its Agent has. */
@@ -106,14 +127,14 @@ export function installedVersion(inventory: PluginInventory | undefined, name: s
 export function reviewChanges(plan: PluginPlan | undefined, inventory?: PluginInventory) {
   const changes = plan?.changes ?? [];
   return {
-    active: changes.filter((c) => c.action !== 'noop'),
-    idle: changes.filter((c) => c.action === 'noop').map((c) => ({ name: c.name, target: c.target, version: c.binding?.version ?? installedVersion(inventory, c.name, c.target) })),
+    active: changes.filter((c) => c.action !== 'noop' || c.guidance),
+    idle: changes.filter((c) => c.action === 'noop' && !c.guidance).map((c) => ({ name: c.name, target: c.target, version: c.binding?.version ?? installedVersion(inventory, c.name, c.target) })),
   };
 }
 
 /** What the last run changed, failures first; Agents that ended the same way share a row. */
 export function changedRuns(t: T, outcomes: PluginOutcome[]) {
-  return byPlugin(outcomes.filter((r) => r.status !== 'unchanged').map((r) => ({ ...r, note: r.message ? keyedMessage(t, r) : '' })), (r) => `${r.status}\0${r.note}`)
+  return byPlugin(outcomes.filter((r) => r.status !== 'unchanged' || r.guidance).map((r) => ({ ...r, note: r.message ? keyedMessage(t, r) : '' })), (r) => `${r.status}\0${r.note}`)
     .sort((a, b) => Number(b.status === 'failed') - Number(a.status === 'failed'));
 }
 
@@ -177,15 +198,15 @@ export function usePluginsFlow({ t, inventory, refresh, onPreviewed }: {
       const failedTargets = results.filter((r) => r.status === 'failed').map((r) => r.target);
       const skipped = results.filter((r) => r.status === 'skipped');
       if (failed) set(e.name, { status: 'failed', note: failed, failed: failedTargets.length ? failedTargets : targets });
-      else if (skipped.length) set(e.name, { status: 'skipped', note: skipped.filter((r) => r.message).map((r) => keyedMessage(t, r)).join(' ') || undefined, failed: skipped.map((r) => r.target) });
-      else set(e.name, { status: 'done', note: undefined, failed: undefined });
+      else if (skipped.length) set(e.name, { status: 'skipped', note: skipped.map((r) => keyedMessage(t, r)).join(' ') || undefined, failed: skipped.map((r) => r.target) });
+      else set(e.name, { status: 'done', note: results.filter((r) => r.guidance).map((r) => keyedMessage(t, r)).join(' ') || undefined, failed: undefined });
     };
     let broken = '';
     try {
       await pluginsApi.update(picks.map((p) => ({ ...p, seen: updates[p.name] })), (e) => {
         if (e.event === 'start') set(e.name, { status: 'running' });
         // What the Agent is about to do (an npm install, say) shows while it runs.
-        else if (e.event === 'plan') set(e.name, { note: e.plan.changes.filter((c) => c.message).map((c) => keyedMessage(t, c)).join(' ') || undefined });
+        else if (e.event === 'plan') set(e.name, { note: e.plan.changes.filter((c) => c.action !== 'noop' || c.guidance).map((c) => keyedMessage(t, c)).join(' ') || undefined });
         else if (e.event === 'result') finish(e);
         else if (e.failure) setFailure(e.failure);
       });
@@ -205,7 +226,7 @@ export function usePluginsFlow({ t, inventory, refresh, onPreviewed }: {
       const plan = await pluginsApi.preview(request);
       setReview({ request, plan }); onPreviewed();
     }
-    catch (e) { setFailure((e as Error).message); throw e; }
+    catch (e) { setFailure(pluginErrorMessage(e, t)); throw e; }
     finally { setBusy(false); setWorking(''); }
   };
   const begin = (request: PluginRequest, key = '') => { void preview(request, key).catch(() => {}); };
@@ -249,7 +270,7 @@ export function usePluginsFlow({ t, inventory, refresh, onPreviewed }: {
         results.push(...(response.result?.results ?? []));
         const failed = failureText(t, response);
         if (failed) failures.push(failed);
-      } catch (e) { failures.push(`${request.plugin}: ${(e as Error).message}`); }
+      } catch (e) { failures.push(`${request.plugin}: ${pluginErrorMessage(e, t)}`); }
     }
     setResult({ result: { results }, failure: failures.join(' ') }); setFailure(failures.join(' '));
     setBusy(false); setWorking(''); refresh();

@@ -18,11 +18,52 @@ function mount(path = '/plugins', client = new QueryClient({ defaultOptions: { q
 describe('PluginsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // jsdom has no scrolling API; Select scrolls its focused option in browsers.
+    HTMLElement.prototype.scrollIntoView = vi.fn();
     synced.targets = [{ name: 'pi' }];
     vi.mocked(pluginsApi.list).mockResolvedValue({ targetDefinitions: [{target:'codex',label:'Codex',project:false,operations:['add','sync','import']}], packages: { demo: { bindings: { codex: { id: 'demo@market' } } } }, hosts: [{ target: 'codex', version: '0.154', status: 'ready', installed: [{ id: 'demo@market', enabled: false }] }] });
+    vi.mocked(pluginsApi.discover).mockResolvedValue({ source: 'owner/repo', digest: 'fixture', candidates: [] });
     vi.mocked(pluginsApi.preview).mockResolvedValue({ revision: 'reviewed', blocked: false, changes: [{ name: 'demo', target: 'codex', id: 'demo@market', action: 'selection' }] });
     vi.mocked(pluginsApi.apply).mockResolvedValue({ result: { results: [] }, failure: '' });
     vi.mocked(pluginsApi.update).mockImplementation(async (_items, on) => { on({ event: 'done', failure: '' }); });
+  });
+  it('shows full-inventory ref work in the row and Sync rail, then refreshes after Sync', async () => {
+    let resolveFull!: (value: PluginInventory) => void;
+    let synced = false;
+    const initial: PluginInventory = { packages: { demo: { bindings: { pi: { id: '/local/old', source: 'owner/repo' } } } }, hosts: [], targetDefinitions: [{ target: 'pi', label: 'Pi', project: true, operations: ['sync'] }] };
+    const inventory = (): PluginInventory => ({ ...initial, packages: { demo: { bindings: { pi: { ...initial.packages.demo.bindings.pi!, refChanged: !synced } } } }, hosts: [{ target: 'pi', version: '1', status: 'ready', installed: [{ id: '/local/old', enabled: true }] }] });
+    const full = new Promise<PluginInventory>((resolve) => { resolveFull = resolve; });
+    vi.mocked(pluginsApi.list).mockImplementation((agents) => agents === false ? Promise.resolve(initial) : synced ? Promise.resolve(inventory()) : full);
+    vi.mocked(pluginsApi.preview).mockResolvedValue({ revision: 'ref-review', blocked: false, changes: [{ name: 'demo', target: 'pi', id: '/local/old', action: 'update' }] });
+    vi.mocked(pluginsApi.apply).mockImplementation(async () => { synced = true; return { result: { results: [] }, failure: '' }; });
+    mount();
+    await screen.findByText('demo');
+    expect(screen.queryByText('plugins.pending')).not.toBeInTheDocument();
+    resolveFull(inventory());
+    expect(await screen.findByText('plugins.pending')).toBeInTheDocument();
+    expect(screen.getByText('update')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'plugins.sync' }));
+    const dialog = await screen.findByRole('dialog', { name: 'plugins.preview' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'plugins.apply' }));
+    await waitFor(() => expect(screen.queryByText('plugins.pending')).not.toBeInTheDocument());
+    expect(pluginsApi.apply).toHaveBeenCalledWith({ action: 'sync' }, 'ref-review');
+    expect(await screen.findByText('targets.state.synced')).toBeInTheDocument();
+  });
+  it('imports into the explicitly selected declaration that needs a local binding', async () => {
+    vi.mocked(pluginsApi.list).mockResolvedValue({
+      packages: { bar: { bindings: { pi: { id: '', imported: true } } } },
+      targetDefinitions: [{ target: 'pi', label: 'Pi', project: true, operations: ['import'] }],
+      hosts: [{ target: 'pi', version: '1', status: 'ready', installed: [{ id: 'npm:foo', enabled: true }] }],
+    });
+    mount();
+    fireEvent.click((await screen.findAllByRole('button', { name: 'plugins.import' }))[0]);
+    const selection = await screen.findByRole('combobox', { name: 'resources.col.name' });
+    expect(selection).toHaveTextContent('npm:foo');
+    fireEvent.click(selection);
+    fireEvent.mouseDown(await screen.findByRole('option', { name: 'bar' }));
+    expect(selection).toHaveTextContent('bar');
+    fireEvent.click(await screen.findByRole('button', { name: 'plugins.importOne' }));
+    await waitFor(() => expect(pluginsApi.preview).toHaveBeenCalledWith({ action: 'import', from: 'pi', plugin: 'npm:foo', name: 'bar' }));
   });
   it('adds an imported registration to the managed count only after the reviewed import', async () => {
     let imported = false;
@@ -114,8 +155,8 @@ describe('PluginsPage', () => {
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'plugins.updateDialog.updateSelected.other' }));
     await waitFor(() => expect(pluginsApi.update).toHaveBeenCalledTimes(1));
     expect(vi.mocked(pluginsApi.update).mock.calls[0][0]).toEqual([
-      { name: 'driver', targets: ['pi'], seen: { pi: { version: '1.1.0' } } },
-      { name: 'tail', targets: ['pi', 'codex'], seen: { pi: { version: '2.1.0' }, codex: { version: '2.1.0' } } },
+      { name: 'driver', targets: ['pi'], seen: { pi: { id: 'npm:driver', version: '1.1.0' } } },
+      { name: 'tail', targets: ['pi', 'codex'], seen: { pi: { id: 'npm:tail', version: '2.1.0' }, codex: { id: 'tail@market', version: '2.1.0' } } },
     ]);
   });
   it('leaves out a plugin unticked and an Agent unticked under its plugin', async () => {

@@ -40,6 +40,7 @@ target 会保存该选择。下一次 `sync plugins` 会移除其受管理的安
 | `discover SOURCE` | Inspect a local directory, `owner/repo`, or HTTPS Git repository |
 | `add [SOURCE]` | Choose and install a whole plugin with its target adapter, or an `npm:` package through Pi |
 | `import [NATIVE-ID]` | Adopt an existing installation without reinstalling or enabling it |
+| `unimport NAME` | 卸载明确指定目标的本机导入安装，保留共享来源声明 |
 | `inspect NAME` | Inspect one managed package |
 | `sync [NAME]` | Reconcile selected targets and retry incomplete native operations |
 | `check [NAME]` | 比对 source 内容与记录的 digest，或 Pi npm 包版本与 npm 最新版；绝不更新 |
@@ -256,7 +257,7 @@ OpenCode 必须在 PATH 上，以便 Skillshare 能够选择对应版本的 sche
 
 全局 npm 注册没有 managed cache 时显示 Unknown／只读，不代表尚未安装；Pi 可能使用 Skillshare 不探查的 legacy global npm/pnpm 路径。
 
-Import 接受普通 Pi source，以及Pi 0.99.2 及以上来源与选项格式受支持的 filtered object。预览只显示保留的字段名称，不显示 opaque 值。导入不修改原生设置或已安装文件；原始条目保存在 Skillshare 私有状态，共享配置仅存 digest。sync/update 保留当前条目；卸载前保存最新选项，重新安装时先恢复 object，避免暂时按默认规则启用其他资源。同一次 Apply 批量恢复时，只接受此次操作自己写出的精确内容；其他设置变动仍会阻止后续恢复。这些 bindings 必须保留私有状态：记录丢失、被修改或属于其他 target 时拒绝恢复。Windows 的新注册目录以受保护的 owner/SYSTEM ACL 创建。现有目录与记录若允许当前用户及特权 SYSTEM/Administrators 之外的主体访问，或无法验证 ACL，便拒绝导入或恢复。不会修改现有 ACL；请保留记录，由所有者修复访问保护后再重试。不确定的来源或优先级、不支持的编码，以及 Pi 会规范化的本地引用仍为只读。普通 OpenCode 条目可导入，filtered OpenCode 条目仍拒绝。超过 Pi 10 秒过期阈值的空锁目录，只有 inode 与 mtime 未变动时才能回收；新锁、更新或被替换的锁、非空目录、文件与 symlink 一律保留。过期不代表持有者已终止，最后检查与移除不是原子 CAS。已导入的 Pi package 在全局模式下用 `pi update SOURCE` 更新，并保留其设置条目；project 中的则要在 Pi 里更新，因为 `pi update` 也会影响全局 package。已导入的 OpenCode v1 packages 会在其原生工具中更新。
+Import 接受普通 Pi source，以及Pi 0.99.2 及以上来源与选项格式受支持的 filtered object。预览只显示保留的字段名称，不显示 opaque 值。导入不修改原生设置或已安装文件；原始条目保存在 Skillshare 私有状态，本机安装记录仅存 digest。sync/update 保留当前条目；卸载前保存最新选项，重新安装时先恢复 object，避免暂时按默认规则启用其他资源。同一次 Apply 批量恢复时，只接受此次操作自己写出的精确内容；其他设置变动仍会阻止后续恢复。这些 bindings 必须保留私有状态：记录丢失、被修改或属于其他 target 时拒绝恢复。Windows 的新注册目录以受保护的 owner/SYSTEM ACL 创建。现有目录与记录若允许当前用户及特权 SYSTEM/Administrators 之外的主体访问，或无法验证 ACL，便拒绝导入或恢复。不会修改现有 ACL；请保留记录，由所有者修复访问保护后再重试。不确定的来源或优先级、不支持的编码，以及 Pi 会规范化的本地引用仍为只读。普通 OpenCode 条目可导入，filtered OpenCode 条目仍拒绝。超过 Pi 10 秒过期阈值的空锁目录，只有 inode 与 mtime 未变动时才能回收；新锁、更新或被替换的锁、非空目录、文件与 symlink 一律保留。过期不代表持有者已终止，最后检查与移除不是原子 CAS。已导入的 Pi package 在全局模式下用 `pi update SOURCE` 更新，并保留其设置条目；project 中的则要在 Pi 里更新，因为 `pi update` 也会影响全局 package。已导入的 OpenCode v1 packages 会在其原生工具中更新。
 OpenCode v2 的全局导入可以使用其原生的更新命令；project 导入则必须原生更新，
 因为 v2 的更新命令是全局的。
 
@@ -280,7 +281,7 @@ skillshare plugin add ./package --entry dist/plugin.js --target opencode --no-tu
 skillshare plugin update review --source-ref v1.1.0 --target claude --dry-run --json
 ```
 
-Bindings 会记录 `source_ref` 和解析出的 `commit`。安装使用的是已审阅的 commit；`check` 和 `update`
+共享绑定记录 `source_ref`；解析出的 `commit` 保存在本机记录。安装使用的是已审阅的 commit；`check` 和 `update`
 会重新解析配置的 ref，因此分支可以继续推进，而 commit 则保持锁定。`--revision` 是一个预览
 token，而不是 Git ref。`--entry` 是相对于每个候选 package root 的路径，且必须已存在；
 它不会触发构建或 package manager 安装。
@@ -318,8 +319,7 @@ Skillshare 从不提供原生信任的批准 flags。
   被跳过的更新会保留为待处理，留给之后的 sync。
 - 已导入的 plugins 保留其原始的 marketplace 身份。`check` 无法为没有 source 的
   已导入 plugin 推断发布可用性，但 Pi 的 npm 包会向 npm 检查。若已导入的 Claude 或 Codex plugin 的原生
-  marketplace 已经不在，sync 和 update 会跳过该 target 并说明原因。在从未添加该 marketplace 的另一台
-  机器上也会出现同样的情况。请在 Agent
+  marketplace 已经不在，sync 和 update 会跳过该 target 并说明原因。新机器即使有同名 marketplace，仍需要明确在本机导入。请在 Agent
   中恢复该 marketplace，或移除该 target 后从 source 重新添加 plugin；Skillshare
   不会自行把已导入的 plugin 改到其他 source。
 - Skillshare 为每个受管理的 Claude/Codex plugin 注册一个 marketplace，命名为
@@ -349,3 +349,46 @@ capabilities 和清单 schemas 会在运行时检查；不受支持的操作会�
 - [Pi packages](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md)
 - [OpenCode v1 plugins](https://opencode.ai/docs/plugins/)
 - [OpenCode v2 plugins](https://opencode.ai/v2/docs/plugins)
+
+## 共享声明与本机安装 {#host-state}
+
+`plugins.version: 2` 在全局／项目配置中保存 source、ref、plugin、entry、各目标的来源与 `sync` 选择，或 `imported: true`。目标来源会明确记录，因此修改软件包默认值不会切换其他目标的发行内容。
+
+```yaml
+plugins:
+  version: 2
+  packages:
+    router:
+      source: https://github.com/acme/router.git
+      plugin: router
+      bindings:
+        pi: {source: https://github.com/acme/router.git, plugin: router}
+        omp: {imported: true}
+```
+
+原生 ID、已检查的 commit/digest/version、Pi 注册引用与待处理操作保存在 `<StateDir>/plugins/<config-path-hash>/state.json`（本机格式 version 1）。StateDir 必须保留在各机器本地。状态以配置文件的**绝对路径**区分：移动或重命名项目／配置文件会建立新的状态空间，不会自动跟踪或清理原有安装。请先通过原配置位置移除安装，或在新位置明确管理／导入。
+
+sync、普通 update、验证、失败与重试不会改写共享声明。`update --source-ref` 仅在 ref 改变时更新声明。读取会在本地操作锁下保存旧格式证据，不修改共享 YAML。锁被其他操作持有时，会将保存延后至该操作或下次读取。add、import、选择与 remove 会保存必要的声明变更并检查外部修改；这不会合并同时发生的 Syncthing 编辑。
+
+来源检查与 commit 固定是**各机器独立**的。分支 ref 在该机器安装或更新时解析，因此非交互 sync 可能安装比另一台机器检查时更新的 commit。ref 变更也会在本地解析。若所有机器必须使用相同版本，请将 `source_ref` 设为 commit SHA。本地来源路径也必须在各机器存在。
+
+native-only 目标显示“此机器需要导入”，sync 会跳过。请先在原生客户端安装，再执行 `plugin import LOCAL-ID --from TARGET --name NAME`。导入已有来源声明只记录本机安装，不改变其他机器的来源或安装。重新导入已验证来源的同一 ID 也会保留来源。明确的 Pi `add npm:PACKAGE` 会共享安装方式，并由 Pi 执行安装脚本；npm import 则建立 native-only 声明。
+
+导入不会获取远程来源。手动编写的远程来源配置若缺少 `plugin:`，请在导入前将 `plugin:` 设为原生软件包名称，以便离线验证其身份。`plugin add` 创建的配置已经记录该名称。本地目录来源可以在本机发现。
+
+旧格式读取与 sync 不改写 YAML，下次声明编辑才写入 version 2。**首次 v2 编辑前，请升级所有写入端，并在共享 YAML 仍为旧格式时，于每台机器执行 `skillshare plugin list`。** 即使原生客户端暂时不可用，也能保存迁移线索。采用旧 ID 需要原生环境清单；来源安装还需本机拥有的 snapshot 证据。不会执行其他主机的待处理操作。未验证线索与移除证据会保留到所有权确认及清理完成。旧 npm 无法区分 add/import，若需要共享安装方式，请明确重新 add。
+
+账户变更时，请先处理原本的原生环境，再进行清理。认证、原生配置与信任仍留在各工具中。
+
+重复导入不会改写共享意图。清理失败会保留可重试的本机记录，供下次 sync 使用。旧版可执行文件无法写入 v2，因为它们不认识版本化的声明字段。
+
+共享来源配置更改时，本机导入仍会保留。若要在本机切换到共享来源安装，请运行：
+
+```bash
+skillshare plugin unimport NAME --target TARGET --no-tui
+skillshare plugin sync NAME --no-tui
+```
+
+`unimport` 要求明确指定一个或多个 `--target`，且各目标必须已有本机导入记录和共享来源配置。它通过目标的卸载适配器移除本机导入的安装，然后清除本机记录。共享声明和其他机器的安装保持不变。下一次 sync 会从共享来源安装。
+
+卸载也会移除原生客户端中与该安装相关的配置或登录信息。
